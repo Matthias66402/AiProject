@@ -1,9 +1,13 @@
 import re
 
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, redirect, url_for
 from groq import Groq, APIStatusError
 from dotenv import load_dotenv
+from werkzeug.security import generate_password_hash
 import os
+
+import db
+from db import ROLES, DEFAULT_ROLE
 
 THINK_BLOCK_RE = re.compile(r"<think>.*?</think>\s*", re.DOTALL)
 
@@ -11,6 +15,7 @@ load_dotenv()
 
 app = Flask(__name__)
 client = Groq(api_key=os.environ["GROQ_API_KEY"])
+db.init_db()
 
 # Verfügbare Zauberer (KI-Modelle). Key = Groq-Modell-ID, Value = Anzeigename.
 # Weitere Modelle können hier einfach ergänzt werden.
@@ -58,9 +63,49 @@ def home():  # put application's code here
                 app.logger.warning("Groq API error %s: %s", e.status_code, e.body)
                 answer = f"🧙 {wizard_name}s Kristallkugel ist gerade getrübt. Bitte versuche es später noch einmal."
 
-        return render_template('index.html', answer=answer, models=AVAILABLE_MODELS, selected_model=selected_model)
+        return render_template('index.html', content_template='home.html', answer=answer, models=AVAILABLE_MODELS, selected_model=selected_model)
     else:
-        return render_template('index.html', models=AVAILABLE_MODELS, selected_model=DEFAULT_MODEL)
+        return render_template('index.html', content_template='home.html', models=AVAILABLE_MODELS, selected_model=DEFAULT_MODEL)
+
+@app.route('/users', methods=["GET", "POST"])
+def users():
+    if request.method == "POST":
+        first_name = request.form.get("first_name", "").strip()
+        last_name = request.form.get("last_name", "").strip()
+        short_name = request.form.get("short_name", "").strip()
+        email = request.form.get("email", "").strip()
+        password = request.form.get("password", "")
+        role = request.form.get("role", DEFAULT_ROLE)
+        if role not in ROLES:
+            role = DEFAULT_ROLE
+
+        if first_name and last_name and short_name and email and password:
+            db.create_user(first_name, last_name, short_name, email, generate_password_hash(password), role)
+
+        return redirect(url_for('users'))
+
+    return render_template('index.html', content_template='user.html', users=db.list_users(), editing_user=None, roles=ROLES)
+
+
+@app.route('/users/<int:user_id>/edit', methods=["GET", "POST"])
+def edit_user(user_id):
+    if request.method == "POST":
+        first_name = request.form.get("first_name", "").strip()
+        last_name = request.form.get("last_name", "").strip()
+        short_name = request.form.get("short_name", "").strip()
+        email = request.form.get("email", "").strip()
+        password = request.form.get("password", "")
+        role = request.form.get("role", DEFAULT_ROLE)
+        if role not in ROLES:
+            role = DEFAULT_ROLE
+        password_hash = generate_password_hash(password) if password else None
+
+        if first_name and last_name and short_name and email:
+            db.update_user(user_id, first_name, last_name, short_name, email, role, password_hash)
+
+        return redirect(url_for('users'))
+
+    return render_template('index.html', content_template='user.html', users=db.list_users(), editing_user=db.get_user(user_id), roles=ROLES)
 
 
 if __name__ == '__main__':
