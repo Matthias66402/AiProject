@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Merlins Orakel</title>
+    <style>
+        * { box-sizing: border-box; }
+
+        body {
+            min-height: 100vh;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            font-family: 'Georgia', 'Palatino Linotype', serif;
+            background:
+                radial-gradient(circle at 20% 20%, rgba(255, 215, 130, 0.08), transparent 40%),
+                radial-gradient(circle at 80% 70%, rgba(160, 100, 255, 0.12), transparent 45%),
+                linear-gradient(160deg, #1b0f33 0%, #2b1454 45%, #120826 100%);
+            color: #f1e9ff;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background-image:
+                radial-gradient(2px 2px at 10% 15%, #ffe9a8, transparent),
+                radial-gradient(2px 2px at 80% 25%, #ffffff, transparent),
+                radial-gradient(1.5px 1.5px at 55% 65%, #ffe9a8, transparent),
+                radial-gradient(2px 2px at 30% 80%, #ffffff, transparent),
+                radial-gradient(1.5px 1.5px at 90% 85%, #ffd76a, transparent),
+                radial-gradient(1.5px 1.5px at 65% 10%, #ffffff, transparent);
+            opacity: 0.7;
+            animation: twinkle 4s ease-in-out infinite alternate;
+            pointer-events: none;
+        }
+
+        @keyframes twinkle {
+            from { opacity: 0.35; }
+            to { opacity: 0.85; }
+        }
+
+        .scroll {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 560px;
+            background: linear-gradient(180deg, rgba(45, 22, 82, 0.85), rgba(24, 11, 46, 0.9));
+            border: 1px solid rgba(255, 215, 130, 0.35);
+            border-radius: 18px;
+            padding: 40px 36px;
+            box-shadow: 0 0 0 1px rgba(255, 215, 130, 0.08), 0 20px 60px rgba(0, 0, 0, 0.55), 0 0 80px rgba(147, 90, 255, 0.15);
+            backdrop-filter: blur(4px);
+        }
+
+        .wand-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            margin-bottom: 6px;
+        }
+
+        .wand {
+            font-size: 2.2rem;
+            transform: rotate(-35deg);
+            display: inline-block;
+            animation: sparkle-wand 3s ease-in-out infinite;
+            filter: drop-shadow(0 0 10px rgba(255, 215, 130, 0.7));
+        }
+
+        @keyframes sparkle-wand {
+            0%, 100% { transform: rotate(-35deg) translateY(0); }
+            50% { transform: rotate(-25deg) translateY(-4px); }
+        }
+
+        h1#greetings {
+            text-align: center;
+            font-size: 1.9rem;
+            margin: 0 0 4px;
+            color: #ffe9a8;
+            text-shadow: 0 0 18px rgba(255, 215, 130, 0.5);
+            letter-spacing: 0.5px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #c9b8f0;
+            font-size: 0.95rem;
+            margin: 0 0 30px;
+            font-style: italic;
+        }
+
+        form div {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        label {
+            color: #d9c9ff;
+            font-size: 0.85rem;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        input#name-input {
+            padding: 12px 16px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 215, 130, 0.4);
+            background: rgba(10, 4, 26, 0.55);
+            color: #f8f1ff;
+            font-family: inherit;
+            font-size: 1rem;
+            outline: none;
+            transition: box-shadow 0.2s ease, border-color 0.2s ease;
+        }
+
+        input#name-input::placeholder { color: #8a78b8; }
+
+        input#name-input:focus {
+            border-color: #ffd76a;
+            box-shadow: 0 0 0 3px rgba(255, 215, 130, 0.2);
+        }
+
+        select#wizard-select {
+            padding: 12px 16px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 215, 130, 0.4);
+            background: rgba(10, 4, 26, 0.55);
+            color: #f8f1ff;
+            font-family: inherit;
+            font-size: 1rem;
+            outline: none;
+            transition: box-shadow 0.2s ease, border-color 0.2s ease;
+        }
+
+        select#wizard-select::placeholder { color: #8a78b8; }
+
+        select#wizard-select:focus {
+            border-color: #ffd76a;
+            box-shadow: 0 0 0 3px rgba(255, 215, 130, 0.2);
+        }
+
+        #special-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #7b3fe4, #b06cff 50%, #ffd76a 150%);
+            border: none;
+            border-radius: 10px;
+            color: #1b0f33;
+            font-family: inherit;
+            font-size: 1rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            padding: 13px 30px;
+            cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+            box-shadow: 0 8px 20px rgba(123, 63, 228, 0.4);
+        }
+
+        #special-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 26px rgba(255, 215, 130, 0.35);
+        }
+
+        #special-btn:active { transform: translateY(0); }
+
+        #answer {
+            margin: 28px 0 0;
+            padding: 18px 20px;
+            border-radius: 12px;
+            background: rgba(10, 4, 26, 0.55);
+            border: 1px dashed rgba(255, 215, 130, 0.45);
+            color: #f1e9ff;
+            line-height: 1.6;
+            min-height: 20px;
+        }
+
+        #answer::before {
+            content: "🔮 ";
+        }
+    </style>
+</head>
+<body>
+    <div class="scroll">
+        <div class="wand-row">
+            <span class="wand">🪄</span>
+        </div>
+        <h1 id="greetings">Merlins Orakel</h1>
+        <p class="subtitle">Stelle deine Frage – der Zauberer wird antworten</p>
+        <form action="/" method="POST">
+            <div>
+                <label for="name-input">Deine Frage</label>
+                <input id="name-input" name="question" type="text" placeholder="Was möchtest du wissen?">
+            </div>
+            <div>
+                <label for="wizard-select">Welcher Zauberer?</label>
+                <select id="wizard-select" name="model">
+                    {% for model_id, model_label in models.items() %}
+                    <option value="{{ model_id }}" {% if model_id == selected_model %}selected{% endif %}>{{ model_label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button id="special-btn" type="submit">✨ Zauber wirken</button>
+        </form>
+        <p id="answer">{{ answer or "Merlin lauscht schweigend den Sternen und wartet auf deine Frage ..." }}</p>
+    </div>
+</body>
+</html>
