@@ -22,6 +22,13 @@ AVAILABLE_MODELS = {
 }
 DEFAULT_MODEL = "openai/gpt-oss-20b"
 
+AVAILABE_WIZARDS = {
+    "openai/gpt-oss-20b": "Merlin",
+    "openai/gpt-oss-120b": "Gandalf",
+    "qwen/qwen3.6-27b": "Rincewind",
+    "groq/compound-mini": "Radagast",
+}
+
 
 @app.route('/', methods=["GET", "POST"])
 def home():  # put application's code here
@@ -30,6 +37,8 @@ def home():  # put application's code here
         selected_model = request.form.get("model")
         if selected_model not in AVAILABLE_MODELS:
             selected_model = DEFAULT_MODEL
+
+        wizard_name = AVAILABE_WIZARDS.get(selected_model, "Der Zauberer")
 
         try:
             response = client.chat.completions.create(
@@ -44,10 +53,10 @@ def home():  # put application's code here
         except APIStatusError as e:
             if e.status_code == 429:
                 app.logger.warning("Groq 429 details: %s", e.body)
-                answer = "🧙 Merlin ist müde und hat für heute keine Zaubersprüche mehr übrig. Bitte versuche es morgen erneut."
+                answer = f"🧙 {wizard_name} ist müde und hat für heute keine Zaubersprüche mehr übrig. Bitte versuche es morgen erneut."
             else:
                 app.logger.warning("Groq API error %s: %s", e.status_code, e.body)
-                answer = "🧙 Merlins Kristallkugel ist gerade getrübt. Bitte versuche es später noch einmal."
+                answer = f"🧙 {wizard_name}s Kristallkugel ist gerade getrübt. Bitte versuche es später noch einmal."
 
         return render_template('index.html', answer=answer, models=AVAILABLE_MODELS, selected_model=selected_model)
     else:
