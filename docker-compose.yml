@@ -16,5 +16,22 @@ services:
       timeout: 5s
       retries: 10
 
+  app:
+    build: .
+    container_name: aiproject_app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Innerhalb des Docker-Netzwerks wird mysql über den Servicenamen und den
+      # internen Port erreicht, nicht über den nach außen gemappten ${DB_PORT}.
+      DB_HOST: mysql
+      DB_PORT: 3306
+    ports:
+      - "5003:5003"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
 volumes:
   aiproject_mysql_data:
