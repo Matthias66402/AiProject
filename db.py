@@ -74,6 +74,16 @@ def get_user(user_id):
         conn.close()
 
 
+def get_user_by_email(email):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM users WHERE email = %s", (email,))
+            return cur.fetchone()
+    finally:
+        conn.close()
+
+
 def create_user(first_name, last_name, short_name, email, password_hash, role=DEFAULT_ROLE):
     conn = get_connection()
     try:

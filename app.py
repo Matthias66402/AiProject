@@ -1,9 +1,9 @@
 import re
 
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, session
 from groq import Groq, APIStatusError
 from dotenv import load_dotenv
-from werkzeug.security import generate_password_hash
+from werkzeug.security import generate_password_hash, check_password_hash
 import os
 
 import db
@@ -14,8 +14,27 @@ THINK_BLOCK_RE = re.compile(r"<think>.*?</think>\s*", re.DOTALL)
 load_dotenv()
 
 app = Flask(__name__)
+app.secret_key = os.environ["SECRET_KEY"]
 client = Groq(api_key=os.environ["GROQ_API_KEY"])
 db.init_db()
+
+
+@app.context_processor
+def inject_current_user():
+    user_id = session.get("user_id")
+    if not user_id:
+        return {"current_user": None}
+    return {"current_user": {
+        "id": user_id,
+        "short_name": session.get("user_short_name"),
+        "role": session.get("user_role"),
+    }}
+
+
+def _log_in_user(user):
+    session["user_id"] = user["id"]
+    session["user_short_name"] = user["short_name"]
+    session["user_role"] = user["role"]
 
 # Verfügbare Zauberer (KI-Modelle). Key = Groq-Modell-ID, Value = Anzeigename.
 # Weitere Modelle können hier einfach ergänzt werden.
@@ -71,6 +90,52 @@ def home():  # put application's code here
         return render_template('index.html', content_template='home.html', answer=answer, models=AVAILABLE_MODELS, selected_model=selected_model)
     else:
         return render_template('index.html', content_template='home.html', models=AVAILABLE_MODELS, selected_model=DEFAULT_MODEL)
+
+@app.route('/login', methods=["GET", "POST"])
+def login():
+    error = None
+    if request.method == "POST":
+        email = request.form.get("email", "").strip()
+        password = request.form.get("password", "")
+        user = db.get_user_by_email(email)
+        if user and check_password_hash(user["password_hash"], password):
+            _log_in_user(user)
+            return redirect(url_for('home'))
+        error = "E-Mail oder Passwort ist falsch."
+
+    return render_template('index.html', content_template='login.html', error=error)
+
+
+@app.route('/register', methods=["GET", "POST"])
+def register():
+    error = None
+    if request.method == "POST":
+        first_name = request.form.get("first_name", "").strip()
+        last_name = request.form.get("last_name", "").strip()
+        short_name = request.form.get("short_name", "").strip()
+        email = request.form.get("email", "").strip()
+        password = request.form.get("password", "")
+        password_confirm = request.form.get("password_confirm", "")
+
+        if not (first_name and last_name and short_name and email and password):
+            error = "Bitte alle Felder ausfüllen."
+        elif password != password_confirm:
+            error = "Die Passwörter stimmen nicht überein."
+        elif db.get_user_by_email(email):
+            error = "Diese E-Mail-Adresse ist bereits registriert."
+        else:
+            db.create_user(first_name, last_name, short_name, email, generate_password_hash(password), DEFAULT_ROLE)
+            _log_in_user(db.get_user_by_email(email))
+            return redirect(url_for('home'))
+
+    return render_template('index.html', content_template='register.html', error=error)
+
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('home'))
+
 
 @app.route('/users', methods=["GET", "POST"])
 def users():

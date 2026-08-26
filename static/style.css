@@ -73,6 +73,24 @@ nav a.active {
     text-shadow: 0 0 12px rgba(255, 215, 130, 0.6);
 }
 
+nav summary {
+    list-style: none;
+}
+
+nav summary::-webkit-details-marker,
+nav summary::marker {
+    display: none;
+}
+
+.form-error {
+    color: #ffb4b4;
+    background: rgba(180, 40, 40, 0.25);
+    border: 1px solid rgba(255, 120, 120, 0.5);
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-bottom: 16px;
+}
+
 .scroll {
     position: relative;
     z-index: 1;
