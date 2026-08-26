@@ -20,18 +20,18 @@ db.init_db()
 # Verfügbare Zauberer (KI-Modelle). Key = Groq-Modell-ID, Value = Anzeigename.
 # Weitere Modelle können hier einfach ergänzt werden.
 AVAILABLE_MODELS = {
-    "openai/gpt-oss-20b": "Merlin (Standard, schnell)",
-    "openai/gpt-oss-120b": "Gandalf (groß & mächtig)",
-    "qwen/qwen3.6-27b": "Rincewind (kompakt & clever)",
-    "groq/compound-mini": "Radagast (agentisch, mit Websuche)",
+    "openai/gpt-oss-20b": "Openai - gpt-oss-20b (Standard, schnell)",
+    "openai/gpt-oss-120b": "Openai - gpt-oss-120b (groß & mächtig)",
+    "qwen/qwen3.6-27b": "Qwen - qwen3.6-27b (kompakt & clever)",
+    "groq/compound-mini": "Groq - compound-mini (agentisch, mit Websuche)",
 }
 DEFAULT_MODEL = "openai/gpt-oss-20b"
 
 AVAILABE_WIZARDS = {
-    "openai/gpt-oss-20b": "Merlin",
-    "openai/gpt-oss-120b": "Gandalf",
-    "qwen/qwen3.6-27b": "Rincewind",
-    "groq/compound-mini": "Radagast",
+    "openai/gpt-oss-20b": "Openai - Standard",
+    "openai/gpt-oss-120b": "Openai - Mächtig",
+    "qwen/qwen3.6-27b": "Qwen - Kompakt",
+    "groq/compound-mini": "Groq - agentisch",
 }
 
 
@@ -43,14 +43,19 @@ def home():  # put application's code here
         if selected_model not in AVAILABLE_MODELS:
             selected_model = DEFAULT_MODEL
 
-        wizard_name = AVAILABE_WIZARDS.get(selected_model, "Der Zauberer")
+        wizard_name = AVAILABE_WIZARDS.get(selected_model, "KI-Modelle")
 
         try:
             response = client.chat.completions.create(
                 model=selected_model,
+                # messages=[
+                #     {"role": "user", "content": "Bitte gib eine originelle, nicht zu lange, falsche Antwort auf folgende Frage: " + question}
+                # ],
                 messages=[
-                    {"role": "user", "content": "Bitte gib eine originelle, nicht zu lange, falsche Antwort auf folgende Frage: " + question}
-                ],
+                    {"role": "system", "content": "Du bist ein Assistent, der bei allgemeinen Fragen zur Website, Stellenbewerbung und Stellenveröffentlichung. Für Fragen zum Verorten der Routen bitte die Routen von app.py bzw. von templates/navigation.html berücksichtigen - nichts dazu erfinden. Bitte kurz und knapp antworten ohne Hintergrundinformation zur genauen Route."},
+                    {"role": "user",
+                     "content": question}
+                ]
             )
             answer = response.choices[0].message.content
             # Manche Modelle (z.B. Qwen) geben ihre Denkschritte in <think>-Tags aus.
@@ -107,6 +112,44 @@ def edit_user(user_id):
 
     return render_template('index.html', content_template='user.html', users=db.list_users(), editing_user=db.get_user(user_id), roles=ROLES)
 
+
+@app.route('/jobs', methods=["GET", "POST"])
+def jobs():
+    if request.method == "POST":
+        first_name = request.form.get("first_name", "").strip()
+        last_name = request.form.get("last_name", "").strip()
+        short_name = request.form.get("short_name", "").strip()
+        email = request.form.get("email", "").strip()
+        password = request.form.get("password", "")
+        role = request.form.get("role", DEFAULT_ROLE)
+        if role not in ROLES:
+            role = DEFAULT_ROLE
+
+        if first_name and last_name and short_name and email and password:
+            db.create_user(first_name, last_name, short_name, email, generate_password_hash(password), role)
+
+        return redirect(url_for('users'))
+
+    return render_template('index.html', content_template='user.html', users=db.list_users(), editing_user=None, roles=ROLES)
+
+@app.route('/customers', methods=["GET", "POST"])
+def customers():
+    if request.method == "POST":
+        first_name = request.form.get("first_name", "").strip()
+        last_name = request.form.get("last_name", "").strip()
+        short_name = request.form.get("short_name", "").strip()
+        email = request.form.get("email", "").strip()
+        password = request.form.get("password", "")
+        role = request.form.get("role", DEFAULT_ROLE)
+        if role not in ROLES:
+            role = DEFAULT_ROLE
+
+        if first_name and last_name and short_name and email and password:
+            db.create_user(first_name, last_name, short_name, email, generate_password_hash(password), role)
+
+        return redirect(url_for('users'))
+
+    return render_template('index.html', content_template='customer.html', users=db.list_users(), editing_user=None, roles=ROLES)
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5003)

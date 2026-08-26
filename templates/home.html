@@ -2,22 +2,22 @@
     <div class="wand-row">
         <span class="wand">🪄</span>
     </div>
-    <h1 id="greetings">Merlins Orakel</h1>
-    <p class="subtitle">Stelle deine Frage – der Zauberer wird antworten</p>
+    <h1 id="greetings">KI-Assistent</h1>
+    <p class="subtitle">Wie kann ich Dir helfen?</p>
     <form action="/" method="POST">
         <div>
             <label for="name-input">Deine Frage</label>
             <input id="name-input" name="question" type="text" placeholder="Was möchtest du wissen?">
         </div>
         <div>
-            <label for="wizard-select">Welcher Zauberer?</label>
+            <label for="wizard-select">Welches KI-Modell?</label>
             <select id="wizard-select" name="model">
                 {% for model_id, model_label in models.items() %}
                 <option value="{{ model_id }}" {% if model_id == selected_model %}selected{% endif %}>{{ model_label }}</option>
                 {% endfor %}
             </select>
         </div>
-        <button id="special-btn" type="submit">✨ Zauber wirken</button>
+        <button id="special-btn" type="submit">✨ Anfrage</button>
     </form>
-    <p id="answer">{{ answer or "Merlin lauscht schweigend den Sternen und wartet auf deine Frage ..." }}</p>
+    <p id="answer">{{ answer or "Die KI wartet auf deine Frage ..." }}</p>
 </div>
