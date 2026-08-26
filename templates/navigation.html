@@ -1,6 +1,6 @@
 <nav>
-    <a href="{{ url_for('home') }}" class="{{ 'active' if request.endpoint == 'home' else '' }}">Home</a>
-    <a href="{{ url_for('users') }}" class="{{ 'active' if request.endpoint in ('users', 'edit_user') else '' }}">Nutzer</a>
-    <a href="{{ url_for('jobs') }}" class="{{ 'active' if request.endpoint in ('jobs', 'edit_job') else '' }}">Stellenangebote</a>
-    <a href="{{ url_for('customers') }}" class="{{ 'active' if request.endpoint in ('customers', 'edit_job') else '' }}">Stellenanbieter</a>
+    <a href="{{ url_for('home') }}" class="{{ 'active' if request.endpoint == 'home' else '' }}"><i class="fa-solid fa-home text-xl text-[#76A250]"></i> Start</a>
+    <a href="{{ url_for('users') }}" class="{{ 'active' if request.endpoint in ('users', 'edit_user') else '' }}"><i class="fa-solid fa-user text-xl text-[#76A250]"></i> Nutzer</a>
+    <a href="{{ url_for('jobs') }}" class="{{ 'active' if request.endpoint in ('jobs', 'edit_job') else '' }}"><i class="fa-solid fa-briefcase text-xl text-[#76A250]"></i> Stellenangebote</a>
+    <a href="{{ url_for('customers') }}" class="{{ 'active' if request.endpoint in ('customers', 'edit_job') else '' }}"><i class="fa-solid fa-building text-xl text-[#76A250]"></i> Stellenanbieter</a>
 </nav>

@@ -9,6 +9,7 @@ body {
     padding: 40px 20px;
     font-family: 'Georgia', 'Palatino Linotype', serif;
     background:
+        #76a250 !important;
         radial-gradient(circle at 20% 20%, rgba(255, 215, 130, 0.08), transparent 40%),
         radial-gradient(circle at 80% 70%, rgba(160, 100, 255, 0.12), transparent 45%),
         linear-gradient(160deg, #1b0f33 0%, #2b1454 45%, #120826 100%);

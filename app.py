@@ -128,9 +128,9 @@ def jobs():
         if first_name and last_name and short_name and email and password:
             db.create_user(first_name, last_name, short_name, email, generate_password_hash(password), role)
 
-        return redirect(url_for('users'))
+        return redirect(url_for('jobs'))
 
-    return render_template('index.html', content_template='user.html', users=db.list_users(), editing_user=None, roles=ROLES)
+    return render_template('index.html', content_template='jobs.html', users=db.list_users(), editing_user=None, roles=ROLES)
 
 @app.route('/customers', methods=["GET", "POST"])
 def customers():
