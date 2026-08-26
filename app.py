@@ -181,40 +181,81 @@ def edit_user(user_id):
 @app.route('/jobs', methods=["GET", "POST"])
 def jobs():
     if request.method == "POST":
-        first_name = request.form.get("first_name", "").strip()
-        last_name = request.form.get("last_name", "").strip()
-        short_name = request.form.get("short_name", "").strip()
-        email = request.form.get("email", "").strip()
-        password = request.form.get("password", "")
-        role = request.form.get("role", DEFAULT_ROLE)
-        if role not in ROLES:
-            role = DEFAULT_ROLE
+        position = request.form.get("position", "").strip()
+        content = request.form.get("content", "").strip()
+        valid_from = request.form.get("valid_from") or None
+        valid_until = request.form.get("valid_until") or None
+        customer_id = request.form.get("customer_id")
 
-        if first_name and last_name and short_name and email and password:
-            db.create_user(first_name, last_name, short_name, email, generate_password_hash(password), role)
+        if position and content and customer_id:
+            db.create_job(position, content, valid_from, valid_until, int(customer_id))
 
         return redirect(url_for('jobs'))
 
-    return render_template('index.html', content_template='jobs.html', users=db.list_users(), editing_user=None, roles=ROLES)
+    return render_template('index.html', content_template='jobs.html', jobs=db.list_jobs(), customers=db.list_customers(), editing_job=None)
+
+
+@app.route('/jobs/<int:job_id>/edit', methods=["GET", "POST"])
+def edit_job(job_id):
+    if request.method == "POST":
+        position = request.form.get("position", "").strip()
+        content = request.form.get("content", "").strip()
+        valid_from = request.form.get("valid_from") or None
+        valid_until = request.form.get("valid_until") or None
+        customer_id = request.form.get("customer_id")
+
+        if position and content and customer_id:
+            db.update_job(job_id, position, content, valid_from, valid_until, int(customer_id))
+
+        return redirect(url_for('jobs'))
+
+    return render_template('index.html', content_template='jobs.html', jobs=db.list_jobs(), customers=db.list_customers(), editing_job=db.get_job(job_id))
+
+
+@app.route('/jobs/<int:job_id>/delete', methods=["POST"])
+def delete_job(job_id):
+    db.delete_job(job_id)
+    return redirect(url_for('jobs'))
+
 
 @app.route('/customers', methods=["GET", "POST"])
 def customers():
     if request.method == "POST":
-        first_name = request.form.get("first_name", "").strip()
-        last_name = request.form.get("last_name", "").strip()
-        short_name = request.form.get("short_name", "").strip()
-        email = request.form.get("email", "").strip()
-        password = request.form.get("password", "")
-        role = request.form.get("role", DEFAULT_ROLE)
-        if role not in ROLES:
-            role = DEFAULT_ROLE
+        company_name = request.form.get("company_name", "").strip()
+        street = request.form.get("street", "").strip()
+        street_number = request.form.get("street_number", "").strip()
+        zip_code = request.form.get("zip", "").strip()
+        city = request.form.get("city", "").strip()
 
-        if first_name and last_name and short_name and email and password:
-            db.create_user(first_name, last_name, short_name, email, generate_password_hash(password), role)
+        if company_name and street and street_number and zip_code and city:
+            db.create_customer(company_name, street, street_number, zip_code, city)
 
-        return redirect(url_for('users'))
+        return redirect(url_for('customers'))
 
-    return render_template('index.html', content_template='customer.html', users=db.list_users(), editing_user=None, roles=ROLES)
+    return render_template('index.html', content_template='customer.html', customers=db.list_customers(), editing_customer=None)
+
+
+@app.route('/customers/<int:customer_id>/edit', methods=["GET", "POST"])
+def edit_customer(customer_id):
+    if request.method == "POST":
+        company_name = request.form.get("company_name", "").strip()
+        street = request.form.get("street", "").strip()
+        street_number = request.form.get("street_number", "").strip()
+        zip_code = request.form.get("zip", "").strip()
+        city = request.form.get("city", "").strip()
+
+        if company_name and street and street_number and zip_code and city:
+            db.update_customer(customer_id, company_name, street, street_number, zip_code, city)
+
+        return redirect(url_for('customers'))
+
+    return render_template('index.html', content_template='customer.html', customers=db.list_customers(), editing_customer=db.get_customer(customer_id))
+
+
+@app.route('/customers/<int:customer_id>/delete', methods=["POST"])
+def delete_customer(customer_id):
+    db.delete_customer(customer_id)
+    return redirect(url_for('customers'))
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5003)

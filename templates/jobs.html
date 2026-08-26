@@ -1,66 +1,74 @@
-<div class="scroll">
-    <h1 id="greetings">{{ "Stelle bearbeiten" if editing_user else "Stellen" }}</h1>
-    <p class="subtitle">Verwalte die Stellenangebote</p>
+<div class="scroll wide">
+    <h1 id="greetings">Stellenangebote</h1>
+    <p class="subtitle">Übersicht der Stellenangebote</p>
+
+    <details class="entity-form" {% if editing_job %}open{% endif %}>
+        <summary class="special-btn">{{ "Stelle bearbeiten" if editing_job else "+ Stelle anlegen" }}</summary>
+
+        <form action="{{ url_for('edit_job', job_id=editing_job.id) if editing_job else url_for('jobs') }}" method="POST">
+            <div>
+                <label for="position">Position</label>
+                <input id="position" name="position" type="text" value="{{ editing_job.position if editing_job else '' }}" required>
+            </div>
+            <div>
+                <label for="customer_id">Kunde</label>
+                <select id="customer_id" name="customer_id" required>
+                    <option value="" disabled {% if not editing_job %}selected{% endif %}>Bitte wählen</option>
+                    {% for customer in customers %}
+                    <option value="{{ customer.id }}" {% if editing_job and editing_job.customer_id == customer.id %}selected{% endif %}>{{ customer.company_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="content">Beschreibung</label>
+                <textarea id="content" name="content" rows="5" required>{{ editing_job.content if editing_job else '' }}</textarea>
+            </div>
+            <div>
+                <label for="valid_from">Gültig von</label>
+                <input id="valid_from" name="valid_from" type="date" value="{{ editing_job.valid_from if editing_job else '' }}">
+            </div>
+            <div>
+                <label for="valid_until">Gültig bis</label>
+                <input id="valid_until" name="valid_until" type="date" value="{{ editing_job.valid_until if editing_job else '' }}">
+            </div>
+            <button class="special-btn" type="submit">{{ "Speichern" if editing_job else "Stelle anlegen" }}</button>
+        </form>
+        {% if editing_job %}
+        <p class="subtitle"><a href="{{ url_for('jobs') }}">Abbrechen</a></p>
+        {% endif %}
+    </details>
 
     <table class="user-table">
         <thead>
             <tr>
-                <th>Name</th>
-                <th>Kurzname</th>
-                <th>E-Mail</th>
-                <th>Rolle</th>
+                <th>Position</th>
+                <th>Kunde</th>
+                <th>Gültig von</th>
+                <th>Gültig bis</th>
+                <th>Erstellt am</th>
                 <th></th>
             </tr>
         </thead>
         <tbody>
-            {% for user in users %}
+            {% for job in jobs %}
             <tr>
-                <td>{{ user.first_name }} {{ user.last_name }}</td>
-                <td>{{ user.short_name }}</td>
-                <td>{{ user.email }}</td>
-                <td>{{ user.role }}</td>
-                <td><a href="{{ url_for('edit_user', user_id=user.id) }}">Bearbeiten</a></td>
+                <td>{{ job.position }}</td>
+                <td>{{ job.customer_name }}</td>
+                <td>{{ job.valid_from or "-" }}</td>
+                <td>{{ job.valid_until or "-" }}</td>
+                <td>{{ job.created_at }}</td>
+                <td class="row-actions">
+                    <a href="{{ url_for('edit_job', job_id=job.id) }}"><i class="fa-solid fa-pen"></i> Bearbeiten</a>
+                    <form action="{{ url_for('delete_job', job_id=job.id) }}" method="POST" onsubmit="return confirm('Stelle wirklich löschen?');">
+                        <button type="submit" class="link-button"><i class="fa-solid fa-trash"></i> Löschen</button>
+                    </form>
+                </td>
             </tr>
             {% else %}
             <tr>
-                <td colspan="5">Noch keine Stelle angelegt.</td>
+                <td colspan="6">Noch keine Stelle angelegt.</td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
-
-    <form action="{{ url_for('edit_user', user_id=editing_user.id) if editing_user else url_for('users') }}" method="POST">
-        <div>
-            <label for="first_name">Vorname</label>
-            <input id="first_name" name="first_name" type="text" value="{{ editing_user.first_name if editing_user else '' }}" required>
-        </div>
-        <div>
-            <label for="last_name">Nachname</label>
-            <input id="last_name" name="last_name" type="text" value="{{ editing_user.last_name if editing_user else '' }}" required>
-        </div>
-        <div>
-            <label for="short_name">Kurzname</label>
-            <input id="short_name" name="short_name" type="text" value="{{ editing_user.short_name if editing_user else '' }}" required>
-        </div>
-        <div>
-            <label for="email">E-Mail</label>
-            <input id="email" name="email" type="email" value="{{ editing_user.email if editing_user else '' }}" required>
-        </div>
-        <div>
-            <label for="role">Rolle</label>
-            <select id="role" name="role">
-                {% for role in roles %}
-                <option value="{{ role }}" {% if (editing_user.role if editing_user else 'user') == role %}selected{% endif %}>{{ role }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div>
-            <label for="password">{{ "Neues Passwort (optional)" if editing_user else "Passwort" }}</label>
-            <input id="password" name="password" type="password" {% if not editing_user %}required{% endif %}>
-        </div>
-        <button id="special-btn" type="submit">{{ "Speichern" if editing_user else "Benutzer anlegen" }}</button>
-    </form>
-    {% if editing_user %}
-    <p class="subtitle"><a href="{{ url_for('users') }}">Abbrechen</a></p>
-    {% endif %}
 </div>

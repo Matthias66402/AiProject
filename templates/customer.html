@@ -1,66 +1,69 @@
-<div class="scroll">
-    <h1 id="greetings">{{ "Kunde bearbeiten" if editing_user else "Kunde" }}</h1>
-    <p class="subtitle">Verwalte die registrierten Kunden</p>
+<div class="scroll wide">
+    <h1 id="greetings">Kunden</h1>
+    <p class="subtitle">Übersicht der registrierten Kunden</p>
+
+    <details class="entity-form" {% if editing_customer %}open{% endif %}>
+        <summary class="special-btn">{{ "Kunde bearbeiten" if editing_customer else "+ Kunde anlegen" }}</summary>
+
+        <form action="{{ url_for('edit_customer', customer_id=editing_customer.id) if editing_customer else url_for('customers') }}" method="POST">
+            <div>
+                <label for="company_name">Firma</label>
+                <input id="company_name" name="company_name" type="text" value="{{ editing_customer.company_name if editing_customer else '' }}" required>
+            </div>
+            <div>
+                <label for="street">Straße</label>
+                <input id="street" name="street" type="text" value="{{ editing_customer.street if editing_customer else '' }}" required>
+            </div>
+            <div>
+                <label for="street_number">Hausnummer</label>
+                <input id="street_number" name="street_number" type="text" value="{{ editing_customer.street_number if editing_customer else '' }}" required>
+            </div>
+            <div>
+                <label for="zip">PLZ</label>
+                <input id="zip" name="zip" type="text" value="{{ editing_customer.zip if editing_customer else '' }}" required>
+            </div>
+            <div>
+                <label for="city">Stadt</label>
+                <input id="city" name="city" type="text" value="{{ editing_customer.city if editing_customer else '' }}" required>
+            </div>
+            <button class="special-btn" type="submit">{{ "Speichern" if editing_customer else "Kunde anlegen" }}</button>
+        </form>
+        {% if editing_customer %}
+        <p class="subtitle"><a href="{{ url_for('customers') }}">Abbrechen</a></p>
+        {% endif %}
+    </details>
 
     <table class="user-table">
         <thead>
             <tr>
-                <th>Name</th>
-                <th>Kurzname</th>
-                <th>E-Mail</th>
-                <th>Rolle</th>
+                <th>Firma</th>
+                <th>Adresse</th>
+                <th>PLZ</th>
+                <th>Stadt</th>
+                <th>Angelegt am</th>
                 <th></th>
             </tr>
         </thead>
         <tbody>
-            {% for user in users %}
+            {% for customer in customers %}
             <tr>
-                <td>{{ user.first_name }} {{ user.last_name }}</td>
-                <td>{{ user.short_name }}</td>
-                <td>{{ user.email }}</td>
-                <td>{{ user.role }}</td>
-                <td><a href="{{ url_for('edit_user', user_id=user.id) }}">Bearbeiten</a></td>
+                <td>{{ customer.company_name }}</td>
+                <td>{{ customer.street }} {{ customer.street_number }}</td>
+                <td>{{ customer.zip }}</td>
+                <td>{{ customer.city }}</td>
+                <td>{{ customer.created_at }}</td>
+                <td class="row-actions">
+                    <a href="{{ url_for('edit_customer', customer_id=customer.id) }}"><i class="fa-solid fa-pen"></i> Bearbeiten</a>
+                    <form action="{{ url_for('delete_customer', customer_id=customer.id) }}" method="POST" onsubmit="return confirm('Kunde wirklich löschen?');">
+                        <button type="submit" class="link-button"><i class="fa-solid fa-trash"></i> Löschen</button>
+                    </form>
+                </td>
             </tr>
             {% else %}
             <tr>
-                <td colspan="5">Noch keine Benutzer angelegt.</td>
+                <td colspan="6">Noch keine Kunden angelegt.</td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
-
-    <form action="{{ url_for('edit_user', user_id=editing_user.id) if editing_user else url_for('users') }}" method="POST">
-        <div>
-            <label for="first_name">Vorname</label>
-            <input id="first_name" name="first_name" type="text" value="{{ editing_user.first_name if editing_user else '' }}" required>
-        </div>
-        <div>
-            <label for="last_name">Nachname</label>
-            <input id="last_name" name="last_name" type="text" value="{{ editing_user.last_name if editing_user else '' }}" required>
-        </div>
-        <div>
-            <label for="short_name">Kurzname</label>
-            <input id="short_name" name="short_name" type="text" value="{{ editing_user.short_name if editing_user else '' }}" required>
-        </div>
-        <div>
-            <label for="email">E-Mail</label>
-            <input id="email" name="email" type="email" value="{{ editing_user.email if editing_user else '' }}" required>
-        </div>
-        <div>
-            <label for="role">Rolle</label>
-            <select id="role" name="role">
-                {% for role in roles %}
-                <option value="{{ role }}" {% if (editing_user.role if editing_user else 'user') == role %}selected{% endif %}>{{ role }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div>
-            <label for="password">{{ "Neues Passwort (optional)" if editing_user else "Passwort" }}</label>
-            <input id="password" name="password" type="password" {% if not editing_user %}required{% endif %}>
-        </div>
-        <button id="special-btn" type="submit">{{ "Speichern" if editing_user else "Benutzer anlegen" }}</button>
-    </form>
-    {% if editing_user %}
-    <p class="subtitle"><a href="{{ url_for('users') }}">Abbrechen</a></p>
-    {% endif %}
 </div>
