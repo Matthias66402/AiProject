@@ -1,6 +1,8 @@
 import re
+from datetime import datetime
 
 from flask import Flask, render_template, request, redirect, url_for, session
+from fpdf import FPDF
 from groq import Groq, APIStatusError as GroqAPIStatusError
 from openai import OpenAI, APIStatusError as OpenAIAPIStatusError
 from dotenv import load_dotenv
@@ -89,6 +91,7 @@ PAGE_DESCRIPTIONS = {
     "customers": "Stellenanbieter (Kunden) verwalten, im Hauptmenü als 'Stellenanbieter' verlinkt",
     "edit_customer": "Einen bestehenden Stellenanbieter bearbeiten",
     "delete_customer": "Einen Stellenanbieter löschen",
+    "generate_resume": "Lebenslauf generieren. Nur für Admins, erreichbar über das 'Tools'-Menü in der Navigation",
 }
 
 
@@ -318,6 +321,52 @@ def edit_customer(customer_id):
 def delete_customer(customer_id):
     db.delete_customer(customer_id)
     return redirect(url_for('customers'))
+
+
+RESUME_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "resumes")
+
+
+@app.route('/tools/resume', methods=["GET", "POST"])
+def generate_resume():
+    if session.get("user_role") != "admin":
+        return redirect(url_for('home'))
+
+    message = None
+    if request.method == "POST":
+        spec = request.form.get("spec", "").strip()
+        if not spec:
+            message = "Bitte zuerst beschreiben, was der Lebenslauf enthalten soll."
+        else:
+            try:
+                response = openai_client.chat.completions.create(
+                    model=DEFAULT_MODEL,
+                    messages=[
+                        {"role": "system", "content": (
+                            "Du erstellst einen Dummy-Lebenslauf mit frei erfundenen, kreativen Personendaten  "
+                            "(keine echten Personen) auf Basis der Vorgaben des Nutzers. "
+                            "Antworte ausschließlich mit dem fertigen Lebenslauf als Klartext, "
+                            "ohne zusätzliche Erklärungen."
+                        )},
+                        {"role": "user", "content": spec},
+                    ],
+                )
+                resume_text = THINK_BLOCK_RE.sub("", response.choices[0].message.content).strip()
+
+                os.makedirs(RESUME_DIR, exist_ok=True)
+                filename = f"lebenslauf_{datetime.now():%Y%m%d_%H%M%S}.pdf"
+                pdf = FPDF()
+                pdf.add_page()
+                pdf.add_font("DejaVu", "", os.path.join(app.static_folder, "fonts", "DejaVuSans.ttf"))
+                pdf.set_font("DejaVu", size=12)
+                pdf.multi_cell(0, 8, resume_text)
+                pdf.output(os.path.join(RESUME_DIR, filename))
+
+                message = f"Lebenslauf wurde erstellt und unter data/resumes/{filename} gespeichert."
+            except (GroqAPIStatusError, OpenAIAPIStatusError) as e:
+                app.logger.warning("API error %s: %s", e.status_code, e.body)
+                message = "Der Lebenslauf konnte gerade nicht erstellt werden. Bitte später erneut versuchen."
+
+    return render_template('index.html', content_template='resume.html', message=message)
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5003)

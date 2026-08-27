@@ -3,3 +3,4 @@ groq
 openai
 python-dotenv
 PyMySQL
+fpdf2

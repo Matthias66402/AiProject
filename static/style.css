@@ -82,6 +82,10 @@ nav summary::marker {
     display: none;
 }
 
+#navigation-bar {
+    z-index: 100;
+}
+
 .form-error {
     color: #ffb4b4;
     background: rgba(180, 40, 40, 0.25);
