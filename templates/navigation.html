@@ -19,6 +19,7 @@
             </summary>
             <div class="flex flex-col md:absolute md:left-0 md:w-56 mt-2 bg-[#241141] border border-[rgba(255,215,130,0.35)] rounded-lg overflow-hidden md:shadow-lg z-10">
                 <a href="{{ url_for('generate_resume') }}" class="!normal-case px-4 py-2 hover:bg-[rgba(255,255,255,0.08)] {{ 'active' if request.endpoint == 'generate_resume' else '' }}"><i class="fa-solid fa-file-lines text-[#76A250]"></i> Lebenslauf generieren</a>
+                <a href="{{ url_for('generate_joboffer') }}" class="!normal-case px-4 py-2 hover:bg-[rgba(255,255,255,0.08)] {{ 'active' if request.endpoint == 'generate_joboffer' else '' }}"><i class="fa-solid fa-file-lines text-[#76A250]"></i> Stellenangebot generieren</a>
             </div>
         </details>
         {% endif %}

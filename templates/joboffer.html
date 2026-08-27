@@ -1,0 +1,35 @@
+<div class="scroll wide">
+    <h1 id="greetings">Stellenangebot generieren</h1>
+    <p class="subtitle">Bitte spezifieren Sie, was das Stellenangebot enthalten soll:</p>
+    {% if message %}
+    <p class="subtitle">
+        {{ message }}
+        {% if file_url %}
+        <a href="{{ file_url }}" target="_blank" rel="noopener">Stellenangebot öffnen</a>
+        {% endif %}
+    </p>
+    {% endif %}
+    <form action="{{ url_for('generate_joboffer') }}" method="POST" id="joboffer-form">
+        <div class="textarea-wrap">
+            <textarea class="p-3" name="spec" rows="8"></textarea>
+            <div class="generating-indicator" id="joboffer-generating-indicator">
+                <span class="spinner"></span>
+                Stellenangebot wird generiert …
+            </div>
+        </div>
+        <button class="special-btn" type="submit" id="joboffer-submit-btn">Generieren</button>
+    </form>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var form = document.getElementById('joboffer-form');
+        var btn = document.getElementById('joboffer-submit-btn');
+        var indicator = document.getElementById('joboffer-generating-indicator');
+        if (!form) return;
+        form.addEventListener('submit', function () {
+            btn.disabled = true;
+            indicator.classList.add('visible');
+        });
+    });
+</script>

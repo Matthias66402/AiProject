@@ -2,12 +2,34 @@
     <h1 id="greetings">Lebenslauf generieren</h1>
     <p class="subtitle">Bitte spezifieren Sie, was der Lebenslauf enthalten soll:</p>
     {% if message %}
-    <p class="subtitle">{{ message }}</p>
+    <p class="subtitle">
+        {{ message }}
+        {% if file_url %}
+        <a href="{{ file_url }}" target="_blank" rel="noopener">Lebenslauf öffnen</a>
+        {% endif %}
+    </p>
     {% endif %}
-    <form action="{{ url_for('generate_resume') }}" method="POST">
-        <div>
+    <form action="{{ url_for('generate_resume') }}" method="POST" id="resume-form">
+        <div class="textarea-wrap">
             <textarea class="p-3" name="spec" rows="8"></textarea>
+            <div class="generating-indicator" id="resume-generating-indicator">
+                <span class="spinner"></span>
+                Lebenslauf wird generiert …
+            </div>
         </div>
-        <button class="special-btn" type="submit">Generieren</button>
+        <button class="special-btn" type="submit" id="resume-submit-btn">Generieren</button>
     </form>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var form = document.getElementById('resume-form');
+        var btn = document.getElementById('resume-submit-btn');
+        var indicator = document.getElementById('resume-generating-indicator');
+        if (!form) return;
+        form.addEventListener('submit', function () {
+            btn.disabled = true;
+            indicator.classList.add('visible');
+        });
+    });
+</script>

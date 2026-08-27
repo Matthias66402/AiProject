@@ -13,12 +13,16 @@ Die Website ist noch im Aufbau, Struktur und Funktionsumfang können sich häufi
 - **Nutzerverwaltung** (`/users`): Nutzer anlegen, bearbeiten, Rolle zuweisen (`user`/`admin`).
 - **Stellenangebote** (`/jobs`): Stellenanzeigen anlegen, bearbeiten, löschen, mit Gültigkeitszeitraum und Zuordnung zu einem Stellenanbieter.
 - **Stellenanbieter** (`/customers`): Kunden (Unternehmen) mit Adresse anlegen, bearbeiten, löschen.
+- **Tools-Menü** (nur für Rolle `admin`): erzeugt per KI Dummy-PDFs auf Basis einer frei formulierten Beschreibung, mit dezentem Lade-Spinner während der Generierung und Link zum Öffnen der fertigen Datei in einem neuen Tab.
+  - **Lebenslauf generieren** (`/tools/resume`): Dummy-Lebenslauf, abgelegt unter `data/resumes/`.
+  - **Stellenangebot generieren** (`/tools/joboffer`): Dummy-Stellenangebot, abgelegt unter `data/joboffers/`.
 
 ## Tech-Stack
 
 - **Backend**: Flask (Python 3.14)
 - **Datenbank**: MySQL 8.0 über PyMySQL; Schema wird beim App-Start automatisch angelegt und migriert (`db.init_db()`)
 - **KI**: [Groq](https://pypi.org/project/groq/)- und [OpenAI](https://pypi.org/project/openai/)-Python-SDKs
+- **PDF-Erzeugung**: [fpdf2](https://pypi.org/project/fpdf2/) mit eingebetteter DejaVu-Sans-Schrift (`static/fonts/DejaVuSans.ttf`) für vollen Unicode-Support (Umlaute, Sonderzeichen)
 - **Frontend**: Jinja2-Templates, Tailwind-Klassen, Font Awesome (lokal in `static/fontawesome`)
 - **Deployment**: Docker + docker-compose (App + MySQL)
 - **CI**: GitHub Actions (Syntaxcheck, Smoke-Test, Docker-Build) — siehe `.github/workflows/main.yml`
@@ -30,15 +34,21 @@ app.py                     Flask-Routen, KI-Assistent-Logik, Modellauswahl
 db.py                      DB-Verbindung, Schema-Erstellung/Migration, CRUD-Funktionen
 templates/
   index.html                Basis-Layout, bindet navigation.html + content_template ein
-  navigation.html            Navigationsleiste inkl. Konto-Dropdown (Anmelden/Registrieren/Abmelden)
+  navigation.html            Navigationsleiste inkl. Konto-Dropdown (Anmelden/Registrieren/Abmelden) und Tools-Dropdown (nur Admin)
   home.html                  KI-Assistent-Formular (Startseite)
   login.html, register.html  Anmeldung/Registrierung
   user.html                  Nutzerverwaltung
   jobs.html                  Stellenangebote
   customer.html              Stellenanbieter
+  resume.html                 Tools: Lebenslauf generieren (nur Admin)
+  joboffer.html                Tools: Stellenangebot generieren (nur Admin)
 static/
   style.css                  eigenes Stylesheet
   fontawesome/                lokal eingebundene Icon-Bibliothek
+  fonts/DejaVuSans.ttf        Unicode-Schrift für die PDF-Erzeugung
+data/                        generierte PDFs (Lebensläufe/Stellenangebote), von Git ausgeschlossen
+  resumes/
+  joboffers/
 Dockerfile                  Python-3.14-slim-Image für die App
 docker-compose.yml          App + MySQL-Service für lokalen/Produktions-Betrieb
 .github/workflows/main.yml  CI: Syntaxcheck, Smoke-Test, Docker-Build

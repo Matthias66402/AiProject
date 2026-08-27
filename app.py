@@ -1,7 +1,7 @@
 import re
 from datetime import datetime
 
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory
 from fpdf import FPDF
 from groq import Groq, APIStatusError as GroqAPIStatusError
 from openai import OpenAI, APIStatusError as OpenAIAPIStatusError
@@ -92,6 +92,7 @@ PAGE_DESCRIPTIONS = {
     "edit_customer": "Einen bestehenden Stellenanbieter bearbeiten",
     "delete_customer": "Einen Stellenanbieter löschen",
     "generate_resume": "Lebenslauf generieren. Nur für Admins, erreichbar über das 'Tools'-Menü in der Navigation",
+    "generate_joboffer": "Stellenangebot generieren. Nur für Admins, erreichbar über das 'Tools'-Menü in der Navigation",
 }
 
 
@@ -324,6 +325,7 @@ def delete_customer(customer_id):
 
 
 RESUME_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "resumes")
+JOBOFFER_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "joboffers")
 
 
 @app.route('/tools/resume', methods=["GET", "POST"])
@@ -332,6 +334,7 @@ def generate_resume():
         return redirect(url_for('home'))
 
     message = None
+    file_url = None
     if request.method == "POST":
         spec = request.form.get("spec", "").strip()
         if not spec:
@@ -361,12 +364,72 @@ def generate_resume():
                 pdf.multi_cell(0, 8, resume_text)
                 pdf.output(os.path.join(RESUME_DIR, filename))
 
-                message = f"Lebenslauf wurde erstellt und unter data/resumes/{filename} gespeichert."
+                message = "Lebenslauf wurde erstellt:"
+                file_url = url_for('view_resume', filename=filename)
             except (GroqAPIStatusError, OpenAIAPIStatusError) as e:
                 app.logger.warning("API error %s: %s", e.status_code, e.body)
                 message = "Der Lebenslauf konnte gerade nicht erstellt werden. Bitte später erneut versuchen."
 
-    return render_template('index.html', content_template='resume.html', message=message)
+    return render_template('index.html', content_template='resume.html', message=message, file_url=file_url)
+
+
+@app.route('/tools/resume/<path:filename>')
+def view_resume(filename):
+    if session.get("user_role") != "admin":
+        return redirect(url_for('home'))
+    return send_from_directory(RESUME_DIR, filename)
+
+
+@app.route('/tools/joboffer', methods=["GET", "POST"])
+def generate_joboffer():
+    if session.get("user_role") != "admin":
+        return redirect(url_for('home'))
+
+    message = None
+    file_url = None
+    if request.method == "POST":
+        spec = request.form.get("spec", "").strip()
+        if not spec:
+            message = "Bitte zuerst beschreiben, was das Stellenangebot enthalten soll."
+        else:
+            try:
+                response = openai_client.chat.completions.create(
+                    model=DEFAULT_MODEL,
+                    messages=[
+                        {"role": "system", "content": (
+                            "Du erstellst ein Dummy-Stellenangebot mit frei erfundenen, kreativen Angaben "
+                            "(kein echtes Unternehmen) auf Basis der Vorgaben des Nutzers. "
+                            "Antworte ausschließlich mit dem fertigen Stellenangebot als formatierten Text mit Überschriften, Aufzählungen etc., "
+                            "ohne zusätzliche Erklärungen."
+                        )},
+                        {"role": "user", "content": spec},
+                    ],
+                )
+                joboffer_text = THINK_BLOCK_RE.sub("", response.choices[0].message.content).strip()
+
+                os.makedirs(JOBOFFER_DIR, exist_ok=True)
+                filename = f"stellenangebot_{datetime.now():%Y%m%d_%H%M%S}.pdf"
+                pdf = FPDF()
+                pdf.add_page()
+                pdf.add_font("DejaVu", "", os.path.join(app.static_folder, "fonts", "DejaVuSans.ttf"))
+                pdf.set_font("DejaVu", size=12)
+                pdf.multi_cell(0, 8, joboffer_text)
+                pdf.output(os.path.join(JOBOFFER_DIR, filename))
+
+                message = "Stellenangebot wurde erstellt:"
+                file_url = url_for('view_joboffer', filename=filename)
+            except (GroqAPIStatusError, OpenAIAPIStatusError) as e:
+                app.logger.warning("API error %s: %s", e.status_code, e.body)
+                message = "Das Stellenangebot konnte gerade nicht erstellt werden. Bitte später erneut versuchen."
+
+    return render_template('index.html', content_template='joboffer.html', message=message, file_url=file_url)
+
+
+@app.route('/tools/joboffer/<path:filename>')
+def view_joboffer(filename):
+    if session.get("user_role") != "admin":
+        return redirect(url_for('home'))
+    return send_from_directory(JOBOFFER_DIR, filename)
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5003)
