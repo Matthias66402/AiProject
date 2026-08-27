@@ -1,4 +1,5 @@
 Flask
 groq
+openai
 python-dotenv
 PyMySQL

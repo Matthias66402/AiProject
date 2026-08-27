@@ -1,7 +1,8 @@
 import re
 
 from flask import Flask, render_template, request, redirect, url_for, session
-from groq import Groq, APIStatusError
+from groq import Groq, APIStatusError as GroqAPIStatusError
+from openai import OpenAI, APIStatusError as OpenAIAPIStatusError
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
@@ -16,6 +17,7 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.environ["SECRET_KEY"]
 client = Groq(api_key=os.environ["GROQ_API_KEY"])
+openai_client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 db.init_db()
 
 
@@ -39,19 +41,69 @@ def _log_in_user(user):
 # Verfügbare Zauberer (KI-Modelle). Key = Groq-Modell-ID, Value = Anzeigename.
 # Weitere Modelle können hier einfach ergänzt werden.
 AVAILABLE_MODELS = {
-    "openai/gpt-oss-20b": "Openai - gpt-oss-20b (Standard, schnell)",
-    "openai/gpt-oss-120b": "Openai - gpt-oss-120b (groß & mächtig)",
+    "openai/gpt-oss-20b": "Groq - gpt-oss-20b (Standard, schnell)",
+    "openai/gpt-oss-120b": "Groq - gpt-oss-120b (groß & mächtig)",
     "qwen/qwen3.6-27b": "Qwen - qwen3.6-27b (kompakt & clever)",
     "groq/compound-mini": "Groq - compound-mini (agentisch, mit Websuche)",
+    "gpt-5-mini": "OpenAI - gpt-5-mini",
+    "gpt-4o-mini": "OpenAI - gpt-4o-mini",
+    "gpt-4.1-mini": "OpenAI - gpt-4.1-mini",
 }
-DEFAULT_MODEL = "openai/gpt-oss-20b"
+DEFAULT_MODEL = "gpt-4.1-mini"
 
-AVAILABE_WIZARDS = {
-    "openai/gpt-oss-20b": "Openai - Standard",
-    "openai/gpt-oss-120b": "Openai - Mächtig",
+AVAILABE_MODEL_NAMES = {
+    "openai/gpt-oss-20b": "Groq - Standard",
+    "openai/gpt-oss-120b": "Groq - Mächtig",
     "qwen/qwen3.6-27b": "Qwen - Kompakt",
     "groq/compound-mini": "Groq - agentisch",
+    "gpt-5-mini": "OpenAI - gpt-5-mini",
+    "gpt-4o-mini": "OpenAI - gpt-4o-mini",
+    "gpt-4.1-mini": "OpenAI - gpt-4.1-mini",
 }
+
+# Welcher Client (Groq oder OpenAI) für welches Modell zuständig ist.
+MODEL_CLIENTS = {
+    "openai/gpt-oss-20b": client,
+    "openai/gpt-oss-120b": client,
+    "qwen/qwen3.6-27b": client,
+    "groq/compound-mini": client,
+    "gpt-5-mini": openai_client,
+    "gpt-4o-mini": openai_client,
+    "gpt-4.1-mini": openai_client,
+}
+
+# Kurzbeschreibung je Route für den KI-Assistenten. Die Website ist noch im
+# Aufbau, deshalb wird die eigentliche Seitenliste (URL + erlaubte Methoden)
+# unten automatisch aus den registrierten Flask-Routen erzeugt - hier muss
+# bei neuen Routen nur noch der Zweck ergänzt werden, der Rest bleibt sync.
+PAGE_DESCRIPTIONS = {
+    "home": "Startseite mit dem KI-Assistenten (diese Seite)",
+    "login": "Anmeldeseite für bestehende Nutzer. Erreichbar über das Konto-Menü oben rechts in der Navigation (Symbol + Beschriftung 'Konto'), dort auf 'Anmelden' klicken - nur sichtbar, wenn niemand eingeloggt ist",
+    "register": "Registrierungsseite für neue Nutzer. Erreichbar über das Konto-Menü oben rechts in der Navigation (Symbol + Beschriftung 'Konto'), dort auf 'Registrieren' klicken - nur sichtbar, wenn niemand eingeloggt ist",
+    "logout": "Abmelden. Erreichbar über das Konto-Menü oben rechts in der Navigation - dort steht im eingeloggten Zustand nicht 'Konto', sondern der Kurzname des angemeldeten Nutzers; darauf klicken, um das Menü zu öffnen, dort erscheint 'Abmelden'",
+    "users": "Nutzerverwaltung: Liste aller Nutzer + neuen Nutzer anlegen",
+    "edit_user": "Einen bestehenden Nutzer bearbeiten",
+    "jobs": "Stellenangebote verwalten, im Hauptmenü als 'Stellenangebote' verlinkt",
+    "edit_job": "Ein bestehendes Stellenangebot bearbeiten",
+    "delete_job": "Ein Stellenangebot löschen",
+    "customers": "Stellenanbieter (Kunden) verwalten, im Hauptmenü als 'Stellenanbieter' verlinkt",
+    "edit_customer": "Einen bestehenden Stellenanbieter bearbeiten",
+    "delete_customer": "Einen Stellenanbieter löschen",
+}
+
+
+def build_site_map():
+    """Erzeugt eine aktuelle Liste aller Routen aus app.url_map, ergänzt um
+    die Kurzbeschreibung aus PAGE_DESCRIPTIONS. Läuft bei jeder Anfrage neu,
+    damit neue/geänderte Routen sofort ohne Prompt-Pflege sichtbar sind."""
+    lines = []
+    for rule in sorted(app.url_map.iter_rules(), key=lambda r: r.rule):
+        if rule.endpoint == "static":
+            continue
+        description = PAGE_DESCRIPTIONS.get(rule.endpoint, "(noch keine Beschreibung hinterlegt)")
+        methods = ", ".join(sorted(rule.methods - {"HEAD", "OPTIONS"}))
+        lines.append(f"- {rule.rule} [{methods}] -> {description}")
+    return "\n".join(lines)
 
 
 @app.route('/', methods=["GET", "POST"])
@@ -62,16 +114,26 @@ def home():  # put application's code here
         if selected_model not in AVAILABLE_MODELS:
             selected_model = DEFAULT_MODEL
 
-        wizard_name = AVAILABE_WIZARDS.get(selected_model, "KI-Modelle")
+        wizard_name = AVAILABE_MODEL_NAMES.get(selected_model, "KI-Modelle")
+        active_client = MODEL_CLIENTS.get(selected_model, client)
 
         try:
-            response = client.chat.completions.create(
+            response = active_client.chat.completions.create(
                 model=selected_model,
                 # messages=[
                 #     {"role": "user", "content": "Bitte gib eine originelle, nicht zu lange, falsche Antwort auf folgende Frage: " + question}
                 # ],
                 messages=[
-                    {"role": "system", "content": "Du bist ein Assistent, der bei allgemeinen Fragen zur Website, Stellenbewerbung und Stellenveröffentlichung. Für Fragen zum Verorten der Routen bitte die Routen von app.py bzw. von templates/navigation.html berücksichtigen - nichts dazu erfinden. Bitte kurz und knapp antworten ohne Hintergrundinformation zur genauen Route."},
+                    {"role": "system", "content": (
+                        "Du bist ein Assistent, der bei allgemeinen Fragen zur Website, Stellenbewerbung und Stellenveröffentlichung hilft.\n\n"
+                        "Das ist die vollständige, aktuelle Seitenstruktur der Website (Route, erlaubte HTTP-Methoden, Zweck):\n"
+                        f"{build_site_map()}\n\n"
+                        "Diese Liste ist deine einzige Wissensquelle über den Aufbau der Website. "
+                        "Wenn eine Seite, ein Menüpunkt oder eine Funktion hier nicht auftaucht, existiert sie nicht - "
+                        "erfinde in diesem Fall nichts, sondern sage klar, dass es das nicht gibt. "
+                        "Die Website ist noch im Aufbau, die Liste kann sich also häufig ändern - verlasse dich ausschließlich auf die aktuelle Liste oben, nicht auf frühere Annahmen. "
+                        "Antworte kurz und knapp in normaler Sprache (z.B. Menüpunkt-Name), ohne die technische Route (z.B. /jobs) zu nennen."
+                    )},
                     {"role": "user",
                      "content": question}
                 ]
@@ -79,12 +141,12 @@ def home():  # put application's code here
             answer = response.choices[0].message.content
             # Manche Modelle (z.B. Qwen) geben ihre Denkschritte in <think>-Tags aus.
             answer = THINK_BLOCK_RE.sub("", answer).strip()
-        except APIStatusError as e:
+        except (GroqAPIStatusError, OpenAIAPIStatusError) as e:
             if e.status_code == 429:
-                app.logger.warning("Groq 429 details: %s", e.body)
+                app.logger.warning("API 429 details: %s", e.body)
                 answer = f"🧙 {wizard_name} ist müde und hat für heute keine Zaubersprüche mehr übrig. Bitte versuche es morgen erneut."
             else:
-                app.logger.warning("Groq API error %s: %s", e.status_code, e.body)
+                app.logger.warning("API error %s: %s", e.status_code, e.body)
                 answer = f"🧙 {wizard_name}s Kristallkugel ist gerade getrübt. Bitte versuche es später noch einmal."
 
         return render_template('index.html', content_template='home.html', answer=answer, models=AVAILABLE_MODELS, selected_model=selected_model)
