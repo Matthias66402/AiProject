@@ -1,0 +1,13 @@
+<div class="scroll wide">
+    <h1 id="greetings">Lebenslauf generieren</h1>
+    <p class="subtitle">Bitte spezifieren Sie, was der Lebenslauf enthalten soll:</p>
+    {% if message %}
+    <p class="subtitle">{{ message }}</p>
+    {% endif %}
+    <form action="{{ url_for('generate_resume') }}" method="POST">
+        <div>
+            <textarea class="p-3" name="spec" rows="8"></textarea>
+        </div>
+        <button class="special-btn" type="submit">Generieren</button>
+    </form>
+</div>
