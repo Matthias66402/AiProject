@@ -13,16 +13,17 @@ Die Website ist noch im Aufbau, Struktur und Funktionsumfang können sich häufi
 - **Nutzerverwaltung** (`/users`): Nutzer anlegen, bearbeiten, Rolle zuweisen (`user`/`admin`).
 - **Stellenangebote** (`/jobs`): Stellenanzeigen anlegen, bearbeiten, löschen, mit Gültigkeitszeitraum und Zuordnung zu einem Stellenanbieter.
 - **Stellenanbieter** (`/customers`): Kunden (Unternehmen) mit Adresse anlegen, bearbeiten, löschen.
-- **Tools-Menü** (nur für Rolle `admin`): erzeugt per KI Dummy-PDFs auf Basis einer frei formulierten Beschreibung, mit dezentem Lade-Spinner während der Generierung und Link zum Öffnen der fertigen Datei in einem neuen Tab.
+- **Tools-Menü** (nur für Rolle `admin`): lässt die KI Dummy-Inhalte als HTML formulieren und rendert sie per WeasyPrint zu PDF, mit dezentem Lade-Spinner während der Generierung und Link zum Öffnen der fertigen Datei in einem neuen Tab.
   - **Lebenslauf generieren** (`/tools/resume`): Dummy-Lebenslauf, abgelegt unter `data/resumes/`.
   - **Stellenangebot generieren** (`/tools/joboffer`): Dummy-Stellenangebot, abgelegt unter `data/joboffers/`.
+  - ⚠️ Läuft nur, wo WeasyPrints native Abhängigkeiten (Pango/Cairo) vorhanden sind — siehe [WeasyPrint unter Windows](#weasyprint-unter-windows) weiter unten. Im Docker-Image ist das bereits eingerichtet.
 
 ## Tech-Stack
 
 - **Backend**: Flask (Python 3.14)
 - **Datenbank**: MySQL 8.0 über PyMySQL; Schema wird beim App-Start automatisch angelegt und migriert (`db.init_db()`)
 - **KI**: [Groq](https://pypi.org/project/groq/)- und [OpenAI](https://pypi.org/project/openai/)-Python-SDKs
-- **PDF-Erzeugung**: [fpdf2](https://pypi.org/project/fpdf2/) mit eingebetteter DejaVu-Sans-Schrift (`static/fonts/DejaVuSans.ttf`) für vollen Unicode-Support (Umlaute, Sonderzeichen)
+- **PDF-Erzeugung**: [WeasyPrint](https://pypi.org/project/weasyprint/) rendert vom KI-Modell geliefertes HTML zu PDF. Benötigt native Pango/Cairo-Bibliotheken (siehe unten) — im `Dockerfile` und in der CI bereits per `apt` eingerichtet
 - **Frontend**: Jinja2-Templates, Tailwind-Klassen, Font Awesome (lokal in `static/fontawesome`)
 - **Deployment**: Docker + docker-compose (App + MySQL)
 - **CI**: GitHub Actions (Syntaxcheck, Smoke-Test, Docker-Build) — siehe `.github/workflows/main.yml`
@@ -45,7 +46,6 @@ templates/
 static/
   style.css                  eigenes Stylesheet
   fontawesome/                lokal eingebundene Icon-Bibliothek
-  fonts/DejaVuSans.ttf        Unicode-Schrift für die PDF-Erzeugung
 data/                        generierte PDFs (Lebensläufe/Stellenangebote), von Git ausgeschlossen
   resumes/
   joboffers/
@@ -72,6 +72,12 @@ python app.py
 ```
 
 Die App läuft danach auf `http://localhost:5003`.
+
+#### WeasyPrint unter Windows
+
+`pip install weasyprint` reicht unter Windows **nicht** aus: Der Import schlägt mit `OSError: cannot load library ... libgobject-2.0-0.dll` fehl, weil WeasyPrint zur Laufzeit native GTK-Bibliotheken (Pango/Cairo/GObject) über `cffi` lädt, die kein reines Python-Package sind. Betroffen sind ausschließlich die beiden Tools-Seiten (`/tools/resume`, `/tools/joboffer`) — der Rest der App läuft davon unberührt, **außer** der komplette App-Import schlägt fehl, weil `from weasyprint import HTML` ganz oben in `app.py` steht.
+
+Lokale Entwicklung unter Windows ohne Docker wird für dieses Feature aktuell nicht unterstützt/dokumentiert — für die Tools-Seiten (und damit zum vollständigen Start der App) bitte über Docker Compose laufen lassen; dort ist alles Nötige bereits eingerichtet.
 
 ### Mit Docker Compose
 

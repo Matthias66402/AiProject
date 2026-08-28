@@ -3,4 +3,4 @@ groq
 openai
 python-dotenv
 PyMySQL
-fpdf2
+weasyprint

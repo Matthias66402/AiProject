@@ -2,7 +2,7 @@ import re
 from datetime import datetime
 
 from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory
-from fpdf import FPDF
+from weasyprint import HTML
 from groq import Groq, APIStatusError as GroqAPIStatusError
 from openai import OpenAI, APIStatusError as OpenAIAPIStatusError
 from dotenv import load_dotenv
@@ -13,6 +13,11 @@ import db
 from db import ROLES, DEFAULT_ROLE
 
 THINK_BLOCK_RE = re.compile(r"<think>.*?</think>\s*", re.DOTALL)
+CODE_FENCE_RE = re.compile(r"^```[a-zA-Z]*\s*\n?|\n?```\s*$")
+
+
+def _strip_code_fence(text):
+    return CODE_FENCE_RE.sub("", text.strip()).strip()
 
 load_dotenv()
 
@@ -328,6 +333,11 @@ RESUME_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "r
 JOBOFFER_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "joboffers")
 
 
+def _write_html_as_pdf(html_fragment, output_path):
+    document = f"<!DOCTYPE html><html><head><meta charset=\"utf-8\"></head><body>{html_fragment}</body></html>"
+    HTML(string=document).write_pdf(output_path)
+
+
 @app.route('/tools/resume', methods=["GET", "POST"])
 def generate_resume():
     if session.get("user_role") != "admin":
@@ -347,22 +357,17 @@ def generate_resume():
                         {"role": "system", "content": (
                             "Du erstellst einen Dummy-Lebenslauf mit frei erfundenen, kreativen Personendaten  "
                             "(keine echten Personen) auf Basis der Vorgaben des Nutzers. "
-                            "Antworte ausschließlich mit dem fertigen Lebenslauf als Klartext, "
+                            "Antworte ausschließlich mit dem fertigen Lebenslauf im HTML-Format, "
                             "ohne zusätzliche Erklärungen."
                         )},
                         {"role": "user", "content": spec},
                     ],
                 )
-                resume_text = THINK_BLOCK_RE.sub("", response.choices[0].message.content).strip()
+                resume_text = _strip_code_fence(THINK_BLOCK_RE.sub("", response.choices[0].message.content).strip())
 
                 os.makedirs(RESUME_DIR, exist_ok=True)
                 filename = f"lebenslauf_{datetime.now():%Y%m%d_%H%M%S}.pdf"
-                pdf = FPDF()
-                pdf.add_page()
-                pdf.add_font("DejaVu", "", os.path.join(app.static_folder, "fonts", "DejaVuSans.ttf"))
-                pdf.set_font("DejaVu", size=12)
-                pdf.multi_cell(0, 8, resume_text)
-                pdf.output(os.path.join(RESUME_DIR, filename))
+                _write_html_as_pdf(resume_text, os.path.join(RESUME_DIR, filename))
 
                 message = "Lebenslauf wurde erstellt:"
                 file_url = url_for('view_resume', filename=filename)
@@ -399,22 +404,17 @@ def generate_joboffer():
                         {"role": "system", "content": (
                             "Du erstellst ein Dummy-Stellenangebot mit frei erfundenen, kreativen Angaben "
                             "(kein echtes Unternehmen) auf Basis der Vorgaben des Nutzers. "
-                            "Antworte ausschließlich mit dem fertigen Stellenangebot als formatierten Text mit Überschriften, Aufzählungen etc., "
+                            "Antworte ausschließlich mit dem fertigen Stellenangebot als formatiertes HTML mit Überschriften, Aufzählungen etc., "
                             "ohne zusätzliche Erklärungen."
                         )},
                         {"role": "user", "content": spec},
                     ],
                 )
-                joboffer_text = THINK_BLOCK_RE.sub("", response.choices[0].message.content).strip()
+                joboffer_text = _strip_code_fence(THINK_BLOCK_RE.sub("", response.choices[0].message.content).strip())
 
                 os.makedirs(JOBOFFER_DIR, exist_ok=True)
                 filename = f"stellenangebot_{datetime.now():%Y%m%d_%H%M%S}.pdf"
-                pdf = FPDF()
-                pdf.add_page()
-                pdf.add_font("DejaVu", "", os.path.join(app.static_folder, "fonts", "DejaVuSans.ttf"))
-                pdf.set_font("DejaVu", size=12)
-                pdf.multi_cell(0, 8, joboffer_text)
-                pdf.output(os.path.join(JOBOFFER_DIR, filename))
+                _write_html_as_pdf(joboffer_text, os.path.join(JOBOFFER_DIR, filename))
 
                 message = "Stellenangebot wurde erstellt:"
                 file_url = url_for('view_joboffer', filename=filename)

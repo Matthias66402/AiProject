@@ -44,6 +44,13 @@ jobs:
           python-version: "3.14"
           cache: pip
 
+      - name: Install WeasyPrint system dependencies (Pango/Cairo)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libpango-1.0-0 libpangoft2-1.0-0 libpangocairo-1.0-0 libcairo2 \
+            libgdk-pixbuf-2.0-0 shared-mime-info fonts-dejavu-core
+
       - name: Install dependencies
         run: pip install -r requirements.txt
 
