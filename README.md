@@ -9,13 +9,18 @@ Die Website ist noch im Aufbau, Struktur und Funktionsumfang können sich häufi
 - **KI-Assistent** (Startseite): beantwortet Fragen zur Website über wählbare KI-Modelle. Der System-Prompt bekommt bei jeder Anfrage automatisch die aktuelle Seitenstruktur (aus den registrierten Flask-Routen erzeugt) mitgegeben, damit der Assistent nichts über nicht existierende Funktionen erfindet.
   - Modelle über [Groq](https://groq.com/) (`openai/gpt-oss-20b`, `openai/gpt-oss-120b`, `qwen/qwen3.6-27b`, `groq/compound-mini`)
   - Modelle über [OpenAI](https://platform.openai.com/) (`gpt-5-mini`, `gpt-4o-mini`, `gpt-4.1-mini`)
-- **Login/Registrierung**: Nutzer registrieren sich, melden sich an/ab; Passwörter werden gehasht (Werkzeug) gespeichert.
-- **Nutzerverwaltung** (`/users`): Nutzer anlegen, bearbeiten, Rolle zuweisen (`user`/`admin`).
-- **Stellenangebote** (`/jobs`): Stellenanzeigen anlegen, bearbeiten, löschen, mit Gültigkeitszeitraum und Zuordnung zu einem Stellenanbieter.
-- **Stellenanbieter** (`/customers`): Kunden (Unternehmen) mit Adresse anlegen, bearbeiten, löschen.
-- **Tools-Menü** (nur für Rolle `admin`): lässt die KI Dummy-Inhalte als HTML formulieren und rendert sie per WeasyPrint zu PDF, mit dezentem Lade-Spinner während der Generierung und Link zum Öffnen der fertigen Datei in einem neuen Tab.
-  - **Lebenslauf generieren** (`/tools/resume`): Dummy-Lebenslauf, abgelegt unter `data/resumes/`.
-  - **Stellenangebot generieren** (`/tools/joboffer`): Dummy-Stellenangebot, abgelegt unter `data/joboffers/`.
+- **Login/Registrierung**: Nutzer registrieren sich (immer mit Rolle `user`), melden sich an/ab; Passwörter werden gehasht (Werkzeug) gespeichert.
+- **Rollen**: `user` (Standard bei Registrierung), `customer`, `admin`. Nur `admin` kann Rollen vergeben und hat Schreibzugriff auf Nutzer-, Stellenanbieter- und Stellenverwaltung; die Rollenliste ist in `db.py` (`ROLES`) zentral gepflegt.
+- **Nutzerverwaltung** (`/users`, nur `admin`): Nutzer anlegen, bearbeiten, Rolle zuweisen, optional PLZ/Stadt hinterlegen. Zeigt außerdem den Link zum zuletzt für diesen Nutzer generierten Lebenslauf-PDF (`document_link`), falls vorhanden.
+- **Stellenangebote** (`/jobs`): Stellenanzeigen mit Gültigkeitszeitraum, PLZ/Stadt und Zuordnung zu einem Stellenanbieter.
+  - `admin`: anlegen, bearbeiten, löschen.
+  - Alle anderen (inkl. nicht eingeloggt): nur Liste + Lesemodus ("Ansehen") pro Stelle — Position, Kunde, PLZ/Stadt, Gültigkeitszeitraum als Text, bei KI-generierten Stellen zusätzlich das PDF eingebettet statt der Beschreibung.
+- **Stellenanbieter** (`/customers`): Kunden (Unternehmen) mit Adresse.
+  - `admin`: anlegen, bearbeiten, löschen.
+  - Alle anderen: nur Liste + Lesemodus ("Ansehen"), kein Bearbeiten/Löschen.
+- **Tools-Menü** (nur für Rolle `admin`): lässt die KI Inhalte als HTML formulieren und rendert sie per WeasyPrint zu PDF, mit dezentem Lade-Spinner während der Generierung und Link zum Öffnen der fertigen Datei in einem neuen Tab.
+  - **Lebenslauf generieren** (`/tools/resume`): ein bestehender Nutzer wird per Selectbox ausgewählt. Sind bei ihm PLZ **und** Stadt hinterlegt, übernimmt die KI dessen echten Namen und Wohnort unverändert (Rest frei erfunden); ansonsten ein komplett fiktiver Dummy-Lebenslauf. Das PDF wird unter `data/resumes/` abgelegt und als `document_link` beim Nutzer gespeichert.
+  - **Stellenangebot generieren** (`/tools/joboffer`): ein Stellenanbieter wird per Selectbox ausgewählt. Die KI liefert Position, PLZ, Stadt und den Stellentext strukturiert als JSON zurück; das PDF wird unter `data/joboffers/` abgelegt und automatisch ein passender Eintrag in `/jobs` angelegt (inkl. `document_link`, Gültigkeit heute bis +30 Tage).
   - ⚠️ Läuft nur, wo WeasyPrints native Abhängigkeiten (Pango/Cairo) vorhanden sind — siehe [WeasyPrint unter Windows](#weasyprint-unter-windows) weiter unten. Im Docker-Image ist das bereits eingerichtet.
 
 ## Tech-Stack
@@ -35,7 +40,7 @@ app.py                     Flask-Routen, KI-Assistent-Logik, Modellauswahl
 db.py                      DB-Verbindung, Schema-Erstellung/Migration, CRUD-Funktionen
 templates/
   index.html                Basis-Layout, bindet navigation.html + content_template ein
-  navigation.html            Navigationsleiste inkl. Konto-Dropdown (Anmelden/Registrieren/Abmelden) und Tools-Dropdown (nur Admin)
+  navigation.html            Navigationsleiste inkl. Konto-Dropdown (Anmelden/Registrieren/Abmelden), "Benutzer"-Link und Tools-Dropdown (beide nur Admin)
   home.html                  KI-Assistent-Formular (Startseite)
   login.html, register.html  Anmeldung/Registrierung
   user.html                  Nutzerverwaltung
@@ -46,11 +51,11 @@ templates/
 static/
   style.css                  eigenes Stylesheet
   fontawesome/                lokal eingebundene Icon-Bibliothek
-data/                        generierte PDFs (Lebensläufe/Stellenangebote), von Git ausgeschlossen
+data/                        generierte PDFs (Lebensläufe/Stellenangebote), von Git ausgeschlossen; im Docker-Setup per Bind-Mount (./data:/app/data) persistent auf dem Host
   resumes/
   joboffers/
 Dockerfile                  Python-3.14-slim-Image für die App
-docker-compose.yml          App + MySQL-Service für lokalen/Produktions-Betrieb
+docker-compose.yml          App + MySQL-Service für lokalen/Produktions-Betrieb, mountet ./data in den App-Container
 .github/workflows/main.yml  CI: Syntaxcheck, Smoke-Test, Docker-Build
 .env.example                Vorlage für benötigte Umgebungsvariablen
 ```
@@ -86,7 +91,7 @@ cp .env.example .env   # Werte eintragen
 docker compose up --build
 ```
 
-Startet App und MySQL zusammen; die DB-Daten liegen in einem benannten Volume (`aiproject_mysql_data`).
+Startet App und MySQL zusammen; die DB-Daten liegen in einem benannten Volume (`aiproject_mysql_data`), generierte PDFs unter `./data` (Bind-Mount, direkt im Projektordner sichtbar).
 
 ### Umgebungsvariablen (`.env`)
 

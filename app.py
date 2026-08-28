@@ -91,14 +91,14 @@ PAGE_DESCRIPTIONS = {
     "logout": "Abmelden. Erreichbar über das Konto-Menü oben rechts in der Navigation - dort steht im eingeloggten Zustand nicht 'Konto', sondern der Kurzname des angemeldeten Nutzers; darauf klicken, um das Menü zu öffnen, dort erscheint 'Abmelden'",
     "users": "Nutzerverwaltung: Liste aller Nutzer + neuen Nutzer anlegen, inkl. Rollenvergabe. Nur für Admins, im Hauptmenü als 'Benutzer' verlinkt",
     "edit_user": "Einen bestehenden Nutzer bearbeiten, inkl. Rollenvergabe. Nur für Admins",
-    "jobs": "Stellenangebote verwalten, im Hauptmenü als 'Stellenangebote' verlinkt",
-    "edit_job": "Ein bestehendes Stellenangebot bearbeiten",
-    "delete_job": "Ein Stellenangebot löschen",
-    "customers": "Stellenanbieter (Kunden) verwalten, im Hauptmenü als 'Stellenanbieter' verlinkt",
-    "edit_customer": "Einen bestehenden Stellenanbieter bearbeiten",
-    "delete_customer": "Einen Stellenanbieter löschen",
-    "generate_resume": "Lebenslauf generieren. Nur für Admins, erreichbar über das 'Tools'-Menü in der Navigation",
-    "generate_joboffer": "Stellenangebot generieren. Nur für Admins, erreichbar über das 'Tools'-Menü in der Navigation",
+    "jobs": "Stellenangebote: Liste für alle sichtbar (auch nicht eingeloggt), im Hauptmenü als 'Stellenangebote' verlinkt. Neue Stelle anlegen nur für Admins",
+    "edit_job": "Ein bestehendes Stellenangebot ansehen. Für Admins ein Bearbeiten-Formular, für alle anderen nur eine Leseansicht (Position, Kunde, PLZ/Stadt, Gültigkeit als Text, bei KI-generierten Stellen zusätzlich das PDF eingebettet) ohne Speichern-Möglichkeit",
+    "delete_job": "Ein Stellenangebot löschen. Nur für Admins",
+    "customers": "Stellenanbieter (Kunden): Liste für alle sichtbar, im Hauptmenü als 'Stellenanbieter' verlinkt. Neuen Stellenanbieter anlegen nur für Admins",
+    "edit_customer": "Einen bestehenden Stellenanbieter ansehen. Für Admins ein Bearbeiten-Formular, für alle anderen nur eine Leseansicht (Firma, Adresse, PLZ, Stadt als Text) ohne Speichern-Möglichkeit",
+    "delete_customer": "Einen Stellenanbieter löschen. Nur für Admins",
+    "generate_resume": "Lebenslauf für einen bestehenden, per Auswahlliste gewählten Nutzer generieren (personalisiert mit dessen echtem Namen/Wohnort, falls bei ihm PLZ und Stadt hinterlegt sind, sonst komplett fiktiv). Nur für Admins, erreichbar über das 'Tools'-Menü in der Navigation",
+    "generate_joboffer": "Stellenangebot für einen per Auswahlliste gewählten Stellenanbieter generieren; legt dabei automatisch auch einen passenden Eintrag unter 'Stellenangebote' an. Nur für Admins, erreichbar über das 'Tools'-Menü in der Navigation",
 }
 
 
