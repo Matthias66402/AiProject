@@ -223,9 +223,11 @@ def users():
         role = request.form.get("role", DEFAULT_ROLE)
         if role not in ROLES:
             role = DEFAULT_ROLE
+        zip_code = request.form.get("zip", "").strip() or None
+        city = request.form.get("city", "").strip() or None
 
         if first_name and last_name and short_name and email and password:
-            db.create_user(first_name, last_name, short_name, email, generate_password_hash(password), role)
+            db.create_user(first_name, last_name, short_name, email, generate_password_hash(password), role, zip_code, city)
 
         return redirect(url_for('users'))
 
@@ -247,9 +249,11 @@ def edit_user(user_id):
         if role not in ROLES:
             role = DEFAULT_ROLE
         password_hash = generate_password_hash(password) if password else None
+        zip_code = request.form.get("zip", "").strip() or None
+        city = request.form.get("city", "").strip() or None
 
         if first_name and last_name and short_name and email:
-            db.update_user(user_id, first_name, last_name, short_name, email, role, password_hash)
+            db.update_user(user_id, first_name, last_name, short_name, email, role, password_hash, zip_code, city)
 
         return redirect(url_for('users'))
 
@@ -374,20 +378,40 @@ def generate_resume():
     file_url = None
     if request.method == "POST":
         spec = request.form.get("spec", "").strip()
-        if not spec:
-            message = "Bitte zuerst beschreiben, was der Lebenslauf enthalten soll."
+        user_id = request.form.get("user_id")
+        if not spec or not user_id:
+            message = "Bitte zuerst einen Nutzer wählen und beschreiben, was der Lebenslauf enthalten soll."
         else:
             try:
+                selected_user = db.get_user(int(user_id))
+                if selected_user and selected_user.get("zip") and selected_user.get("city"):
+                    system_content = (
+                        "Du erstellst einen Lebenslauf auf Basis der Vorgaben des Nutzers. "
+                        "Name und Wohnort sind vorgegeben und müssen unverändert übernommen werden, "
+                        "alle weiteren Angaben (Ausbildung, Erfahrung, Qualifikationen) darfst du frei "
+                        "und kreativ erfinden. "
+                        "Antworte ausschließlich mit dem fertigen Lebenslauf im HTML-Format, "
+                        "ohne zusätzliche Erklärungen."
+                    )
+                    user_content = (
+                        f"Name: {selected_user['first_name']} {selected_user['last_name']}\n"
+                        f"Wohnort: {selected_user['zip']} {selected_user['city']}\n\n"
+                        f"{spec}"
+                    )
+                else:
+                    system_content = (
+                        "Du erstellst einen Dummy-Lebenslauf mit frei erfundenen, kreativen Personendaten  "
+                        "(keine echten Personen) auf Basis der Vorgaben des Nutzers. "
+                        "Antworte ausschließlich mit dem fertigen Lebenslauf im HTML-Format, "
+                        "ohne zusätzliche Erklärungen."
+                    )
+                    user_content = spec
+
                 response = openai_client.chat.completions.create(
                     model=DEFAULT_MODEL,
                     messages=[
-                        {"role": "system", "content": (
-                            "Du erstellst einen Dummy-Lebenslauf mit frei erfundenen, kreativen Personendaten  "
-                            "(keine echten Personen) auf Basis der Vorgaben des Nutzers. "
-                            "Antworte ausschließlich mit dem fertigen Lebenslauf im HTML-Format, "
-                            "ohne zusätzliche Erklärungen."
-                        )},
-                        {"role": "user", "content": spec},
+                        {"role": "system", "content": system_content},
+                        {"role": "user", "content": user_content},
                     ],
                 )
                 resume_text = _strip_code_fence(THINK_BLOCK_RE.sub("", response.choices[0].message.content).strip())
@@ -395,14 +419,15 @@ def generate_resume():
                 os.makedirs(RESUME_DIR, exist_ok=True)
                 filename = f"lebenslauf_{datetime.now():%Y%m%d_%H%M%S}.pdf"
                 _write_html_as_pdf(resume_text, os.path.join(RESUME_DIR, filename))
-
-                message = "Lebenslauf wurde erstellt:"
                 file_url = url_for('view_resume', filename=filename)
+                db.set_user_document_link(int(user_id), file_url)
+
+                message = "Lebenslauf wurde erstellt und dem Nutzer zugeordnet:"
             except (GroqAPIStatusError, OpenAIAPIStatusError) as e:
                 app.logger.warning("API error %s: %s", e.status_code, e.body)
                 message = "Der Lebenslauf konnte gerade nicht erstellt werden. Bitte später erneut versuchen."
 
-    return render_template('index.html', content_template='resume.html', message=message, file_url=file_url)
+    return render_template('index.html', content_template='resume.html', message=message, file_url=file_url, users=db.list_users())
 
 
 @app.route('/tools/resume/<path:filename>')

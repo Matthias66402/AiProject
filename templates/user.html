@@ -47,6 +47,14 @@
             <input id="email" name="email" type="email" value="{{ editing_user.email if editing_user else '' }}" required>
         </div>
         <div>
+            <label for="zip">PLZ</label>
+            <input id="zip" name="zip" type="text" value="{{ editing_user.zip if editing_user else '' }}">
+        </div>
+        <div>
+            <label for="city">Stadt</label>
+            <input id="city" name="city" type="text" value="{{ editing_user.city if editing_user else '' }}">
+        </div>
+        <div>
             <label for="role">Rolle</label>
             <select id="role" name="role">
                 {% for role in roles %}
@@ -54,6 +62,12 @@
                 {% endfor %}
             </select>
         </div>
+        {% if editing_user and editing_user.document_link %}
+        <div>
+            <label>Dokument</label>
+            <p><a href="{{ editing_user.document_link }}" target="_blank" rel="noopener">PDF öffnen</a></p>
+        </div>
+        {% endif %}
         <div>
             <label for="password">{{ "Neues Passwort (optional)" if editing_user else "Passwort" }}</label>
             <input id="password" name="password" type="password" {% if not editing_user %}required{% endif %}>

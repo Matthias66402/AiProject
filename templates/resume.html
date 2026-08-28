@@ -10,6 +10,15 @@
     </p>
     {% endif %}
     <form action="{{ url_for('generate_resume') }}" method="POST" id="resume-form">
+        <div>
+            <label for="user_id">Nutzer</label>
+            <select id="user_id" name="user_id" required>
+                <option value="" disabled selected>Bitte wählen</option>
+                {% for user in users %}
+                <option value="{{ user.id }}">{{ user.first_name }} {{ user.last_name }} ({{ user.short_name }})</option>
+                {% endfor %}
+            </select>
+        </div>
         <div class="textarea-wrap">
             <textarea class="p-3" name="spec" rows="8"></textarea>
             <div class="generating-indicator" id="resume-generating-indicator">

@@ -25,6 +25,12 @@ _JOB_COLUMNS = {
     "city": "VARCHAR(100)",
 }
 
+_USER_COLUMNS = {
+    "document_link": "VARCHAR(500)",
+    "zip": "VARCHAR(10)",
+    "city": "VARCHAR(100)",
+}
+
 
 def get_connection():
     return pymysql.connect(
@@ -52,6 +58,9 @@ def init_db():
                     email VARCHAR(255) NOT NULL UNIQUE,
                     password_hash VARCHAR(255) NOT NULL,
                     role {_ROLE_COLUMN_TYPE} NOT NULL DEFAULT '{DEFAULT_ROLE}',
+                    document_link VARCHAR(500),
+                    zip VARCHAR(10),
+                    city VARCHAR(100),
                     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                 )
@@ -67,6 +76,16 @@ def init_db():
                 cur.execute(f"ALTER TABLE users ADD COLUMN role {_ROLE_COLUMN_TYPE} NOT NULL DEFAULT '{DEFAULT_ROLE}'")
             elif row["column_type"] != _ROLE_COLUMN_TYPE.lower():
                 cur.execute(f"ALTER TABLE users MODIFY COLUMN role {_ROLE_COLUMN_TYPE} NOT NULL DEFAULT '{DEFAULT_ROLE}'")
+
+            # Migration für users-Tabellen, die vor Einführung von document_link angelegt wurden.
+            cur.execute("""
+                SELECT COLUMN_NAME AS column_name FROM information_schema.columns
+                WHERE table_schema = DATABASE() AND table_name = 'users'
+            """)
+            existing_user_columns = {row["column_name"] for row in cur.fetchall()}
+            for column, definition in _USER_COLUMNS.items():
+                if column not in existing_user_columns:
+                    cur.execute(f"ALTER TABLE users ADD COLUMN {column} {definition}")
 
             # customer_id in jobs referenziert diese Tabelle, daher muss sie vorher existieren.
             cur.execute("""
@@ -279,22 +298,22 @@ def get_user_by_email(email):
         conn.close()
 
 
-def create_user(first_name, last_name, short_name, email, password_hash, role=DEFAULT_ROLE):
+def create_user(first_name, last_name, short_name, email, password_hash, role=DEFAULT_ROLE, zip_code=None, city=None):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO users (first_name, last_name, short_name, email, password_hash, role)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO users (first_name, last_name, short_name, email, password_hash, role, zip, city)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 """,
-                (first_name, last_name, short_name, email, password_hash, role),
+                (first_name, last_name, short_name, email, password_hash, role, zip_code, city),
             )
     finally:
         conn.close()
 
 
-def update_user(user_id, first_name, last_name, short_name, email, role, password_hash=None):
+def update_user(user_id, first_name, last_name, short_name, email, role, password_hash=None, zip_code=None, city=None):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -302,19 +321,28 @@ def update_user(user_id, first_name, last_name, short_name, email, role, passwor
                 cur.execute(
                     """
                     UPDATE users
-                    SET first_name = %s, last_name = %s, short_name = %s, email = %s, role = %s, password_hash = %s
+                    SET first_name = %s, last_name = %s, short_name = %s, email = %s, role = %s, password_hash = %s, zip = %s, city = %s
                     WHERE id = %s
                     """,
-                    (first_name, last_name, short_name, email, role, password_hash, user_id),
+                    (first_name, last_name, short_name, email, role, password_hash, zip_code, city, user_id),
                 )
             else:
                 cur.execute(
                     """
                     UPDATE users
-                    SET first_name = %s, last_name = %s, short_name = %s, email = %s, role = %s
+                    SET first_name = %s, last_name = %s, short_name = %s, email = %s, role = %s, zip = %s, city = %s
                     WHERE id = %s
                     """,
-                    (first_name, last_name, short_name, email, role, user_id),
+                    (first_name, last_name, short_name, email, role, zip_code, city, user_id),
                 )
+    finally:
+        conn.close()
+
+
+def set_user_document_link(user_id, document_link):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE users SET document_link = %s WHERE id = %s", (document_link, user_id))
     finally:
         conn.close()
