@@ -11,6 +11,10 @@
         <a href="{{ url_for('customers') }}" class="{{ 'active' if request.endpoint in ('customers', 'edit_customer') else '' }}"><i class="fa-solid fa-building text-xl text-[#76A250]"></i> Stellenanbieter</a>
 
         {% if current_user and current_user.role == 'admin' %}
+        <a href="{{ url_for('users') }}" class="{{ 'active' if request.endpoint in ('users', 'edit_user') else '' }}"><i class="fa-solid fa-users text-xl text-[#76A250]"></i> Benutzer</a>
+        {% endif %}
+
+        {% if current_user and current_user.role == 'admin' %}
         <details class="relative">
             <summary class="cursor-pointer flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[rgba(255,215,130,0.35)] bg-[rgba(0,0,0,0.2)] text-[#ffe9a8] text-sm select-none w-fit">
                 <i class="fa-solid fa-toolbox text-[#76A250]"></i>

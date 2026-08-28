@@ -29,6 +29,11 @@ services:
       DB_PORT: 3306
     ports:
       - "5003:5003"
+    volumes:
+      # Erzeugte PDFs (Lebensläufe, Stellenangebote) landen so direkt im
+      # lokalen data/-Ordner statt in der (bei Neustart verlorenen)
+      # schreibbaren Container-Schicht.
+      - ./data:/app/data
     depends_on:
       mysql:
         condition: service_healthy

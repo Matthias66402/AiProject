@@ -88,8 +88,8 @@ PAGE_DESCRIPTIONS = {
     "login": "Anmeldeseite für bestehende Nutzer. Erreichbar über das Konto-Menü oben rechts in der Navigation (Symbol + Beschriftung 'Konto'), dort auf 'Anmelden' klicken - nur sichtbar, wenn niemand eingeloggt ist",
     "register": "Registrierungsseite für neue Nutzer. Erreichbar über das Konto-Menü oben rechts in der Navigation (Symbol + Beschriftung 'Konto'), dort auf 'Registrieren' klicken - nur sichtbar, wenn niemand eingeloggt ist",
     "logout": "Abmelden. Erreichbar über das Konto-Menü oben rechts in der Navigation - dort steht im eingeloggten Zustand nicht 'Konto', sondern der Kurzname des angemeldeten Nutzers; darauf klicken, um das Menü zu öffnen, dort erscheint 'Abmelden'",
-    "users": "Nutzerverwaltung: Liste aller Nutzer + neuen Nutzer anlegen",
-    "edit_user": "Einen bestehenden Nutzer bearbeiten",
+    "users": "Nutzerverwaltung: Liste aller Nutzer + neuen Nutzer anlegen, inkl. Rollenvergabe. Nur für Admins, im Hauptmenü als 'Benutzer' verlinkt",
+    "edit_user": "Einen bestehenden Nutzer bearbeiten, inkl. Rollenvergabe. Nur für Admins",
     "jobs": "Stellenangebote verwalten, im Hauptmenü als 'Stellenangebote' verlinkt",
     "edit_job": "Ein bestehendes Stellenangebot bearbeiten",
     "delete_job": "Ein Stellenangebot löschen",
@@ -210,6 +210,9 @@ def logout():
 
 @app.route('/users', methods=["GET", "POST"])
 def users():
+    if session.get("user_role") != "admin":
+        return redirect(url_for('home'))
+
     if request.method == "POST":
         first_name = request.form.get("first_name", "").strip()
         last_name = request.form.get("last_name", "").strip()
@@ -230,6 +233,9 @@ def users():
 
 @app.route('/users/<int:user_id>/edit', methods=["GET", "POST"])
 def edit_user(user_id):
+    if session.get("user_role") != "admin":
+        return redirect(url_for('home'))
+
     if request.method == "POST":
         first_name = request.form.get("first_name", "").strip()
         last_name = request.form.get("last_name", "").strip()

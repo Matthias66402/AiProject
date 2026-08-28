@@ -5,7 +5,7 @@ from pymysql.cursors import DictCursor
 
 # Erlaubte Werte für users.role (MySQL SET-Spalte). Weitere Rollen können hier
 # einfach ergänzt werden; die Spaltendefinition wird bei jedem Start abgeglichen.
-ROLES = ["user", "admin"]
+ROLES = ["user", "customer", "admin"]
 DEFAULT_ROLE = "user"
 _ROLE_COLUMN_TYPE = "SET(" + ",".join(f"'{role}'" for role in ROLES) + ")"
 
