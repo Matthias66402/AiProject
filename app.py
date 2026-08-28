@@ -1,5 +1,6 @@
+import json
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory
 from weasyprint import HTML
@@ -258,14 +259,19 @@ def edit_user(user_id):
 @app.route('/jobs', methods=["GET", "POST"])
 def jobs():
     if request.method == "POST":
+        if session.get("user_role") != "admin":
+            return redirect(url_for('jobs'))
+
         position = request.form.get("position", "").strip()
         content = request.form.get("content", "").strip()
         valid_from = request.form.get("valid_from") or None
         valid_until = request.form.get("valid_until") or None
         customer_id = request.form.get("customer_id")
+        zip_code = request.form.get("zip", "").strip() or None
+        city = request.form.get("city", "").strip() or None
 
         if position and content and customer_id:
-            db.create_job(position, content, valid_from, valid_until, int(customer_id))
+            db.create_job(position, content, valid_from, valid_until, int(customer_id), zip_code=zip_code, city=city)
 
         return redirect(url_for('jobs'))
 
@@ -275,14 +281,19 @@ def jobs():
 @app.route('/jobs/<int:job_id>/edit', methods=["GET", "POST"])
 def edit_job(job_id):
     if request.method == "POST":
+        if session.get("user_role") != "admin":
+            return redirect(url_for('jobs'))
+
         position = request.form.get("position", "").strip()
         content = request.form.get("content", "").strip()
         valid_from = request.form.get("valid_from") or None
         valid_until = request.form.get("valid_until") or None
         customer_id = request.form.get("customer_id")
+        zip_code = request.form.get("zip", "").strip() or None
+        city = request.form.get("city", "").strip() or None
 
         if position and content and customer_id:
-            db.update_job(job_id, position, content, valid_from, valid_until, int(customer_id))
+            db.update_job(job_id, position, content, valid_from, valid_until, int(customer_id), zip_code=zip_code, city=city)
 
         return redirect(url_for('jobs'))
 
@@ -291,6 +302,8 @@ def edit_job(job_id):
 
 @app.route('/jobs/<int:job_id>/delete', methods=["POST"])
 def delete_job(job_id):
+    if session.get("user_role") != "admin":
+        return redirect(url_for('jobs'))
     db.delete_job(job_id)
     return redirect(url_for('jobs'))
 
@@ -298,6 +311,9 @@ def delete_job(job_id):
 @app.route('/customers', methods=["GET", "POST"])
 def customers():
     if request.method == "POST":
+        if session.get("user_role") != "admin":
+            return redirect(url_for('customers'))
+
         company_name = request.form.get("company_name", "").strip()
         street = request.form.get("street", "").strip()
         street_number = request.form.get("street_number", "").strip()
@@ -315,6 +331,9 @@ def customers():
 @app.route('/customers/<int:customer_id>/edit', methods=["GET", "POST"])
 def edit_customer(customer_id):
     if request.method == "POST":
+        if session.get("user_role") != "admin":
+            return redirect(url_for('customers'))
+
         company_name = request.form.get("company_name", "").strip()
         street = request.form.get("street", "").strip()
         street_number = request.form.get("street_number", "").strip()
@@ -331,6 +350,8 @@ def edit_customer(customer_id):
 
 @app.route('/customers/<int:customer_id>/delete', methods=["POST"])
 def delete_customer(customer_id):
+    if session.get("user_role") != "admin":
+        return redirect(url_for('customers'))
     db.delete_customer(customer_id)
     return redirect(url_for('customers'))
 
@@ -400,41 +421,61 @@ def generate_joboffer():
     file_url = None
     if request.method == "POST":
         spec = request.form.get("spec", "").strip()
-        if not spec:
-            message = "Bitte zuerst beschreiben, was das Stellenangebot enthalten soll."
+        customer_id = request.form.get("customer_id")
+        if not spec or not customer_id:
+            message = "Bitte zuerst einen Stellenanbieter wählen und beschreiben, was das Stellenangebot enthalten soll."
         else:
             try:
                 response = openai_client.chat.completions.create(
                     model=DEFAULT_MODEL,
+                    response_format={"type": "json_object"},
                     messages=[
                         {"role": "system", "content": (
                             "Du erstellst ein Dummy-Stellenangebot mit frei erfundenen, kreativen Angaben "
                             "(kein echtes Unternehmen) auf Basis der Vorgaben des Nutzers. "
-                            "Antworte ausschließlich mit dem fertigen Stellenangebot als formatiertes HTML mit Überschriften, Aufzählungen etc., "
-                            "ohne zusätzliche Erklärungen."
+                            "Antworte ausschließlich mit einem JSON-Objekt mit genau vier Feldern: "
+                            "\"position\" (kurze Stellenbezeichnung als Klartext, z.B. \"Softwareentwickler (m/w/d)\"), "
+                            "\"zip\" (Postleitzahl des Arbeitsortes als Text), "
+                            "\"city\" (Stadt des Arbeitsortes als Text) und "
+                            "\"content\" (das vollständige Stellenangebot als formatiertes HTML mit Überschriften, Aufzählungen etc.), "
+                            "ohne zusätzliche Erklärungen außerhalb des JSON."
                         )},
                         {"role": "user", "content": spec},
                     ],
                 )
-                joboffer_text = _strip_code_fence(THINK_BLOCK_RE.sub("", response.choices[0].message.content).strip())
+                raw = _strip_code_fence(THINK_BLOCK_RE.sub("", response.choices[0].message.content).strip())
+                data = json.loads(raw)
+                position = (data.get("position") or "").strip()
+                joboffer_text = (data.get("content") or "").strip()
+                zip_code = (data.get("zip") or "").strip() or None
+                city = (data.get("city") or "").strip() or None
+                valid_from = datetime.now().date()
+                valid_until = valid_from + timedelta(days=30)
+
+                if not position or not joboffer_text:
+                    raise ValueError("Antwort enthielt kein position/content-Feld.")
 
                 os.makedirs(JOBOFFER_DIR, exist_ok=True)
                 filename = f"stellenangebot_{datetime.now():%Y%m%d_%H%M%S}.pdf"
                 _write_html_as_pdf(joboffer_text, os.path.join(JOBOFFER_DIR, filename))
-
-                message = "Stellenangebot wurde erstellt:"
                 file_url = url_for('view_joboffer', filename=filename)
+                db.create_job(position, joboffer_text, valid_from, valid_until, int(customer_id), file_url, zip_code, city)
+
+                message = "Stellenangebot wurde erstellt und als Stelle angelegt:"
             except (GroqAPIStatusError, OpenAIAPIStatusError) as e:
                 app.logger.warning("API error %s: %s", e.status_code, e.body)
                 message = "Das Stellenangebot konnte gerade nicht erstellt werden. Bitte später erneut versuchen."
+            except (json.JSONDecodeError, ValueError) as e:
+                app.logger.warning("Unerwartetes KI-Antwortformat: %s", e)
+                message = "Das Stellenangebot konnte gerade nicht erstellt werden. Bitte später erneut versuchen."
 
-    return render_template('index.html', content_template='joboffer.html', message=message, file_url=file_url)
+    return render_template('index.html', content_template='joboffer.html', message=message, file_url=file_url, customers=db.list_customers())
 
 
 @app.route('/tools/joboffer/<path:filename>')
 def view_joboffer(filename):
-    if session.get("user_role") != "admin":
-        return redirect(url_for('home'))
+    # Offen für alle: Stellenangebots-PDFs werden im (ebenfalls öffentlichen)
+    # Stellen-Ansichtsmodus für Nicht-Admins eingebettet.
     return send_from_directory(JOBOFFER_DIR, filename)
 
 if __name__ == '__main__':

@@ -10,6 +10,15 @@
     </p>
     {% endif %}
     <form action="{{ url_for('generate_joboffer') }}" method="POST" id="joboffer-form">
+        <div>
+            <label for="customer_id">Stellenanbieter</label>
+            <select id="customer_id" name="customer_id" required>
+                <option value="" disabled selected>Bitte wählen</option>
+                {% for customer in customers %}
+                <option value="{{ customer.id }}">{{ customer.company_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
         <div class="textarea-wrap">
             <textarea class="p-3" name="spec" rows="8"></textarea>
             <div class="generating-indicator" id="joboffer-generating-indicator">
@@ -17,7 +26,7 @@
                 Stellenangebot wird generiert …
             </div>
         </div>
-        <button class="special-btn" type="submit" id="joboffer-submit-btn">Generieren</button>
+        <button class="subtle-btn" type="submit" id="joboffer-submit-btn">Generieren</button>
     </form>
 </div>
 
@@ -33,3 +42,5 @@
         });
     });
 </script>
+
+

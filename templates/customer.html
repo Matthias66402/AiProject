@@ -1,10 +1,35 @@
 <div class="scroll wide">
+    {% set is_admin = current_user and current_user.role == 'admin' %}
     <h1 id="greetings">Kunden</h1>
     <p class="subtitle">Übersicht der registrierten Kunden</p>
 
+    {% if is_admin or editing_customer %}
     <details class="entity-form" {% if editing_customer %}open{% endif %}>
-        <summary class="special-btn">{{ "Kunde bearbeiten" if editing_customer else "+ Kunde anlegen" }}</summary>
+        <summary class="subtle-btn">
+            {% if editing_customer %}{{ "Kunde bearbeiten" if is_admin else "Kunde ansehen" }}{% else %}+ Kunde anlegen{% endif %}
+        </summary>
 
+        {% if editing_customer and not is_admin %}
+        <div class="entity-view">
+            <div>
+                <label>Firma</label>
+                <p>{{ editing_customer.company_name }}</p>
+            </div>
+            <div>
+                <label>Adresse</label>
+                <p>{{ editing_customer.street }} {{ editing_customer.street_number }}</p>
+            </div>
+            <div>
+                <label>PLZ</label>
+                <p>{{ editing_customer.zip }}</p>
+            </div>
+            <div>
+                <label>Stadt</label>
+                <p>{{ editing_customer.city }}</p>
+            </div>
+            <a class="subtle-btn" href="{{ url_for('customers') }}">Schließen</a>
+        </div>
+        {% else %}
         <form action="{{ url_for('edit_customer', customer_id=editing_customer.id) if editing_customer else url_for('customers') }}" method="POST">
             <div>
                 <label for="company_name">Firma</label>
@@ -26,12 +51,14 @@
                 <label for="city">Stadt</label>
                 <input id="city" name="city" type="text" value="{{ editing_customer.city if editing_customer else '' }}" required>
             </div>
-            <button class="special-btn" type="submit">{{ "Speichern" if editing_customer else "Kunde anlegen" }}</button>
+            <button class="subtle-btn" type="submit">{{ "Speichern" if editing_customer else "Kunde anlegen" }}</button>
         </form>
         {% if editing_customer %}
         <p class="subtitle"><a href="{{ url_for('customers') }}">Abbrechen</a></p>
         {% endif %}
+        {% endif %}
     </details>
+    {% endif %}
 
     <table class="user-table">
         <thead>
@@ -53,10 +80,12 @@
                 <td>{{ customer.city }}</td>
                 <td>{{ customer.created_at }}</td>
                 <td class="row-actions">
-                    <a href="{{ url_for('edit_customer', customer_id=customer.id) }}"><i class="fa-solid fa-pen"></i> Bearbeiten</a>
+                    <a href="{{ url_for('edit_customer', customer_id=customer.id) }}"><i class="fa-solid {{ 'fa-pen' if is_admin else 'fa-eye' }}"></i> {{ "Bearbeiten" if is_admin else "Ansehen" }}</a>
+                    {% if is_admin %}
                     <form action="{{ url_for('delete_customer', customer_id=customer.id) }}" method="POST" onsubmit="return confirm('Kunde wirklich löschen?');">
                         <button type="submit" class="link-button"><i class="fa-solid fa-trash"></i> Löschen</button>
                     </form>
+                    {% endif %}
                 </td>
             </tr>
             {% else %}

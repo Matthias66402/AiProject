@@ -19,6 +19,12 @@ _CUSTOMER_COLUMNS = {
     "updated_at": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
 }
 
+_JOB_COLUMNS = {
+    "document_link": "VARCHAR(500)",
+    "zip": "VARCHAR(10)",
+    "city": "VARCHAR(100)",
+}
+
 
 def get_connection():
     return pymysql.connect(
@@ -94,9 +100,21 @@ def init_db():
                     valid_from DATE,
                     valid_until DATE,
                     customer_id INT NOT NULL,
+                    document_link VARCHAR(500),
+                    zip VARCHAR(10),
+                    city VARCHAR(100),
                     FOREIGN KEY (customer_id) REFERENCES customers(id)
                 )
             """)
+            # Migration für jobs-Tabellen, die vor Einführung von document_link/zip/city angelegt wurden.
+            cur.execute("""
+                SELECT COLUMN_NAME AS column_name FROM information_schema.columns
+                WHERE table_schema = DATABASE() AND table_name = 'jobs'
+            """)
+            existing_job_columns = {row["column_name"] for row in cur.fetchall()}
+            for column, definition in _JOB_COLUMNS.items():
+                if column not in existing_job_columns:
+                    cur.execute(f"ALTER TABLE jobs ADD COLUMN {column} {definition}")
     finally:
         conn.close()
 
@@ -200,38 +218,43 @@ def get_job(job_id):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT * FROM jobs WHERE id = %s", (job_id,))
+            cur.execute("""
+                SELECT jobs.*, customers.company_name AS customer_name
+                FROM jobs
+                JOIN customers ON customers.id = jobs.customer_id
+                WHERE jobs.id = %s
+            """, (job_id,))
             return cur.fetchone()
     finally:
         conn.close()
 
 
-def create_job(position, content, valid_from, valid_until, customer_id):
+def create_job(position, content, valid_from, valid_until, customer_id, document_link=None, zip_code=None, city=None):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO jobs (position, content, valid_from, valid_until, customer_id)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO jobs (position, content, valid_from, valid_until, customer_id, document_link, zip, city)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 """,
-                (position, content, valid_from, valid_until, customer_id),
+                (position, content, valid_from, valid_until, customer_id, document_link, zip_code, city),
             )
     finally:
         conn.close()
 
 
-def update_job(job_id, position, content, valid_from, valid_until, customer_id):
+def update_job(job_id, position, content, valid_from, valid_until, customer_id, zip_code=None, city=None):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             cur.execute(
                 """
                 UPDATE jobs
-                SET position = %s, content = %s, valid_from = %s, valid_until = %s, customer_id = %s
+                SET position = %s, content = %s, valid_from = %s, valid_until = %s, customer_id = %s, zip = %s, city = %s
                 WHERE id = %s
                 """,
-                (position, content, valid_from, valid_until, customer_id, job_id),
+                (position, content, valid_from, valid_until, customer_id, zip_code, city, job_id),
             )
     finally:
         conn.close()

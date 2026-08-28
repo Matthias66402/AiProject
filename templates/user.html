@@ -58,7 +58,7 @@
             <label for="password">{{ "Neues Passwort (optional)" if editing_user else "Passwort" }}</label>
             <input id="password" name="password" type="password" {% if not editing_user %}required{% endif %}>
         </div>
-        <button id="special-btn" type="submit">{{ "Speichern" if editing_user else "Benutzer anlegen" }}</button>
+        <button class="{{ 'subtle-btn' if editing_user else 'special-btn' }}" type="submit">{{ "Speichern" if editing_user else "Benutzer anlegen" }}</button>
     </form>
     {% if editing_user %}
     <p class="subtitle"><a href="{{ url_for('users') }}">Abbrechen</a></p>
