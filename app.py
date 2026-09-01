@@ -108,12 +108,17 @@ def build_site_map():
     damit neue/geänderte Routen sofort ohne Prompt-Pflege sichtbar sind."""
     lines = []
     for rule in sorted(app.url_map.iter_rules(), key=lambda r: r.rule):
-        if rule.endpoint == "static":
+        if rule.endpoint in ("static", "favicon"):
             continue
         description = PAGE_DESCRIPTIONS.get(rule.endpoint, "(noch keine Beschreibung hinterlegt)")
         methods = ", ".join(sorted(rule.methods - {"HEAD", "OPTIONS"}))
         lines.append(f"- {rule.rule} [{methods}] -> {description}")
     return "\n".join(lines)
+
+
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(app.static_folder, "favicon.ico", mimetype="image/vnd.microsoft.icon")
 
 
 @app.route('/', methods=["GET", "POST"])
