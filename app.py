@@ -456,29 +456,56 @@ def generate_joboffer():
             message = "Bitte zuerst einen Stellenanbieter wählen und beschreiben, was das Stellenangebot enthalten soll."
         else:
             try:
+                selected_customer = db.get_customer(int(customer_id))
+                if selected_customer:
+                    company_block = (
+                        f"{selected_customer['company_name']}\n"
+                        f"{selected_customer['street']} {selected_customer['street_number']}\n"
+                        f"{selected_customer['zip']} {selected_customer['city']}"
+                    )
+                    system_content = (
+                        "Du erstellst ein Stellenangebot auf Basis der Vorgaben des Nutzers. "
+                        "Unternehmensname und Adresse sind vorgegeben und müssen unverändert als Kontaktdaten "
+                        "im Stellenangebot übernommen werden, alle weiteren Angaben (Aufgaben, Anforderungen, "
+                        "Benefits etc.) darfst du frei und kreativ erfinden. "
+                        "Antworte ausschließlich mit einem JSON-Objekt mit genau zwei Feldern: "
+                        "\"position\" (kurze Stellenbezeichnung als Klartext, z.B. \"Softwareentwickler (m/w/d)\") und "
+                        "\"content\" (das vollständige Stellenangebot als formatiertes HTML mit Überschriften, "
+                        "Aufzählungen etc., inklusive der vorgegebenen Kontaktdaten), "
+                        "ohne zusätzliche Erklärungen außerhalb des JSON."
+                    )
+                    user_content = f"Unternehmen:\n{company_block}\n\n{spec}"
+                else:
+                    system_content = (
+                        "Du erstellst ein Dummy-Stellenangebot mit frei erfundenen, kreativen Angaben "
+                        "(kein echtes Unternehmen) auf Basis der Vorgaben des Nutzers. "
+                        "Antworte ausschließlich mit einem JSON-Objekt mit genau vier Feldern: "
+                        "\"position\" (kurze Stellenbezeichnung als Klartext, z.B. \"Softwareentwickler (m/w/d)\"), "
+                        "\"zip\" (Postleitzahl des Arbeitsortes als Text), "
+                        "\"city\" (Stadt des Arbeitsortes als Text) und "
+                        "\"content\" (das vollständige Stellenangebot als formatiertes HTML mit Überschriften, Aufzählungen etc.), "
+                        "ohne zusätzliche Erklärungen außerhalb des JSON."
+                    )
+                    user_content = spec
+
                 response = openai_client.chat.completions.create(
                     model=DEFAULT_MODEL,
                     response_format={"type": "json_object"},
                     messages=[
-                        {"role": "system", "content": (
-                            "Du erstellst ein Dummy-Stellenangebot mit frei erfundenen, kreativen Angaben "
-                            "(kein echtes Unternehmen) auf Basis der Vorgaben des Nutzers. "
-                            "Antworte ausschließlich mit einem JSON-Objekt mit genau vier Feldern: "
-                            "\"position\" (kurze Stellenbezeichnung als Klartext, z.B. \"Softwareentwickler (m/w/d)\"), "
-                            "\"zip\" (Postleitzahl des Arbeitsortes als Text), "
-                            "\"city\" (Stadt des Arbeitsortes als Text) und "
-                            "\"content\" (das vollständige Stellenangebot als formatiertes HTML mit Überschriften, Aufzählungen etc.), "
-                            "ohne zusätzliche Erklärungen außerhalb des JSON."
-                        )},
-                        {"role": "user", "content": spec},
+                        {"role": "system", "content": system_content},
+                        {"role": "user", "content": user_content},
                     ],
                 )
                 raw = _strip_code_fence(THINK_BLOCK_RE.sub("", response.choices[0].message.content).strip())
                 data = json.loads(raw)
                 position = (data.get("position") or "").strip()
                 joboffer_text = (data.get("content") or "").strip()
-                zip_code = (data.get("zip") or "").strip() or None
-                city = (data.get("city") or "").strip() or None
+                if selected_customer:
+                    zip_code = selected_customer["zip"]
+                    city = selected_customer["city"]
+                else:
+                    zip_code = (data.get("zip") or "").strip() or None
+                    city = (data.get("city") or "").strip() or None
                 valid_from = datetime.now().date()
                 valid_until = valid_from + timedelta(days=30)
 
