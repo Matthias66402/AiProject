@@ -236,7 +236,7 @@ def users():
 
         return redirect(url_for('users'))
 
-    return render_template('index.html', content_template='user.html', users=db.list_users(), editing_user=None, roles=ROLES)
+    return render_template('index.html', content_template='user.html', users=db.list_users(), editing_user=None, roles=ROLES, resumes=[])
 
 
 @app.route('/users/<int:user_id>/edit', methods=["GET", "POST"])
@@ -262,7 +262,7 @@ def edit_user(user_id):
 
         return redirect(url_for('users'))
 
-    return render_template('index.html', content_template='user.html', users=db.list_users(), editing_user=db.get_user(user_id), roles=ROLES)
+    return render_template('index.html', content_template='user.html', users=db.list_users(), editing_user=db.get_user(user_id), roles=ROLES, resumes=db.list_resumes_for_user(user_id))
 
 
 @app.route('/jobs', methods=["GET", "POST"])
@@ -425,7 +425,7 @@ def generate_resume():
                 filename = f"lebenslauf_{datetime.now():%Y%m%d_%H%M%S}.pdf"
                 _write_html_as_pdf(resume_text, os.path.join(RESUME_DIR, filename))
                 file_url = url_for('view_resume', filename=filename)
-                db.set_user_document_link(int(user_id), file_url)
+                db.create_resume(resume_text, file_url, int(user_id))
 
                 message = "Lebenslauf wurde erstellt und dem Nutzer zugeordnet:"
             except (GroqAPIStatusError, OpenAIAPIStatusError) as e:

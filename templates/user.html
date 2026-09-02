@@ -62,10 +62,14 @@
                 {% endfor %}
             </select>
         </div>
-        {% if editing_user and editing_user.document_link %}
+        {% if editing_user and resumes %}
         <div>
-            <label>Dokument</label>
-            <p><a href="{{ editing_user.document_link }}" target="_blank" rel="noopener">PDF öffnen</a></p>
+            <label>Lebensläufe</label>
+            <ul>
+                {% for resume in resumes %}
+                <li><a href="{{ resume.document_link }}" target="_blank" rel="noopener">Lebenslauf vom {{ resume.created_at }}</a></li>
+                {% endfor %}
+            </ul>
         </div>
         {% endif %}
         <div>

@@ -134,6 +134,18 @@ def init_db():
             for column, definition in _JOB_COLUMNS.items():
                 if column not in existing_job_columns:
                     cur.execute(f"ALTER TABLE jobs ADD COLUMN {column} {definition}")
+
+            # user_id in resumes referenziert die users-Tabelle, daher muss sie vorher existieren.
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS resumes (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    content TEXT NOT NULL,
+                    document_link VARCHAR(500),
+                    user_id INT NOT NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                )
+            """)
     finally:
         conn.close()
 
@@ -344,5 +356,33 @@ def set_user_document_link(user_id, document_link):
     try:
         with conn.cursor() as cur:
             cur.execute("UPDATE users SET document_link = %s WHERE id = %s", (document_link, user_id))
+    finally:
+        conn.close()
+
+
+def create_resume(content, document_link, user_id):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO resumes (content, document_link, user_id)
+                VALUES (%s, %s, %s)
+                """,
+                (content, document_link, user_id),
+            )
+    finally:
+        conn.close()
+
+
+def list_resumes_for_user(user_id):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT * FROM resumes WHERE user_id = %s ORDER BY created_at DESC",
+                (user_id,),
+            )
+            return cur.fetchall()
     finally:
         conn.close()
