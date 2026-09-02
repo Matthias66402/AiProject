@@ -180,16 +180,25 @@ def list_customers():
         conn.close()
 
 
-def list_jobs():
+def list_jobs(customer_id=None):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("""
-                SELECT jobs.*, customers.company_name AS customer_name
-                FROM jobs
-                JOIN customers ON customers.id = jobs.customer_id
-                ORDER BY jobs.created_at DESC
-            """)
+            if customer_id:
+                cur.execute("""
+                    SELECT jobs.*, customers.company_name AS customer_name
+                    FROM jobs
+                    JOIN customers ON customers.id = jobs.customer_id
+                    WHERE jobs.customer_id = %s
+                    ORDER BY jobs.created_at DESC
+                """, (customer_id,))
+            else:
+                cur.execute("""
+                    SELECT jobs.*, customers.company_name AS customer_name
+                    FROM jobs
+                    JOIN customers ON customers.id = jobs.customer_id
+                    ORDER BY jobs.created_at DESC
+                """)
             return cur.fetchall()
     finally:
         conn.close()

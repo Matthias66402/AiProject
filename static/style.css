@@ -402,6 +402,16 @@ textarea:focus {
     color: #f8f1ff;
 }
 
+.entity-related {
+    margin-top: 24px;
+}
+
+.entity-related h2 {
+    font-size: 1.1rem;
+    color: #ffe9a8;
+    margin: 0 0 12px;
+}
+
 .pdf-embed {
     width: 100%;
     height: 600px;

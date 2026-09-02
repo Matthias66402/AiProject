@@ -6,26 +6,16 @@
     {% if is_admin or editing_customer %}
     <details class="entity-form" {% if editing_customer %}open{% endif %}>
         <summary class="subtle-btn">
-            {% if editing_customer %}{{ "Kunde bearbeiten" if is_admin else "Kunde ansehen" }}{% else %}+ Kunde anlegen{% endif %}
+            {% if editing_customer %}{{ "Kunde bearbeiten" if is_admin else "Kundendaten" }}{% else %}+ Kunde anlegen{% endif %}
         </summary>
 
         {% if editing_customer and not is_admin %}
-        <div class="entity-view">
+        <div class="entity-views">
             <div>
                 <label>Firma</label>
                 <p>{{ editing_customer.company_name }}</p>
-            </div>
-            <div>
-                <label>Adresse</label>
                 <p>{{ editing_customer.street }} {{ editing_customer.street_number }}</p>
-            </div>
-            <div>
-                <label>PLZ</label>
-                <p>{{ editing_customer.zip }}</p>
-            </div>
-            <div>
-                <label>Stadt</label>
-                <p>{{ editing_customer.city }}</p>
+                <p>{{ editing_customer.zip }} {{ editing_customer.city }}</p>
             </div>
             <a class="subtle-btn" href="{{ url_for('customers') }}">Schließen</a>
         </div>
@@ -56,6 +46,38 @@
         {% if editing_customer %}
         <p class="subtitle"><a href="{{ url_for('customers') }}">Abbrechen</a></p>
         {% endif %}
+        {% endif %}
+
+        {% if editing_customer %}
+        <div class="entity-related">
+            <h2>Stellenangebote von {{ editing_customer.company_name }}</h2>
+            <table class="user-table">
+                <thead>
+                    <tr>
+                        <th>Position</th>
+                        <th>Gültig von</th>
+                        <th>Gültig bis</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for job in customer_jobs %}
+                    <tr>
+                        <td>{{ job.position }}</td>
+                        <td>{{ job.valid_from or "-" }}</td>
+                        <td>{{ job.valid_until or "-" }}</td>
+                        <td class="row-actions">
+                            <a href="{{ url_for('edit_job', job_id=job.id, from_customer=editing_customer.id) }}"><i class="fa-solid {{ 'fa-pen' if is_admin else 'fa-eye' }}"></i> {{ "Bearbeiten" if is_admin else "Ansehen" }}</a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4">Noch keine Stellenangebote für diesen Stellenanbieter.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
         {% endif %}
     </details>
     {% endif %}

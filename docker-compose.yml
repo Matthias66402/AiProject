@@ -34,6 +34,15 @@ services:
       # lokalen data/-Ordner statt in der (bei Neustart verlorenen)
       # schreibbaren Container-Schicht.
       - ./data:/app/data
+      # Quellcode gemountet, damit Flasks Reloader (debug=True) Änderungen
+      # sofort übernimmt - kein "docker compose up --build" bei jeder
+      # Code-/Template-Änderung mehr nötig. Nur bei geänderten
+      # Abhängigkeiten (requirements.txt) oder dem Dockerfile ist ein
+      # Rebuild weiterhin erforderlich.
+      - ./app.py:/app/app.py
+      - ./db.py:/app/db.py
+      - ./templates:/app/templates
+      - ./static:/app/static
     depends_on:
       mysql:
         condition: service_healthy

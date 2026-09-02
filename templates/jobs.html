@@ -1,7 +1,11 @@
 <div class="scroll wide">
     {% set is_admin = current_user and current_user.role == 'admin' %}
     <h1 id="greetings">Stellenangebote</h1>
+    {% if came_from_customer %}
+    <p class="subtitle">Stellenangebote von {{ editing_job.customer_name }} &middot; <a href="{{ url_for('jobs') }}">alle anzeigen</a></p>
+    {% else %}
     <p class="subtitle">Übersicht der Stellenangebote</p>
+    {% endif %}
 
     {% if is_admin or editing_job %}
     <details class="entity-form" {% if editing_job %}open{% endif %}>
@@ -45,6 +49,9 @@
                 <label>Gültig bis</label>
                 <p>{{ editing_job.valid_until or "-" }}</p>
             </div>
+            {% if came_from_customer %}
+            <a class="subtle-btn" href="{{ url_for('edit_customer', customer_id=editing_job.customer_id) }}"><i class="fa-solid fa-arrow-left"></i> Zurück zu {{ editing_job.customer_name }}</a>
+            {% endif %}
             <a class="subtle-btn" href="{{ url_for('jobs') }}">Schließen</a>
         </div>
         {% else %}
@@ -91,7 +98,13 @@
             <button class="subtle-btn" type="submit">{{ "Speichern" if editing_job else "Stelle anlegen" }}</button>
         </form>
         {% if editing_job %}
-        <p class="subtitle"><a href="{{ url_for('jobs') }}">Abbrechen</a></p>
+        <p class="subtitle">
+            {% if came_from_customer %}
+            <a href="{{ url_for('edit_customer', customer_id=editing_job.customer_id) }}"><i class="fa-solid fa-arrow-left"></i> Zurück zu {{ editing_job.customer_name }}</a>
+            &middot;
+            {% endif %}
+            <a href="{{ url_for('jobs') }}">Abbrechen</a>
+        </p>
         {% endif %}
         {% endif %}
     </details>

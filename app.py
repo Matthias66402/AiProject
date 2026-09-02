@@ -95,7 +95,7 @@ PAGE_DESCRIPTIONS = {
     "edit_job": "Ein bestehendes Stellenangebot ansehen. Für Admins ein Bearbeiten-Formular, für alle anderen nur eine Leseansicht (Position, Kunde, PLZ/Stadt, Gültigkeit als Text, bei KI-generierten Stellen zusätzlich das PDF eingebettet) ohne Speichern-Möglichkeit",
     "delete_job": "Ein Stellenangebot löschen. Nur für Admins",
     "customers": "Stellenanbieter (Kunden): Liste für alle sichtbar, im Hauptmenü als 'Stellenanbieter' verlinkt. Neuen Stellenanbieter anlegen nur für Admins",
-    "edit_customer": "Einen bestehenden Stellenanbieter ansehen. Für Admins ein Bearbeiten-Formular, für alle anderen nur eine Leseansicht (Firma, Adresse, PLZ, Stadt als Text) ohne Speichern-Möglichkeit",
+    "edit_customer": "Einen bestehenden Stellenanbieter ansehen. Für Admins ein Bearbeiten-Formular, für alle anderen nur eine Leseansicht (Firma, Adresse, PLZ, Stadt als Text) ohne Speichern-Möglichkeit. Darunter zusätzlich die Liste der zu diesem Stellenanbieter gehörenden Stellenangebote",
     "delete_customer": "Einen Stellenanbieter löschen. Nur für Admins",
     "generate_resume": "Lebenslauf für einen bestehenden, per Auswahlliste gewählten Nutzer generieren (personalisiert mit dessen echtem Namen/Wohnort, falls bei ihm PLZ und Stadt hinterlegt sind, sonst komplett fiktiv). Nur für Admins, erreichbar über das 'Tools'-Menü in der Navigation",
     "generate_joboffer": "Stellenangebot für einen per Auswahlliste gewählten Stellenanbieter generieren; legt dabei automatisch auch einen passenden Eintrag unter 'Stellenangebote' an. Nur für Admins, erreichbar über das 'Tools'-Menü in der Navigation",
@@ -306,7 +306,12 @@ def edit_job(job_id):
 
         return redirect(url_for('jobs'))
 
-    return render_template('index.html', content_template='jobs.html', jobs=db.list_jobs(), customers=db.list_customers(), editing_job=db.get_job(job_id))
+    job = db.get_job(job_id)
+    from_customer_id = request.args.get("from_customer", type=int)
+    came_from_customer = bool(job and from_customer_id and from_customer_id == job["customer_id"])
+    jobs = db.list_jobs(job["customer_id"]) if came_from_customer else db.list_jobs()
+
+    return render_template('index.html', content_template='jobs.html', jobs=jobs, customers=db.list_customers(), editing_job=job, came_from_customer=came_from_customer)
 
 
 @app.route('/jobs/<int:job_id>/delete', methods=["POST"])
@@ -334,7 +339,7 @@ def customers():
 
         return redirect(url_for('customers'))
 
-    return render_template('index.html', content_template='customer.html', customers=db.list_customers(), editing_customer=None)
+    return render_template('index.html', content_template='customer.html', customers=db.list_customers(), editing_customer=None, customer_jobs=None)
 
 
 @app.route('/customers/<int:customer_id>/edit', methods=["GET", "POST"])
@@ -354,7 +359,7 @@ def edit_customer(customer_id):
 
         return redirect(url_for('customers'))
 
-    return render_template('index.html', content_template='customer.html', customers=db.list_customers(), editing_customer=db.get_customer(customer_id))
+    return render_template('index.html', content_template='customer.html', customers=db.list_customers(), editing_customer=db.get_customer(customer_id), customer_jobs=db.list_jobs(customer_id))
 
 
 @app.route('/customers/<int:customer_id>/delete', methods=["POST"])
