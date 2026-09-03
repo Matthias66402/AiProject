@@ -38,6 +38,13 @@ _RESUME_COLUMNS = {
     "embedding": "vector(1536)",
 }
 
+# Ab dieser Cosine-Similarity gilt ein Match als relevant genug für die
+# Anzeige. Erfahrungswert: eng verwandte Stellen/Lebensläufe liegen bei
+# 0.75+, thematisch unverwandte Kombinationen bleiben meist unter 0.6 -
+# ohne Schwellwert würden bei fehlenden echten Treffern trotzdem die
+# "am wenigsten unpassenden" Ergebnisse als Match erscheinen.
+MIN_MATCH_SIMILARITY = 0.65
+
 
 def get_connection():
     conn = psycopg2.connect(
@@ -351,24 +358,32 @@ def update_job(job_id, position, content, valid_from, valid_until, customer_id, 
         conn.close()
 
 
-def find_similar_jobs(embedding, top_k=5):
-    """Liefert (id, similarity)-Paare der top_k Jobs, deren Embedding dem
-    gegebenen am ähnlichsten ist (Cosine Similarity, 1.0 = identisch),
-    absteigend sortiert. Läuft nativ per pgvector-Index in SQL."""
+def find_matching_jobs(embedding, top_k=5, min_similarity=MIN_MATCH_SIMILARITY):
+    """Liefert die top_k Jobs mit Cosine Similarity >= min_similarity zum
+    gegebenen Embedding (1.0 = identisch), absteigend sortiert, inkl.
+    Kundenname für die Anzeige. embedding kann von einem Job oder einem
+    Lebenslauf stammen - für Job<->Job- wie auch Resume->Job-Matching
+    nutzbar. Erwartet ein pgvector-Text-Literal wie aus einer embedding-Spalte
+    gelesen (z.B. job["embedding"]), keinen rohen Python-float-list (dafür
+    embeddings.to_vector_literal() nutzen). Läuft nativ per pgvector-Index."""
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT id, 1 - (embedding <=> %s::vector) AS similarity
+                SELECT jobs.id, jobs.position, jobs.city, jobs.valid_from, jobs.valid_until,
+                       customers.company_name AS customer_name,
+                       1 - (jobs.embedding <=> %s::vector) AS similarity
                 FROM jobs
-                WHERE embedding IS NOT NULL
-                ORDER BY embedding <=> %s::vector
+                JOIN customers ON customers.id = jobs.customer_id
+                WHERE jobs.embedding IS NOT NULL
+                  AND 1 - (jobs.embedding <=> %s::vector) >= %s
+                ORDER BY jobs.embedding <=> %s::vector
                 LIMIT %s
                 """,
-                (to_vector_literal(embedding), to_vector_literal(embedding), top_k),
+                (embedding, embedding, min_similarity, embedding, top_k),
             )
-            return [(row["id"], row["similarity"]) for row in cur.fetchall()]
+            return cur.fetchall()
     finally:
         conn.close()
 
@@ -482,21 +497,26 @@ def list_resumes_for_user(user_id):
         conn.close()
 
 
-def find_similar_resumes(embedding, top_k=5):
-    """Analog zu find_similar_jobs(), für resumes."""
+def find_matching_resumes(embedding, top_k=5, min_similarity=MIN_MATCH_SIMILARITY):
+    """Analog zu find_matching_jobs(), für resumes - inkl. Namen des
+    zugehörigen Nutzers für die Anzeige."""
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT id, 1 - (embedding <=> %s::vector) AS similarity
+                SELECT resumes.id, resumes.user_id, resumes.created_at,
+                       users.first_name, users.last_name, users.short_name,
+                       1 - (resumes.embedding <=> %s::vector) AS similarity
                 FROM resumes
-                WHERE embedding IS NOT NULL
-                ORDER BY embedding <=> %s::vector
+                JOIN users ON users.id = resumes.user_id
+                WHERE resumes.embedding IS NOT NULL
+                  AND 1 - (resumes.embedding <=> %s::vector) >= %s
+                ORDER BY resumes.embedding <=> %s::vector
                 LIMIT %s
                 """,
-                (to_vector_literal(embedding), to_vector_literal(embedding), top_k),
+                (embedding, embedding, min_similarity, embedding, top_k),
             )
-            return [(row["id"], row["similarity"]) for row in cur.fetchall()]
+            return cur.fetchall()
     finally:
         conn.close()

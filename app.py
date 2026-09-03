@@ -314,8 +314,9 @@ def edit_job(job_id):
     from_customer_id = request.args.get("from_customer", type=int)
     came_from_customer = bool(job and from_customer_id and from_customer_id == job["customer_id"])
     jobs = db.list_jobs(job["customer_id"]) if came_from_customer else db.list_jobs()
+    matching_resumes = db.find_matching_resumes(job["embedding"], top_k=5) if job and job.get("embedding") else []
 
-    return render_template('index.html', content_template='jobs.html', jobs=jobs, customers=db.list_customers(), editing_job=job, came_from_customer=came_from_customer)
+    return render_template('index.html', content_template='jobs.html', jobs=jobs, customers=db.list_customers(), editing_job=job, came_from_customer=came_from_customer, matching_resumes=matching_resumes)
 
 
 @app.route('/jobs/<int:job_id>/delete', methods=["POST"])
@@ -568,8 +569,9 @@ def my_resumes():
     resumes = db.list_resumes_for_user(session["user_id"])
     selected_id = newest_id or request.args.get("resume_id", type=int)
     selected_resume = next((r for r in resumes if r["id"] == selected_id), None) or (resumes[0] if resumes else None)
+    matching_jobs = db.find_matching_jobs(selected_resume["embedding"], top_k=5) if selected_resume and selected_resume.get("embedding") else []
 
-    return render_template('index.html', content_template='my_resumes.html', resumes=resumes, selected_resume=selected_resume, message=message)
+    return render_template('index.html', content_template='my_resumes.html', resumes=resumes, selected_resume=selected_resume, matching_jobs=matching_jobs, message=message)
 
 
 @app.route('/resumes/<int:resume_id>/file')

@@ -5,14 +5,19 @@ from openai import APIError as OpenAIAPIError
 
 EMBEDDING_MODEL = "text-embedding-3-small"
 
+_STYLE_SCRIPT_RE = re.compile(r"<(style|script)\b[^>]*>.*?</\1>", re.IGNORECASE | re.DOTALL)
 _TAG_RE = re.compile(r"<[^>]+>")
 _WHITESPACE_RE = re.compile(r"\s+")
 
 
 def strip_html_to_text(content):
-    """Wandelt HTML-Fragmente (job/resume content) in reinen, auf Whitespace
-    normalisierten Text um - saubere Eingabe fürs Embedding."""
-    text = html.unescape(_TAG_RE.sub(" ", content or ""))
+    """Wandelt HTML-Fragmente/-Dokumente (job/resume content) in reinen, auf
+    Whitespace normalisierten Text um - saubere Eingabe fürs Embedding.
+    Entfernt <style>/<script>-Blöcke komplett inkl. Inhalt (nicht nur die
+    Tags) - sonst landet z.B. CSS-Deklarationen aus generierten Lebenslauf-
+    HTML-Dokumenten als Text im Embedding und verfälscht die Ähnlichkeit."""
+    text = _STYLE_SCRIPT_RE.sub(" ", content or "")
+    text = html.unescape(_TAG_RE.sub(" ", text))
     return _WHITESPACE_RE.sub(" ", text).strip()
 
 

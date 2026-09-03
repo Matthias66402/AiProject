@@ -25,6 +25,22 @@
 
     {% if selected_resume %}
     <iframe class="pdf-embed" src="{{ url_for('my_resume_file', resume_id=selected_resume.id) }}" title="Lebenslauf PDF"></iframe>
+
+    <div class="entity-view mt-5">
+        <label>Passende Stellenangebote</label>
+        {% if matching_jobs %}
+        <ul>
+            {% for m in matching_jobs %}
+            <li>
+                <a href="{{ url_for('edit_job', job_id=m.id) }}">{{ m.position }} bei {{ m.customer_name }}</a>{% if m.city %} ({{ m.city }}){% endif %}
+                &middot; {{ (m.similarity * 100) | round(1) }}% Übereinstimmung
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p>Keine passenden Stellenangebote gefunden.</p>
+        {% endif %}
+    </div>
     {% endif %}
     {% endif %}
 

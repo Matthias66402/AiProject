@@ -110,6 +110,24 @@
     </details>
     {% endif %}
 
+    {% if editing_job and is_admin %}
+    <div class="entity-view">
+        <label>Passende Kandidaten</label>
+        {% if matching_resumes %}
+        <ul>
+            {% for m in matching_resumes %}
+            <li>
+                <a href="{{ url_for('edit_user', user_id=m.user_id) }}">{{ m.first_name }} {{ m.last_name }} ({{ m.short_name }})</a>
+                &middot; {{ (m.similarity * 100) | round(1) }}% Übereinstimmung
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p>Keine Übereinstimmungen gefunden (evtl. noch kein Embedding vorhanden).</p>
+        {% endif %}
+    </div>
+    {% endif %}
+
     <table class="user-table">
         <thead>
             <tr>
