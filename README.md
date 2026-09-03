@@ -12,6 +12,7 @@ Die Website ist noch im Aufbau, Struktur und Funktionsumfang können sich häufi
 - **Login/Registrierung**: Nutzer registrieren sich (immer mit Rolle `user`), melden sich an/ab; Passwörter werden gehasht (Werkzeug) gespeichert.
 - **Rollen**: `user` (Standard bei Registrierung), `customer`, `admin`. Nur `admin` kann Rollen vergeben und hat Schreibzugriff auf Nutzer-, Stellenanbieter- und Stellenverwaltung; die Rollenliste ist in `db.py` (`ROLES`) zentral gepflegt.
 - **Nutzerverwaltung** (`/users`, nur `admin`): Nutzer anlegen, bearbeiten, Rolle zuweisen, optional PLZ/Stadt hinterlegen. Zeigt außerdem alle für diesen Nutzer generierten Lebenslauf-PDFs (Tabelle `resumes`, FK auf `users`), falls vorhanden.
+- **Eigener Lebenslauf** (`/resumes`, für jeden eingeloggten Nutzer): zeigt den aktuellsten eigenen Lebenslauf als eingebettetes PDF; eine Selectbox erlaubt den Zugriff auf ältere Versionen. Ein eingeklapptes Formular lässt den Nutzer sich selbst per KI (dieselbe Logik wie das Admin-Tool `/tools/resume`) einen neuen Lebenslauf erstellen. Die PDF-Auslieferung prüft Besitzerschaft (nur die eigenen Lebensläufe, unabhängig vom Admin-Zugriff auf `/tools/resume/<datei>`). Der Menüpunkt selbst ist nur für Rolle `user` im Konto-Dropdown verlinkt.
 - **Stellenangebote** (`/jobs`): Stellenanzeigen mit Gültigkeitszeitraum, PLZ/Stadt und Zuordnung zu einem Stellenanbieter.
   - `admin`: anlegen, bearbeiten, löschen.
   - Alle anderen (inkl. nicht eingeloggt): nur Liste + Lesemodus ("Ansehen") pro Stelle — Position, Kunde, PLZ/Stadt, Gültigkeitszeitraum als Text, bei KI-generierten Stellen zusätzlich das PDF eingebettet statt der Beschreibung.
@@ -23,6 +24,22 @@ Die Website ist noch im Aufbau, Struktur und Funktionsumfang können sich häufi
   - **Lebenslauf generieren** (`/tools/resume`): ein bestehender Nutzer wird per Selectbox ausgewählt. Sind bei ihm PLZ **und** Stadt hinterlegt, übernimmt die KI dessen echten Namen und Wohnort unverändert (Rest frei erfunden); ansonsten ein komplett fiktiver Dummy-Lebenslauf. Das PDF wird unter `data/resumes/` abgelegt und als neuer Eintrag in `resumes` (FK auf den Nutzer) gespeichert.
   - **Stellenangebot generieren** (`/tools/joboffer`): ein Stellenanbieter wird per Selectbox ausgewählt. Die KI liefert Position, PLZ, Stadt und den Stellentext strukturiert als JSON zurück; das PDF wird unter `data/joboffers/` abgelegt und automatisch ein passender Eintrag in `/jobs` angelegt (inkl. `document_link`, Gültigkeit heute bis +30 Tage).
   - ⚠️ Läuft nur, wo WeasyPrints native Abhängigkeiten (Pango/Cairo) vorhanden sind — siehe [WeasyPrint unter Windows](#weasyprint-unter-windows) weiter unten. Im Docker-Image ist das bereits eingerichtet.
+
+## Embeddings (RAG-Grundlage)
+
+Jeder Job (`jobs.embedding`) und jeder Lebenslauf (`resumes.embedding`) bekommt beim Anlegen/Ändern automatisch ein OpenAI-Embedding (`text-embedding-3-small`) berechnet und als JSON-Array in der jeweiligen Spalte gespeichert — sowohl bei manueller Eingabe als auch bei KI-Generierung über die Tools-Seiten. Zuständig ist `embeddings.py`:
+
+- `strip_html_to_text()` — bereitet die HTML-Inhalte (`content`) für ein sauberes Embedding auf
+- `embed_text()` / `embed_texts()` — einzelnes bzw. batch-weises Embedding über die OpenAI-API; API-Fehler (Status-, Verbindungs-, Timeout-Fehler) werden abgefangen und geloggt, statt das eigentliche Anlegen/Ändern zu blockieren
+- `cosine_similarity()` / `top_matches()` — Ähnlichkeitssuche in reinem Python (keine zusätzliche Vektor-DB nötig bei der aktuellen Datenmenge)
+
+`backfill_embeddings.py` berechnet einmalig Embeddings für bestehende Jobs/Lebensläufe ohne Embedding nach (z.B. nach der Einführung dieses Features oder bei einem Modellwechsel):
+
+```bash
+docker compose exec app python backfill_embeddings.py
+```
+
+Aktuell dient das als Grundlage für eine spätere Matching-Funktion (Kandidat ↔ Stellenangebot per Ähnlichkeit) — es gibt noch keine UI dafür.
 
 ## Tech-Stack
 
@@ -39,9 +56,11 @@ Die Website ist noch im Aufbau, Struktur und Funktionsumfang können sich häufi
 ```
 app.py                     Flask-Routen, KI-Assistent-Logik, Modellauswahl
 db.py                      DB-Verbindung, Schema-Erstellung/Migration, CRUD-Funktionen
+embeddings.py              Embedding-Erzeugung (einzeln/batch), HTML-Stripping, Cosinus-Ähnlichkeit/Top-Matches
+backfill_embeddings.py     Einmaliges Nachrechnen fehlender Embeddings für Bestandsdaten
 templates/
   index.html                Basis-Layout, bindet navigation.html + content_template ein
-  navigation.html            Navigationsleiste inkl. Konto-Dropdown (Anmelden/Registrieren/Abmelden), "Benutzer"-Link und Tools-Dropdown (beide nur Admin)
+  navigation.html            Navigationsleiste inkl. Konto-Dropdown (Anmelden/Registrieren/Abmelden/eigener Lebenslauf), "Benutzer"-Link und Tools-Dropdown (beide nur Admin)
   home.html                  KI-Assistent-Formular (Startseite)
   login.html, register.html  Anmeldung/Registrierung
   user.html                  Nutzerverwaltung
@@ -49,6 +68,7 @@ templates/
   customer.html              Stellenanbieter
   resume.html                 Tools: Lebenslauf generieren (nur Admin)
   joboffer.html                Tools: Stellenangebot generieren (nur Admin)
+  my_resumes.html              Eigener Lebenslauf ansehen/generieren (jeder eingeloggte Nutzer)
 static/
   style.css                  eigenes Stylesheet
   fontawesome/                lokal eingebundene Icon-Bibliothek
@@ -99,7 +119,7 @@ Startet App und MySQL zusammen; die DB-Daten liegen in einem benannten Volume (`
 | Variable | Bedeutung |
 |---|---|
 | `GROQ_API_KEY` | API-Key für Groq (Chat-Modelle) |
-| `OPENAI_API_KEY` | API-Key für OpenAI (Chat-Modelle) |
+| `OPENAI_API_KEY` | API-Key für OpenAI (Chat-Modelle + Embeddings) |
 | `DB_HOST` / `DB_PORT` / `DB_NAME` / `DB_USER` / `DB_PASSWORD` | Verbindungsdaten zur MySQL-Datenbank |
 | `SECRET_KEY` | Flask-Session-Secret |
 
