@@ -1,0 +1,58 @@
+<div class="scroll wide">
+    <h1 id="greetings">Mein Lebenslauf</h1>
+
+    {% if message %}
+    <p class="subtitle">{{ message }}</p>
+    {% endif %}
+
+    {% if not resumes %}
+    <p class="subtitle">Für dich wurde noch kein Lebenslauf erstellt.</p>
+    {% else %}
+    <p class="subtitle">Dein aktuellster Lebenslauf ist unten eingebettet - über die Auswahl erreichst du auch ältere Versionen.</p>
+
+    <form method="GET" action="{{ url_for('my_resumes') }}">
+        <div>
+            <label for="resume_id">Version</label>
+            <select id="resume_id" name="resume_id" onchange="this.form.submit()">
+                {% for resume in resumes %}
+                <option value="{{ resume.id }}" {% if selected_resume and resume.id == selected_resume.id %}selected{% endif %}>
+                    {{ resume.created_at }}{% if loop.first %} (neueste){% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+    </form>
+
+    {% if selected_resume %}
+    <iframe class="pdf-embed" src="{{ url_for('my_resume_file', resume_id=selected_resume.id) }}" title="Lebenslauf PDF"></iframe>
+    {% endif %}
+    {% endif %}
+
+    <details class="entity-form">
+        <summary class="subtle-btn mt-5">{{ "Neuen Lebenslauf generieren" if resumes else "Lebenslauf generieren" }}</summary>
+        <p class="subtitle">Bitte beschreibe, was dein Lebenslauf enthalten soll:</p>
+        <form action="{{ url_for('my_resumes') }}" method="POST" id="my-resume-form">
+            <div class="textarea-wrap">
+                <textarea class="p-3" name="spec" rows="8"></textarea>
+                <div class="generating-indicator" id="my-resume-generating-indicator">
+                    <span class="spinner"></span>
+                    Lebenslauf wird generiert …
+                </div>
+            </div>
+            <button class="subtle-btn" type="submit" id="my-resume-submit-btn">Generieren</button>
+        </form>
+    </details>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var form = document.getElementById('my-resume-form');
+        var btn = document.getElementById('my-resume-submit-btn');
+        var indicator = document.getElementById('my-resume-generating-indicator');
+        if (!form) return;
+        form.addEventListener('submit', function () {
+            btn.disabled = true;
+            indicator.classList.add('visible');
+        });
+    });
+</script>

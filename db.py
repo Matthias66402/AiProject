@@ -1,3 +1,4 @@
+import json
 import os
 
 import pymysql
@@ -23,12 +24,17 @@ _JOB_COLUMNS = {
     "document_link": "VARCHAR(500)",
     "zip": "VARCHAR(10)",
     "city": "VARCHAR(100)",
+    "embedding": "JSON",
 }
 
 _USER_COLUMNS = {
     "document_link": "VARCHAR(500)",
     "zip": "VARCHAR(10)",
     "city": "VARCHAR(100)",
+}
+
+_RESUME_COLUMNS = {
+    "embedding": "JSON",
 }
 
 
@@ -146,6 +152,15 @@ def init_db():
                     FOREIGN KEY (user_id) REFERENCES users(id)
                 )
             """)
+            # Migration für resumes-Tabellen, die vor Einführung von embedding angelegt wurden.
+            cur.execute("""
+                SELECT COLUMN_NAME AS column_name FROM information_schema.columns
+                WHERE table_schema = DATABASE() AND table_name = 'resumes'
+            """)
+            existing_resume_columns = {row["column_name"] for row in cur.fetchall()}
+            for column, definition in _RESUME_COLUMNS.items():
+                if column not in existing_resume_columns:
+                    cur.execute(f"ALTER TABLE resumes ADD COLUMN {column} {definition}")
     finally:
         conn.close()
 
@@ -269,33 +284,45 @@ def get_job(job_id):
         conn.close()
 
 
-def create_job(position, content, valid_from, valid_until, customer_id, document_link=None, zip_code=None, city=None):
+def create_job(position, content, valid_from, valid_until, customer_id, document_link=None, zip_code=None, city=None, embedding=None):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO jobs (position, content, valid_from, valid_until, customer_id, document_link, zip, city)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO jobs (position, content, valid_from, valid_until, customer_id, document_link, zip, city, embedding)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
-                (position, content, valid_from, valid_until, customer_id, document_link, zip_code, city),
+                (position, content, valid_from, valid_until, customer_id, document_link, zip_code, city,
+                 json.dumps(embedding) if embedding is not None else None),
             )
     finally:
         conn.close()
 
 
-def update_job(job_id, position, content, valid_from, valid_until, customer_id, zip_code=None, city=None):
+def update_job(job_id, position, content, valid_from, valid_until, customer_id, zip_code=None, city=None, embedding=None):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             cur.execute(
                 """
                 UPDATE jobs
-                SET position = %s, content = %s, valid_from = %s, valid_until = %s, customer_id = %s, zip = %s, city = %s
+                SET position = %s, content = %s, valid_from = %s, valid_until = %s, customer_id = %s, zip = %s, city = %s, embedding = %s
                 WHERE id = %s
                 """,
-                (position, content, valid_from, valid_until, customer_id, zip_code, city, job_id),
+                (position, content, valid_from, valid_until, customer_id, zip_code, city,
+                 json.dumps(embedding) if embedding is not None else None, job_id),
             )
+    finally:
+        conn.close()
+
+
+def list_job_embeddings():
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, embedding FROM jobs WHERE embedding IS NOT NULL")
+            return [(row["id"], json.loads(row["embedding"])) for row in cur.fetchall()]
     finally:
         conn.close()
 
@@ -369,17 +396,28 @@ def set_user_document_link(user_id, document_link):
         conn.close()
 
 
-def create_resume(content, document_link, user_id):
+def create_resume(content, document_link, user_id, embedding=None):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO resumes (content, document_link, user_id)
-                VALUES (%s, %s, %s)
+                INSERT INTO resumes (content, document_link, user_id, embedding)
+                VALUES (%s, %s, %s, %s)
                 """,
-                (content, document_link, user_id),
+                (content, document_link, user_id, json.dumps(embedding) if embedding is not None else None),
             )
+            return cur.lastrowid
+    finally:
+        conn.close()
+
+
+def get_resume(resume_id):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM resumes WHERE id = %s", (resume_id,))
+            return cur.fetchone()
     finally:
         conn.close()
 
@@ -393,5 +431,15 @@ def list_resumes_for_user(user_id):
                 (user_id,),
             )
             return cur.fetchall()
+    finally:
+        conn.close()
+
+
+def list_resume_embeddings():
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, embedding FROM resumes WHERE embedding IS NOT NULL")
+            return [(row["id"], json.loads(row["embedding"])) for row in cur.fetchall()]
     finally:
         conn.close()

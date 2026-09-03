@@ -41,6 +41,8 @@ services:
       # Rebuild weiterhin erforderlich.
       - ./app.py:/app/app.py
       - ./db.py:/app/db.py
+      - ./embeddings.py:/app/embeddings.py
+      - ./backfill_embeddings.py:/app/backfill_embeddings.py
       - ./templates:/app/templates
       - ./static:/app/static
     depends_on:

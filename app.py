@@ -12,6 +12,7 @@ import os
 
 import db
 from db import ROLES, DEFAULT_ROLE
+from embeddings import embed_text, strip_html_to_text
 
 THINK_BLOCK_RE = re.compile(r"<think>.*?</think>\s*", re.DOTALL)
 CODE_FENCE_RE = re.compile(r"^```[a-zA-Z]*\s*\n?|\n?```\s*$")
@@ -99,6 +100,7 @@ PAGE_DESCRIPTIONS = {
     "delete_customer": "Einen Stellenanbieter löschen. Nur für Admins",
     "generate_resume": "Lebenslauf für einen bestehenden, per Auswahlliste gewählten Nutzer generieren (personalisiert mit dessen echtem Namen/Wohnort, falls bei ihm PLZ und Stadt hinterlegt sind, sonst komplett fiktiv). Nur für Admins, erreichbar über das 'Tools'-Menü in der Navigation",
     "generate_joboffer": "Stellenangebot für einen per Auswahlliste gewählten Stellenanbieter generieren; legt dabei automatisch auch einen passenden Eintrag unter 'Stellenangebote' an. Nur für Admins, erreichbar über das 'Tools'-Menü in der Navigation",
+    "my_resumes": "Eigene Lebensläufe des eingeloggten Nutzers ansehen: der neueste als PDF eingebettet, per Auswahlliste sind auch ältere Versionen abrufbar. Nur für eingeloggte Nutzer mit Rolle 'user', erreichbar über das Konto-Menü oben rechts in der Navigation",
 }
 
 
@@ -280,7 +282,8 @@ def jobs():
         city = request.form.get("city", "").strip() or None
 
         if position and content and customer_id:
-            db.create_job(position, content, valid_from, valid_until, int(customer_id), zip_code=zip_code, city=city)
+            embedding = embed_text(openai_client, f"{position}\n\n{strip_html_to_text(content)}", app.logger)
+            db.create_job(position, content, valid_from, valid_until, int(customer_id), zip_code=zip_code, city=city, embedding=embedding)
 
         return redirect(url_for('jobs'))
 
@@ -302,7 +305,8 @@ def edit_job(job_id):
         city = request.form.get("city", "").strip() or None
 
         if position and content and customer_id:
-            db.update_job(job_id, position, content, valid_from, valid_until, int(customer_id), zip_code=zip_code, city=city)
+            embedding = embed_text(openai_client, f"{position}\n\n{strip_html_to_text(content)}", app.logger)
+            db.update_job(job_id, position, content, valid_from, valid_until, int(customer_id), zip_code=zip_code, city=city, embedding=embedding)
 
         return redirect(url_for('jobs'))
 
@@ -379,6 +383,51 @@ def _write_html_as_pdf(html_fragment, output_path):
     HTML(string=document).write_pdf(output_path)
 
 
+def _generate_resume_document(user_id, spec):
+    """Erzeugt per LLM einen Lebenslauf-PDF für user_id auf Basis von spec, speichert
+    ihn (inkl. Embedding) als neuen Eintrag in resumes und gibt dessen id zurück.
+    Lässt GroqAPIStatusError/OpenAIAPIStatusError zum Aufrufer durch."""
+    selected_user = db.get_user(user_id)
+    if selected_user and selected_user.get("zip") and selected_user.get("city"):
+        system_content = (
+            "Du erstellst einen Lebenslauf auf Basis der Vorgaben des Nutzers. "
+            "Name und Wohnort sind vorgegeben und müssen unverändert übernommen werden, "
+            "alle weiteren Angaben (Ausbildung, Erfahrung, Qualifikationen) darfst du frei "
+            "und kreativ erfinden. "
+            "Antworte ausschließlich mit dem fertigen Lebenslauf im HTML-Format, "
+            "ohne zusätzliche Erklärungen."
+        )
+        user_content = (
+            f"Name: {selected_user['first_name']} {selected_user['last_name']}\n"
+            f"Wohnort: {selected_user['zip']} {selected_user['city']}\n\n"
+            f"{spec}"
+        )
+    else:
+        system_content = (
+            "Du erstellst einen Dummy-Lebenslauf mit frei erfundenen, kreativen Personendaten  "
+            "(keine echten Personen) auf Basis der Vorgaben des Nutzers. "
+            "Antworte ausschließlich mit dem fertigen Lebenslauf im HTML-Format, "
+            "ohne zusätzliche Erklärungen."
+        )
+        user_content = spec
+
+    response = openai_client.chat.completions.create(
+        model=DEFAULT_MODEL,
+        messages=[
+            {"role": "system", "content": system_content},
+            {"role": "user", "content": user_content},
+        ],
+    )
+    resume_text = _strip_code_fence(THINK_BLOCK_RE.sub("", response.choices[0].message.content).strip())
+
+    os.makedirs(RESUME_DIR, exist_ok=True)
+    filename = f"lebenslauf_{datetime.now():%Y%m%d_%H%M%S}.pdf"
+    _write_html_as_pdf(resume_text, os.path.join(RESUME_DIR, filename))
+    file_url = url_for('view_resume', filename=filename)
+    embedding = embed_text(openai_client, strip_html_to_text(resume_text), app.logger)
+    return db.create_resume(resume_text, file_url, user_id, embedding=embedding)
+
+
 @app.route('/tools/resume', methods=["GET", "POST"])
 def generate_resume():
     if session.get("user_role") != "admin":
@@ -393,45 +442,8 @@ def generate_resume():
             message = "Bitte zuerst einen Nutzer wählen und beschreiben, was der Lebenslauf enthalten soll."
         else:
             try:
-                selected_user = db.get_user(int(user_id))
-                if selected_user and selected_user.get("zip") and selected_user.get("city"):
-                    system_content = (
-                        "Du erstellst einen Lebenslauf auf Basis der Vorgaben des Nutzers. "
-                        "Name und Wohnort sind vorgegeben und müssen unverändert übernommen werden, "
-                        "alle weiteren Angaben (Ausbildung, Erfahrung, Qualifikationen) darfst du frei "
-                        "und kreativ erfinden. "
-                        "Antworte ausschließlich mit dem fertigen Lebenslauf im HTML-Format, "
-                        "ohne zusätzliche Erklärungen."
-                    )
-                    user_content = (
-                        f"Name: {selected_user['first_name']} {selected_user['last_name']}\n"
-                        f"Wohnort: {selected_user['zip']} {selected_user['city']}\n\n"
-                        f"{spec}"
-                    )
-                else:
-                    system_content = (
-                        "Du erstellst einen Dummy-Lebenslauf mit frei erfundenen, kreativen Personendaten  "
-                        "(keine echten Personen) auf Basis der Vorgaben des Nutzers. "
-                        "Antworte ausschließlich mit dem fertigen Lebenslauf im HTML-Format, "
-                        "ohne zusätzliche Erklärungen."
-                    )
-                    user_content = spec
-
-                response = openai_client.chat.completions.create(
-                    model=DEFAULT_MODEL,
-                    messages=[
-                        {"role": "system", "content": system_content},
-                        {"role": "user", "content": user_content},
-                    ],
-                )
-                resume_text = _strip_code_fence(THINK_BLOCK_RE.sub("", response.choices[0].message.content).strip())
-
-                os.makedirs(RESUME_DIR, exist_ok=True)
-                filename = f"lebenslauf_{datetime.now():%Y%m%d_%H%M%S}.pdf"
-                _write_html_as_pdf(resume_text, os.path.join(RESUME_DIR, filename))
-                file_url = url_for('view_resume', filename=filename)
-                db.create_resume(resume_text, file_url, int(user_id))
-
+                resume_id = _generate_resume_document(int(user_id), spec)
+                file_url = db.get_resume(resume_id)["document_link"]
                 message = "Lebenslauf wurde erstellt und dem Nutzer zugeordnet:"
             except (GroqAPIStatusError, OpenAIAPIStatusError) as e:
                 app.logger.warning("API error %s: %s", e.status_code, e.body)
@@ -521,7 +533,8 @@ def generate_joboffer():
                 filename = f"stellenangebot_{datetime.now():%Y%m%d_%H%M%S}.pdf"
                 _write_html_as_pdf(joboffer_text, os.path.join(JOBOFFER_DIR, filename))
                 file_url = url_for('view_joboffer', filename=filename)
-                db.create_job(position, joboffer_text, valid_from, valid_until, int(customer_id), file_url, zip_code, city)
+                embedding = embed_text(openai_client, f"{position}\n\n{strip_html_to_text(joboffer_text)}", app.logger)
+                db.create_job(position, joboffer_text, valid_from, valid_until, int(customer_id), file_url, zip_code, city, embedding=embedding)
 
                 message = "Stellenangebot wurde erstellt und als Stelle angelegt:"
             except (GroqAPIStatusError, OpenAIAPIStatusError) as e:
@@ -532,6 +545,40 @@ def generate_joboffer():
                 message = "Das Stellenangebot konnte gerade nicht erstellt werden. Bitte später erneut versuchen."
 
     return render_template('index.html', content_template='joboffer.html', message=message, file_url=file_url, customers=db.list_customers())
+
+@app.route('/resumes', methods=["GET", "POST"])
+def my_resumes():
+    if not session.get("user_id"):
+        return redirect(url_for('home'))
+
+    message = None
+    newest_id = None
+    if request.method == "POST":
+        spec = request.form.get("spec", "").strip()
+        if not spec:
+            message = "Bitte beschreibe, was dein Lebenslauf enthalten soll."
+        else:
+            try:
+                newest_id = _generate_resume_document(session["user_id"], spec)
+                message = "Dein Lebenslauf wurde erstellt:"
+            except (GroqAPIStatusError, OpenAIAPIStatusError) as e:
+                app.logger.warning("API error %s: %s", e.status_code, e.body)
+                message = "Der Lebenslauf konnte gerade nicht erstellt werden. Bitte später erneut versuchen."
+
+    resumes = db.list_resumes_for_user(session["user_id"])
+    selected_id = newest_id or request.args.get("resume_id", type=int)
+    selected_resume = next((r for r in resumes if r["id"] == selected_id), None) or (resumes[0] if resumes else None)
+
+    return render_template('index.html', content_template='my_resumes.html', resumes=resumes, selected_resume=selected_resume, message=message)
+
+
+@app.route('/resumes/<int:resume_id>/file')
+def my_resume_file(resume_id):
+    resume = db.get_resume(resume_id)
+    if not resume or resume["user_id"] != session.get("user_id") or not resume["document_link"]:
+        return redirect(url_for('home'))
+    filename = os.path.basename(resume["document_link"])
+    return send_from_directory(RESUME_DIR, filename)
 
 
 @app.route('/tools/joboffer/<path:filename>')
