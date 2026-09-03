@@ -44,11 +44,11 @@ Aktuell dient das als Grundlage für eine spätere Matching-Funktion (Kandidat �
 ## Tech-Stack
 
 - **Backend**: Flask (Python 3.14)
-- **Datenbank**: MySQL 8.0 über PyMySQL; Schema wird beim App-Start automatisch angelegt und migriert (`db.init_db()`)
+- **Datenbank**: PostgreSQL 16 über psycopg2; Schema wird beim App-Start automatisch angelegt und migriert (`db.init_db()`)
 - **KI**: [Groq](https://pypi.org/project/groq/)- und [OpenAI](https://pypi.org/project/openai/)-Python-SDKs
 - **PDF-Erzeugung**: [WeasyPrint](https://pypi.org/project/weasyprint/) rendert vom KI-Modell geliefertes HTML zu PDF. Benötigt native Pango/Cairo-Bibliotheken (siehe unten) — im `Dockerfile` und in der CI bereits per `apt` eingerichtet
 - **Frontend**: Jinja2-Templates, Tailwind-Klassen, Font Awesome (lokal in `static/fontawesome`)
-- **Deployment**: Docker + docker-compose (App + MySQL)
+- **Deployment**: Docker + docker-compose (App + PostgreSQL)
 - **CI**: GitHub Actions (Syntaxcheck, Smoke-Test, Docker-Build) — siehe `.github/workflows/main.yml`
 
 ## Projektstruktur
@@ -58,6 +58,7 @@ app.py                     Flask-Routen, KI-Assistent-Logik, Modellauswahl
 db.py                      DB-Verbindung, Schema-Erstellung/Migration, CRUD-Funktionen
 embeddings.py              Embedding-Erzeugung (einzeln/batch), HTML-Stripping, Cosinus-Ähnlichkeit/Top-Matches
 backfill_embeddings.py     Einmaliges Nachrechnen fehlender Embeddings für Bestandsdaten
+migrate_mysql_to_postgres.py Einmaliges Migrationsskript für den Umstieg von MySQL auf PostgreSQL (Bestandsdaten inkl. IDs übernehmen)
 templates/
   index.html                Basis-Layout, bindet navigation.html + content_template ein
   navigation.html            Navigationsleiste inkl. Konto-Dropdown (Anmelden/Registrieren/Abmelden/eigener Lebenslauf), "Benutzer"-Link und Tools-Dropdown (beide nur Admin)
@@ -76,7 +77,7 @@ data/                        generierte PDFs (Lebensläufe/Stellenangebote), von
   resumes/
   joboffers/
 Dockerfile                  Python-3.14-slim-Image für die App
-docker-compose.yml          App + MySQL-Service für lokalen/Produktions-Betrieb, mountet ./data in den App-Container
+docker-compose.yml          App + PostgreSQL-Service für lokalen/Produktions-Betrieb, mountet ./data in den App-Container
 .github/workflows/main.yml  CI: Syntaxcheck, Smoke-Test, Docker-Build
 .env.example                Vorlage für benötigte Umgebungsvariablen
 ```
@@ -86,7 +87,7 @@ docker-compose.yml          App + MySQL-Service für lokalen/Produktions-Betrieb
 ### Voraussetzungen
 
 - Python 3.14
-- MySQL-Server (lokal oder über Docker)
+- PostgreSQL-Server (lokal oder über Docker)
 - API-Keys für [Groq](https://console.groq.com/) und [OpenAI](https://platform.openai.com/)
 
 ### Lokal ohne Docker
@@ -112,7 +113,7 @@ cp .env.example .env   # Werte eintragen
 docker compose up --build
 ```
 
-Startet App und MySQL zusammen; die DB-Daten liegen in einem benannten Volume (`aiproject_mysql_data`), generierte PDFs unter `./data` (Bind-Mount, direkt im Projektordner sichtbar).
+Startet App und PostgreSQL zusammen; die DB-Daten liegen in einem benannten Volume (`aiproject_postgres_data`), generierte PDFs unter `./data` (Bind-Mount, direkt im Projektordner sichtbar).
 
 ### Umgebungsvariablen (`.env`)
 
@@ -120,10 +121,20 @@ Startet App und MySQL zusammen; die DB-Daten liegen in einem benannten Volume (`
 |---|---|
 | `GROQ_API_KEY` | API-Key für Groq (Chat-Modelle) |
 | `OPENAI_API_KEY` | API-Key für OpenAI (Chat-Modelle + Embeddings) |
-| `DB_HOST` / `DB_PORT` / `DB_NAME` / `DB_USER` / `DB_PASSWORD` | Verbindungsdaten zur MySQL-Datenbank |
+| `DB_HOST` / `DB_PORT` / `DB_NAME` / `DB_USER` / `DB_PASSWORD` | Verbindungsdaten zur PostgreSQL-Datenbank |
 | `SECRET_KEY` | Flask-Session-Secret |
 
 `.env` ist per `.gitignore` von Git ausgeschlossen — nur `.env.example` wird versioniert.
+
+### Von MySQL migrieren
+
+Bis einschließlich Commit vor dieser Umstellung lief das Projekt auf MySQL
+8.0. Wer noch Bestandsdaten in einer alten MySQL-DB hat, migriert sie per
+`migrate_mysql_to_postgres.py` (Details/Voraussetzungen im Skript-Docstring):
+
+```bash
+docker compose exec app python migrate_mysql_to_postgres.py
+```
 
 ## KI-Assistent erweitern
 

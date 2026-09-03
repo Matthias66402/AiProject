@@ -1,17 +1,18 @@
 services:
-  mysql:
-    image: mysql:8.0
-    container_name: aiproject_mysql
+  postgres:
+    image: postgres:16
+    container_name: aiproject_postgres
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
-      MYSQL_DATABASE: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     ports:
-      - "${DB_PORT}:3306"
+      - "${DB_PORT}:5432"
     volumes:
-      - aiproject_mysql_data:/var/lib/mysql
+      - aiproject_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -p$$MYSQL_ROOT_PASSWORD"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -23,10 +24,10 @@ services:
     env_file:
       - .env
     environment:
-      # Innerhalb des Docker-Netzwerks wird mysql über den Servicenamen und den
-      # internen Port erreicht, nicht über den nach außen gemappten ${DB_PORT}.
-      DB_HOST: mysql
-      DB_PORT: 3306
+      # Innerhalb des Docker-Netzwerks wird postgres über den Servicenamen und
+      # den internen Port erreicht, nicht über den nach außen gemappten ${DB_PORT}.
+      DB_HOST: postgres
+      DB_PORT: 5432
     ports:
       - "5003:5003"
     volumes:
@@ -43,11 +44,12 @@ services:
       - ./db.py:/app/db.py
       - ./embeddings.py:/app/embeddings.py
       - ./backfill_embeddings.py:/app/backfill_embeddings.py
+      - ./migrate_mysql_to_postgres.py:/app/migrate_mysql_to_postgres.py
       - ./templates:/app/templates
       - ./static:/app/static
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
 
 volumes:
-  aiproject_mysql_data:
+  aiproject_postgres_data:

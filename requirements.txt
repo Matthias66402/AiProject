@@ -2,5 +2,5 @@ Flask
 groq
 openai
 python-dotenv
-PyMySQL
+psycopg2-binary
 weasyprint

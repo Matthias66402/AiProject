@@ -1,14 +1,14 @@
 import json
 import os
 
-import pymysql
-from pymysql.cursors import DictCursor
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
-# Erlaubte Werte für users.role (MySQL SET-Spalte). Weitere Rollen können hier
-# einfach ergänzt werden; die Spaltendefinition wird bei jedem Start abgeglichen.
+# Erlaubte Werte für users.role. Weitere Rollen können hier einfach ergänzt
+# werden; der CHECK-Constraint wird bei jedem Start abgeglichen.
 ROLES = ["user", "customer", "admin"]
 DEFAULT_ROLE = "user"
-_ROLE_COLUMN_TYPE = "SET(" + ",".join(f"'{role}'" for role in ROLES) + ")"
+_ROLE_CHECK_SQL = "role IN (" + ",".join(f"'{role}'" for role in ROLES) + ")"
 
 _CUSTOMER_COLUMNS = {
     "company_name": "VARCHAR(255) NOT NULL",
@@ -17,14 +17,14 @@ _CUSTOMER_COLUMNS = {
     "zip": "VARCHAR(10) NOT NULL",
     "city": "VARCHAR(100) NOT NULL",
     "created_at": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP",
-    "updated_at": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+    "updated_at": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP",
 }
 
 _JOB_COLUMNS = {
     "document_link": "VARCHAR(500)",
     "zip": "VARCHAR(10)",
     "city": "VARCHAR(100)",
-    "embedding": "JSON",
+    "embedding": "JSONB",
 }
 
 _USER_COLUMNS = {
@@ -34,59 +34,68 @@ _USER_COLUMNS = {
 }
 
 _RESUME_COLUMNS = {
-    "embedding": "JSON",
+    "embedding": "JSONB",
 }
 
 
 def get_connection():
-    return pymysql.connect(
+    conn = psycopg2.connect(
         host=os.environ["DB_HOST"],
         port=int(os.environ["DB_PORT"]),
         user=os.environ["DB_USER"],
         password=os.environ["DB_PASSWORD"],
-        database=os.environ["DB_NAME"],
-        charset="utf8mb4",
-        cursorclass=DictCursor,
-        autocommit=True,
+        dbname=os.environ["DB_NAME"],
+        cursor_factory=RealDictCursor,
     )
+    conn.autocommit = True
+    return conn
 
 
 def init_db():
     conn = get_connection()
     try:
         with conn.cursor() as cur:
+            # Trigger-Funktion für "updated_at" (Postgres kennt kein
+            # ON UPDATE CURRENT_TIMESTAMP wie MySQL) - einmal zentral definiert,
+            # pro Tabelle mit updated_at-Spalte per Trigger registriert.
+            cur.execute("""
+                CREATE OR REPLACE FUNCTION set_updated_at() RETURNS TRIGGER AS $$
+                BEGIN
+                    NEW.updated_at = CURRENT_TIMESTAMP;
+                    RETURN NEW;
+                END;
+                $$ LANGUAGE plpgsql;
+            """)
+
             cur.execute(f"""
                 CREATE TABLE IF NOT EXISTS users (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    id SERIAL PRIMARY KEY,
                     first_name VARCHAR(100) NOT NULL,
                     last_name VARCHAR(100) NOT NULL,
                     short_name VARCHAR(50) NOT NULL,
                     email VARCHAR(255) NOT NULL UNIQUE,
                     password_hash VARCHAR(255) NOT NULL,
-                    role {_ROLE_COLUMN_TYPE} NOT NULL DEFAULT '{DEFAULT_ROLE}',
+                    role VARCHAR(20) NOT NULL DEFAULT '{DEFAULT_ROLE}',
                     document_link VARCHAR(500),
                     zip VARCHAR(10),
                     city VARCHAR(100),
                     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-            # Migration für Tabellen, die vor Einführung von "role" angelegt wurden,
-            # bzw. wenn ROLES sich seither geändert hat (z.B. VARCHAR -> SET, neue Rolle).
+            # Rollen-Constraint bei jedem Start mit ROLES abgleichen (z.B. neue Rolle ergänzt).
+            cur.execute("ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check")
+            cur.execute(f"ALTER TABLE users ADD CONSTRAINT users_role_check CHECK ({_ROLE_CHECK_SQL})")
+            cur.execute("DROP TRIGGER IF EXISTS trg_users_updated_at ON users")
             cur.execute("""
-                SELECT COLUMN_TYPE AS column_type FROM information_schema.columns
-                WHERE table_schema = DATABASE() AND table_name = 'users' AND column_name = 'role'
+                CREATE TRIGGER trg_users_updated_at BEFORE UPDATE ON users
+                FOR EACH ROW EXECUTE FUNCTION set_updated_at()
             """)
-            row = cur.fetchone()
-            if row is None:
-                cur.execute(f"ALTER TABLE users ADD COLUMN role {_ROLE_COLUMN_TYPE} NOT NULL DEFAULT '{DEFAULT_ROLE}'")
-            elif row["column_type"] != _ROLE_COLUMN_TYPE.lower():
-                cur.execute(f"ALTER TABLE users MODIFY COLUMN role {_ROLE_COLUMN_TYPE} NOT NULL DEFAULT '{DEFAULT_ROLE}'")
 
             # Migration für users-Tabellen, die vor Einführung von document_link angelegt wurden.
             cur.execute("""
-                SELECT COLUMN_NAME AS column_name FROM information_schema.columns
-                WHERE table_schema = DATABASE() AND table_name = 'users'
+                SELECT column_name FROM information_schema.columns
+                WHERE table_schema = current_schema() AND table_name = 'users'
             """)
             existing_user_columns = {row["column_name"] for row in cur.fetchall()}
             for column, definition in _USER_COLUMNS.items():
@@ -96,20 +105,25 @@ def init_db():
             # customer_id in jobs referenziert diese Tabelle, daher muss sie vorher existieren.
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS customers (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    id SERIAL PRIMARY KEY,
                     company_name VARCHAR(255) NOT NULL,
                     street VARCHAR(255) NOT NULL,
                     street_number VARCHAR(20) NOT NULL,
                     zip VARCHAR(10) NOT NULL,
                     city VARCHAR(100) NOT NULL,
                     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
+            """)
+            cur.execute("DROP TRIGGER IF EXISTS trg_customers_updated_at ON customers")
+            cur.execute("""
+                CREATE TRIGGER trg_customers_updated_at BEFORE UPDATE ON customers
+                FOR EACH ROW EXECUTE FUNCTION set_updated_at()
             """)
             # Migration für customers-Tabellen, die noch als reiner id-Platzhalter angelegt wurden.
             cur.execute("""
-                SELECT COLUMN_NAME AS column_name FROM information_schema.columns
-                WHERE table_schema = DATABASE() AND table_name = 'customers'
+                SELECT column_name FROM information_schema.columns
+                WHERE table_schema = current_schema() AND table_name = 'customers'
             """)
             existing_customer_columns = {row["column_name"] for row in cur.fetchall()}
             for column, definition in _CUSTOMER_COLUMNS.items():
@@ -118,7 +132,7 @@ def init_db():
 
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS jobs (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    id SERIAL PRIMARY KEY,
                     position VARCHAR(300) NOT NULL,
                     content TEXT NOT NULL,
                     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -133,8 +147,8 @@ def init_db():
             """)
             # Migration für jobs-Tabellen, die vor Einführung von document_link/zip/city angelegt wurden.
             cur.execute("""
-                SELECT COLUMN_NAME AS column_name FROM information_schema.columns
-                WHERE table_schema = DATABASE() AND table_name = 'jobs'
+                SELECT column_name FROM information_schema.columns
+                WHERE table_schema = current_schema() AND table_name = 'jobs'
             """)
             existing_job_columns = {row["column_name"] for row in cur.fetchall()}
             for column, definition in _JOB_COLUMNS.items():
@@ -144,7 +158,7 @@ def init_db():
             # user_id in resumes referenziert die users-Tabelle, daher muss sie vorher existieren.
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS resumes (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    id SERIAL PRIMARY KEY,
                     content TEXT NOT NULL,
                     document_link VARCHAR(500),
                     user_id INT NOT NULL,
@@ -154,8 +168,8 @@ def init_db():
             """)
             # Migration für resumes-Tabellen, die vor Einführung von embedding angelegt wurden.
             cur.execute("""
-                SELECT COLUMN_NAME AS column_name FROM information_schema.columns
-                WHERE table_schema = DATABASE() AND table_name = 'resumes'
+                SELECT column_name FROM information_schema.columns
+                WHERE table_schema = current_schema() AND table_name = 'resumes'
             """)
             existing_resume_columns = {row["column_name"] for row in cur.fetchall()}
             for column, definition in _RESUME_COLUMNS.items():
@@ -322,7 +336,8 @@ def list_job_embeddings():
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT id, embedding FROM jobs WHERE embedding IS NOT NULL")
-            return [(row["id"], json.loads(row["embedding"])) for row in cur.fetchall()]
+            # psycopg2 liefert JSONB-Werte bereits als geparstes Python-Objekt zurück.
+            return [(row["id"], row["embedding"]) for row in cur.fetchall()]
     finally:
         conn.close()
 
@@ -404,10 +419,11 @@ def create_resume(content, document_link, user_id, embedding=None):
                 """
                 INSERT INTO resumes (content, document_link, user_id, embedding)
                 VALUES (%s, %s, %s, %s)
+                RETURNING id
                 """,
                 (content, document_link, user_id, json.dumps(embedding) if embedding is not None else None),
             )
-            return cur.lastrowid
+            return cur.fetchone()["id"]
     finally:
         conn.close()
 
@@ -440,6 +456,7 @@ def list_resume_embeddings():
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT id, embedding FROM resumes WHERE embedding IS NOT NULL")
-            return [(row["id"], json.loads(row["embedding"])) for row in cur.fetchall()]
+            # psycopg2 liefert JSONB-Werte bereits als geparstes Python-Objekt zurück.
+            return [(row["id"], row["embedding"]) for row in cur.fetchall()]
     finally:
         conn.close()

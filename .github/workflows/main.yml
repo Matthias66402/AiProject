@@ -11,15 +11,16 @@ jobs:
     runs-on: ubuntu-latest
 
     services:
-      mysql:
-        image: mysql:8.0
+      postgres:
+        image: postgres:16
         env:
-          MYSQL_ROOT_PASSWORD: test
-          MYSQL_DATABASE: aiproject_test
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: aiproject_test
         ports:
-          - 3306:3306
+          - 5432:5432
         options: >-
-          --health-cmd="mysqladmin ping -h localhost"
+          --health-cmd="pg_isready -U test"
           --health-interval=5s
           --health-timeout=5s
           --health-retries=10
@@ -30,8 +31,8 @@ jobs:
       OPENAI_API_KEY: dummy-key-for-ci
       SECRET_KEY: dummy-secret-for-ci
       DB_HOST: 127.0.0.1
-      DB_PORT: 3306
-      DB_USER: root
+      DB_PORT: 5432
+      DB_USER: test
       DB_PASSWORD: test
       DB_NAME: aiproject_test
 
@@ -58,7 +59,7 @@ jobs:
       - name: Check syntax
         run: python -m py_compile app.py db.py
 
-      - name: Smoke test (App-Import inkl. DB-Migration gegen den MySQL-Service)
+      - name: Smoke test (App-Import inkl. DB-Migration gegen den Postgres-Service)
         run: python -c "import app"
 
       - name: Build Docker image
