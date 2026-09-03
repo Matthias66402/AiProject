@@ -27,11 +27,13 @@ Die Website ist noch im Aufbau, Struktur und Funktionsumfang können sich häufi
 
 ## Embeddings (RAG-Grundlage)
 
-Jeder Job (`jobs.embedding`) und jeder Lebenslauf (`resumes.embedding`) bekommt beim Anlegen/Ändern automatisch ein OpenAI-Embedding (`text-embedding-3-small`) berechnet und als JSON-Array in der jeweiligen Spalte gespeichert — sowohl bei manueller Eingabe als auch bei KI-Generierung über die Tools-Seiten. Zuständig ist `embeddings.py`:
+Jeder Job (`jobs.embedding`) und jeder Lebenslauf (`resumes.embedding`) bekommt beim Anlegen/Ändern automatisch ein OpenAI-Embedding (`text-embedding-3-small`) berechnet und als [pgvector](https://github.com/pgvector/pgvector) `vector(1536)`-Spalte gespeichert — sowohl bei manueller Eingabe als auch bei KI-Generierung über die Tools-Seiten. Die Ähnlichkeitssuche läuft nativ in SQL über den Cosine-Distance-Operator `<=>`, indiziert per HNSW-Index (`idx_jobs_embedding_hnsw`/`idx_resumes_embedding_hnsw`), statt Embeddings nach Python zu laden. Zuständig ist `embeddings.py`:
 
 - `strip_html_to_text()` — bereitet die HTML-Inhalte (`content`) für ein sauberes Embedding auf
 - `embed_text()` / `embed_texts()` — einzelnes bzw. batch-weises Embedding über die OpenAI-API; API-Fehler (Status-, Verbindungs-, Timeout-Fehler) werden abgefangen und geloggt, statt das eigentliche Anlegen/Ändern zu blockieren
-- `cosine_similarity()` / `top_matches()` — Ähnlichkeitssuche in reinem Python (keine zusätzliche Vektor-DB nötig bei der aktuellen Datenmenge)
+- `to_vector_literal()` — formatiert ein Embedding als pgvector-Text-Literal zum Schreiben über einen `::vector`-Cast
+
+`db.find_similar_jobs(embedding, top_k)` / `db.find_similar_resumes(embedding, top_k)` liefern die ähnlichsten Einträge (Cosine Similarity, SQL-nativ) — Grundlage für eine spätere Matching-Funktion (Kandidat ↔ Stellenangebot), es gibt aber noch keine UI dafür.
 
 `backfill_embeddings.py` berechnet einmalig Embeddings für bestehende Jobs/Lebensläufe ohne Embedding nach (z.B. nach der Einführung dieses Features oder bei einem Modellwechsel):
 
@@ -39,12 +41,10 @@ Jeder Job (`jobs.embedding`) und jeder Lebenslauf (`resumes.embedding`) bekommt 
 docker compose exec app python backfill_embeddings.py
 ```
 
-Aktuell dient das als Grundlage für eine spätere Matching-Funktion (Kandidat ↔ Stellenangebot per Ähnlichkeit) — es gibt noch keine UI dafür.
-
 ## Tech-Stack
 
 - **Backend**: Flask (Python 3.14)
-- **Datenbank**: PostgreSQL 16 über psycopg2; Schema wird beim App-Start automatisch angelegt und migriert (`db.init_db()`)
+- **Datenbank**: PostgreSQL 16 (Image `pgvector/pgvector:pg16`) über psycopg2, inkl. [pgvector](https://github.com/pgvector/pgvector)-Extension für die Ähnlichkeitssuche; Schema wird beim App-Start automatisch angelegt und migriert (`db.init_db()`)
 - **KI**: [Groq](https://pypi.org/project/groq/)- und [OpenAI](https://pypi.org/project/openai/)-Python-SDKs
 - **PDF-Erzeugung**: [WeasyPrint](https://pypi.org/project/weasyprint/) rendert vom KI-Modell geliefertes HTML zu PDF. Benötigt native Pango/Cairo-Bibliotheken (siehe unten) — im `Dockerfile` und in der CI bereits per `apt` eingerichtet
 - **Frontend**: Jinja2-Templates, Tailwind-Klassen, Font Awesome (lokal in `static/fontawesome`)

@@ -2,14 +2,13 @@
 Embedding eines nachzuberechnen. Ausführung z.B. via:
     docker compose exec app python backfill_embeddings.py
 """
-import json
 import os
 
 from dotenv import load_dotenv
 from openai import OpenAI
 
 import db
-from embeddings import embed_texts, strip_html_to_text
+from embeddings import embed_texts, strip_html_to_text, to_vector_literal
 
 load_dotenv()
 
@@ -30,8 +29,8 @@ def backfill_jobs(openai_client):
                 print(f"  Job {job['id']}: Embedding fehlgeschlagen, übersprungen.")
                 continue
             with conn.cursor() as cur:
-                cur.execute("UPDATE jobs SET embedding = %s WHERE id = %s",
-                            (json.dumps(embedding), job["id"]))
+                cur.execute("UPDATE jobs SET embedding = %s::vector WHERE id = %s",
+                            (to_vector_literal(embedding), job["id"]))
             print(f"  Job {job['id']}: Embedding gespeichert.")
     finally:
         conn.close()
@@ -53,8 +52,8 @@ def backfill_resumes(openai_client):
                 print(f"  Resume {resume['id']}: Embedding fehlgeschlagen, übersprungen.")
                 continue
             with conn.cursor() as cur:
-                cur.execute("UPDATE resumes SET embedding = %s WHERE id = %s",
-                            (json.dumps(embedding), resume["id"]))
+                cur.execute("UPDATE resumes SET embedding = %s::vector WHERE id = %s",
+                            (to_vector_literal(embedding), resume["id"]))
             print(f"  Resume {resume['id']}: Embedding gespeichert.")
     finally:
         conn.close()

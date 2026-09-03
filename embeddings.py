@@ -1,5 +1,4 @@
 import html
-import math
 import re
 
 from openai import APIError as OpenAIAPIError
@@ -49,18 +48,7 @@ def embed_texts(openai_client, texts, logger=None):
         return [None] * len(texts)
 
 
-def cosine_similarity(a, b):
-    dot = sum(x * y for x, y in zip(a, b))
-    norm_a = math.sqrt(sum(x * x for x in a))
-    norm_b = math.sqrt(sum(y * y for y in b))
-    if norm_a == 0 or norm_b == 0:
-        return 0.0
-    return dot / (norm_a * norm_b)
-
-
-def top_matches(query_embedding, items, top_k=5):
-    """items: Liste von (id, embedding)-Paaren. Gibt die top_k (id, score)
-    absteigend nach Ähnlichkeit sortiert zurück."""
-    scored = [(item_id, cosine_similarity(query_embedding, embedding)) for item_id, embedding in items]
-    scored.sort(key=lambda pair: pair[1], reverse=True)
-    return scored[:top_k]
+def to_vector_literal(embedding):
+    """Formatiert ein Embedding als pgvector-Text-Literal (z.B. "[0.1,-0.2]"),
+    zum Schreiben über einen %s::vector-Cast."""
+    return "[" + ",".join(repr(float(x)) for x in embedding) + "]"

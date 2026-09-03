@@ -1,8 +1,9 @@
-import json
 import os
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
+
+from embeddings import to_vector_literal
 
 # Erlaubte Werte für users.role. Weitere Rollen können hier einfach ergänzt
 # werden; der CHECK-Constraint wird bei jedem Start abgeglichen.
@@ -24,7 +25,7 @@ _JOB_COLUMNS = {
     "document_link": "VARCHAR(500)",
     "zip": "VARCHAR(10)",
     "city": "VARCHAR(100)",
-    "embedding": "JSONB",
+    "embedding": "vector(1536)",
 }
 
 _USER_COLUMNS = {
@@ -34,7 +35,7 @@ _USER_COLUMNS = {
 }
 
 _RESUME_COLUMNS = {
-    "embedding": "JSONB",
+    "embedding": "vector(1536)",
 }
 
 
@@ -51,10 +52,25 @@ def get_connection():
     return conn
 
 
+def _migrate_embedding_to_vector(cur, table):
+    """Wandelt eine noch als JSONB gespeicherte embedding-Spalte (Stand vor
+    Einführung von pgvector) in-place in vector(1536) um. Idempotent - prüft
+    den aktuellen Spaltentyp und tut bei bereits umgestellten Spalten nichts."""
+    cur.execute("""
+        SELECT udt_name FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = %s AND column_name = 'embedding'
+    """, (table,))
+    row = cur.fetchone()
+    if row is not None and row["udt_name"] != "vector":
+        cur.execute(f"ALTER TABLE {table} ALTER COLUMN embedding TYPE vector(1536) USING embedding::text::vector")
+
+
 def init_db():
     conn = get_connection()
     try:
         with conn.cursor() as cur:
+            cur.execute("CREATE EXTENSION IF NOT EXISTS vector")
+
             # Trigger-Funktion für "updated_at" (Postgres kennt kein
             # ON UPDATE CURRENT_TIMESTAMP wie MySQL) - einmal zentral definiert,
             # pro Tabelle mit updated_at-Spalte per Trigger registriert.
@@ -154,6 +170,8 @@ def init_db():
             for column, definition in _JOB_COLUMNS.items():
                 if column not in existing_job_columns:
                     cur.execute(f"ALTER TABLE jobs ADD COLUMN {column} {definition}")
+            _migrate_embedding_to_vector(cur, "jobs")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_jobs_embedding_hnsw ON jobs USING hnsw (embedding vector_cosine_ops)")
 
             # user_id in resumes referenziert die users-Tabelle, daher muss sie vorher existieren.
             cur.execute("""
@@ -175,6 +193,8 @@ def init_db():
             for column, definition in _RESUME_COLUMNS.items():
                 if column not in existing_resume_columns:
                     cur.execute(f"ALTER TABLE resumes ADD COLUMN {column} {definition}")
+            _migrate_embedding_to_vector(cur, "resumes")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_resumes_embedding_hnsw ON resumes USING hnsw (embedding vector_cosine_ops)")
     finally:
         conn.close()
 
@@ -305,10 +325,10 @@ def create_job(position, content, valid_from, valid_until, customer_id, document
             cur.execute(
                 """
                 INSERT INTO jobs (position, content, valid_from, valid_until, customer_id, document_link, zip, city, embedding)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::vector)
                 """,
                 (position, content, valid_from, valid_until, customer_id, document_link, zip_code, city,
-                 json.dumps(embedding) if embedding is not None else None),
+                 to_vector_literal(embedding) if embedding is not None else None),
             )
     finally:
         conn.close()
@@ -321,23 +341,34 @@ def update_job(job_id, position, content, valid_from, valid_until, customer_id, 
             cur.execute(
                 """
                 UPDATE jobs
-                SET position = %s, content = %s, valid_from = %s, valid_until = %s, customer_id = %s, zip = %s, city = %s, embedding = %s
+                SET position = %s, content = %s, valid_from = %s, valid_until = %s, customer_id = %s, zip = %s, city = %s, embedding = %s::vector
                 WHERE id = %s
                 """,
                 (position, content, valid_from, valid_until, customer_id, zip_code, city,
-                 json.dumps(embedding) if embedding is not None else None, job_id),
+                 to_vector_literal(embedding) if embedding is not None else None, job_id),
             )
     finally:
         conn.close()
 
 
-def list_job_embeddings():
+def find_similar_jobs(embedding, top_k=5):
+    """Liefert (id, similarity)-Paare der top_k Jobs, deren Embedding dem
+    gegebenen am ähnlichsten ist (Cosine Similarity, 1.0 = identisch),
+    absteigend sortiert. Läuft nativ per pgvector-Index in SQL."""
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT id, embedding FROM jobs WHERE embedding IS NOT NULL")
-            # psycopg2 liefert JSONB-Werte bereits als geparstes Python-Objekt zurück.
-            return [(row["id"], row["embedding"]) for row in cur.fetchall()]
+            cur.execute(
+                """
+                SELECT id, 1 - (embedding <=> %s::vector) AS similarity
+                FROM jobs
+                WHERE embedding IS NOT NULL
+                ORDER BY embedding <=> %s::vector
+                LIMIT %s
+                """,
+                (to_vector_literal(embedding), to_vector_literal(embedding), top_k),
+            )
+            return [(row["id"], row["similarity"]) for row in cur.fetchall()]
     finally:
         conn.close()
 
@@ -418,10 +449,10 @@ def create_resume(content, document_link, user_id, embedding=None):
             cur.execute(
                 """
                 INSERT INTO resumes (content, document_link, user_id, embedding)
-                VALUES (%s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s::vector)
                 RETURNING id
                 """,
-                (content, document_link, user_id, json.dumps(embedding) if embedding is not None else None),
+                (content, document_link, user_id, to_vector_literal(embedding) if embedding is not None else None),
             )
             return cur.fetchone()["id"]
     finally:
@@ -451,12 +482,21 @@ def list_resumes_for_user(user_id):
         conn.close()
 
 
-def list_resume_embeddings():
+def find_similar_resumes(embedding, top_k=5):
+    """Analog zu find_similar_jobs(), für resumes."""
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT id, embedding FROM resumes WHERE embedding IS NOT NULL")
-            # psycopg2 liefert JSONB-Werte bereits als geparstes Python-Objekt zurück.
-            return [(row["id"], row["embedding"]) for row in cur.fetchall()]
+            cur.execute(
+                """
+                SELECT id, 1 - (embedding <=> %s::vector) AS similarity
+                FROM resumes
+                WHERE embedding IS NOT NULL
+                ORDER BY embedding <=> %s::vector
+                LIMIT %s
+                """,
+                (to_vector_literal(embedding), to_vector_literal(embedding), top_k),
+            )
+            return [(row["id"], row["similarity"]) for row in cur.fetchall()]
     finally:
         conn.close()
