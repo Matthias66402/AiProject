@@ -387,10 +387,19 @@ def customers():
     return render_template('index.html', content_template='customer.html', customers=db.list_customers(), editing_customer=None, customer_jobs=None)
 
 
+def _can_manage_customer(customer_id):
+    """Admins dürfen jeden Stellenanbieter bearbeiten, Nutzer mit Rolle 'customer'
+    nur den ihnen zugeordneten (Anlegen/Löschen bleibt Admins vorbehalten)."""
+    role = session.get("user_role")
+    if role == "admin":
+        return True
+    return role == "customer" and session.get("user_customer_id") == customer_id
+
+
 @app.route('/customers/<int:customer_id>/edit', methods=["GET", "POST"])
 def edit_customer(customer_id):
     if request.method == "POST":
-        if session.get("user_role") != "admin":
+        if not _can_manage_customer(customer_id):
             return redirect(url_for('customers'))
 
         company_name = request.form.get("company_name", "").strip()
