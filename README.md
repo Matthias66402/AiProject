@@ -27,6 +27,7 @@ Die Website ist noch im Aufbau, Struktur und Funktionsumfang können sich häufi
   - `customer`-Nutzer mit zugeordnetem Stellenanbieter: dürfen nur ihren eigenen Datensatz bearbeiten (nicht anlegen/löschen).
   - Alle anderen: nur Liste + Lesemodus ("Ansehen"), kein Bearbeiten/Löschen.
   - Die Bearbeiten-Ansicht zeigt zusätzlich die zu diesem Stellenanbieter gehörenden Stellenangebote.
+  - Anlegen von neuen Stellen per Dokumenten-Upload wird automatisch dem eingeloggten Stellenanbieter zugeordnet.
 - **Tools-Menü** (nur für Rolle `admin`): lässt die KI Inhalte als HTML formulieren und rendert sie per WeasyPrint zu PDF, mit dezentem Lade-Spinner während der Generierung und Link zum Öffnen der fertigen Datei in einem neuen Tab.
   - **Lebenslauf generieren** (`/tools/resume`): ein bestehender Nutzer wird per Selectbox ausgewählt. Sind bei ihm PLZ **und** Stadt hinterlegt, übernimmt die KI dessen echten Namen und Wohnort unverändert (Rest frei erfunden); ansonsten ein komplett fiktiver Dummy-Lebenslauf. Das PDF wird unter `data/resumes/` abgelegt und als neuer Eintrag in `resumes` (FK auf den Nutzer) gespeichert.
   - **Stellenangebot generieren** (`/tools/joboffer`): ein Stellenanbieter wird per Selectbox ausgewählt. Die KI liefert Position, PLZ, Stadt und den Stellentext strukturiert als JSON zurück; das PDF wird unter `data/joboffers/` abgelegt und automatisch ein passender Eintrag in `/jobs` angelegt (inkl. `document_link`, Gültigkeit heute bis +30 Tage).
