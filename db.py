@@ -497,6 +497,15 @@ def list_resumes_for_user(user_id):
         conn.close()
 
 
+def delete_resume(resume_id):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM resumes WHERE id = %s", (resume_id,))
+    finally:
+        conn.close()
+
+
 def find_matching_resumes(embedding, top_k=5, min_similarity=MIN_MATCH_SIMILARITY):
     """Analog zu find_matching_jobs(), für resumes - inkl. Namen des
     zugehörigen Nutzers für die Anzeige."""

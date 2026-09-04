@@ -101,7 +101,7 @@ PAGE_DESCRIPTIONS = {
     "customers": "Stellenanbieter (Kunden): Liste für alle sichtbar, im Hauptmenü als 'Stellenanbieter' verlinkt. Neuen Stellenanbieter anlegen nur für Admins",
     "edit_customer": "Einen bestehenden Stellenanbieter ansehen. Für Admins ein Bearbeiten-Formular, für alle anderen nur eine Leseansicht (Firma, Adresse, PLZ, Stadt als Text) ohne Speichern-Möglichkeit. Darunter zusätzlich die Liste der zu diesem Stellenanbieter gehörenden Stellenangebote",
     "delete_customer": "Einen Stellenanbieter löschen. Nur für Admins",
-    "generate_resume": "Lebenslauf für einen bestehenden, per Auswahlliste gewählten Nutzer generieren (personalisiert mit dessen echtem Namen/Wohnort, falls bei ihm PLZ und Stadt hinterlegt sind, sonst komplett fiktiv). Nur für Admins, erreichbar über das 'Tools'-Menü in der Navigation",
+    "generate_resume": "Lebenslauf für einen bestehenden, per Auswahlliste gewählten Nutzer generieren (immer mit dessen echtem Namen; der Wohnort wird nur übernommen, wenn bei ihm PLZ und Stadt hinterlegt sind, sonst frei erfunden). Nur für Admins, erreichbar über das 'Tools'-Menü in der Navigation",
     "generate_joboffer": "Stellenangebot für einen per Auswahlliste gewählten Stellenanbieter generieren; legt dabei automatisch auch einen passenden Eintrag unter 'Stellenangebote' an. Nur für Admins, erreichbar über das 'Tools'-Menü in der Navigation",
     "my_resumes": "Eigene Lebensläufe des eingeloggten Nutzers ansehen: der neueste eingebettet (PDF direkt, andere Formate als Download-Link), per Auswahlliste sind auch ältere Versionen abrufbar. Neue Lebensläufe entweder per KI generieren lassen oder eine eigene Datei (PDF, .docx, .odt) hochladen - beides wird für die Stellen-Empfehlung vektorisiert. Nur für eingeloggte Nutzer mit Rolle 'user', erreichbar über das Konto-Menü oben rechts in der Navigation",
 }
@@ -196,17 +196,19 @@ def register():
         last_name = request.form.get("last_name", "").strip()
         short_name = request.form.get("short_name", "").strip()
         email = request.form.get("email", "").strip()
+        zip_code = request.form.get("zip", "").strip()
+        city = request.form.get("city", "").strip()
         password = request.form.get("password", "")
         password_confirm = request.form.get("password_confirm", "")
 
-        if not (first_name and last_name and short_name and email and password):
+        if not (first_name and last_name and short_name and email and zip_code and city and password):
             error = "Bitte alle Felder ausfüllen."
         elif password != password_confirm:
             error = "Die Passwörter stimmen nicht überein."
         elif db.get_user_by_email(email):
             error = "Diese E-Mail-Adresse ist bereits registriert."
         else:
-            db.create_user(first_name, last_name, short_name, email, generate_password_hash(password), DEFAULT_ROLE)
+            db.create_user(first_name, last_name, short_name, email, generate_password_hash(password), DEFAULT_ROLE, zip_code, city)
             _log_in_user(db.get_user_by_email(email))
             return redirect(url_for('home'))
 
@@ -404,6 +406,19 @@ def _generate_resume_document(user_id, spec):
         user_content = (
             f"Name: {selected_user['first_name']} {selected_user['last_name']}\n"
             f"Wohnort: {selected_user['zip']} {selected_user['city']}\n\n"
+            f"{spec}"
+        )
+    elif selected_user:
+        system_content = (
+            "Du erstellst einen Lebenslauf auf Basis der Vorgaben des Nutzers. "
+            "Der Name ist vorgegeben und muss unverändert übernommen werden. Einen Wohnort hat "
+            "der Nutzer nicht hinterlegt - den darfst du ebenso wie alle weiteren Angaben "
+            "(Ausbildung, Erfahrung, Qualifikationen) frei und kreativ erfinden. "
+            "Antworte ausschließlich mit dem fertigen Lebenslauf im HTML-Format, "
+            "ohne zusätzliche Erklärungen."
+        )
+        user_content = (
+            f"Name: {selected_user['first_name']} {selected_user['last_name']}\n\n"
             f"{spec}"
         )
     else:
@@ -619,6 +634,19 @@ def my_resume_file(resume_id):
         return redirect(url_for('home'))
     filename = os.path.basename(resume["document_link"])
     return send_from_directory(RESUME_DIR, filename)
+
+
+@app.route('/resumes/<int:resume_id>/delete', methods=["POST"])
+def delete_resume(resume_id):
+    resume = db.get_resume(resume_id)
+    if not resume or resume["user_id"] != session.get("user_id"):
+        return redirect(url_for('home'))
+    if resume["document_link"]:
+        file_path = os.path.join(RESUME_DIR, os.path.basename(resume["document_link"]))
+        if os.path.exists(file_path):
+            os.remove(file_path)
+    db.delete_resume(resume_id)
+    return redirect(url_for('my_resumes'))
 
 
 @app.route('/tools/joboffer/<path:filename>')

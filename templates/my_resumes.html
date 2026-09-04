@@ -24,6 +24,12 @@
     </form>
 
     {% if selected_resume %}
+    <div class="row-actions mt-5">
+        <form action="{{ url_for('delete_resume', resume_id=selected_resume.id) }}" method="POST" onsubmit="return confirm('Diesen Lebenslauf wirklich löschen? Die zugehörige Datei wird dabei ebenfalls entfernt.');">
+            <button type="submit" class="link-button"><i class="fa-solid fa-trash"></i> Lebenslauf löschen</button>
+        </form>
+    </div>
+
     {% if selected_resume.document_link.rsplit('.', 1)[-1] | lower == 'pdf' %}
     <iframe class="pdf-embed" src="{{ url_for('my_resume_file', resume_id=selected_resume.id) }}" title="Lebenslauf PDF"></iframe>
     {% else %}

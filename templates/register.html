@@ -24,6 +24,14 @@
             <input id="email" name="email" type="email" value="{{ request.form.get('email', '') }}" required>
         </div>
         <div>
+            <label for="zip">PLZ</label>
+            <input id="zip" name="zip" type="text" value="{{ request.form.get('zip', '') }}" required>
+        </div>
+        <div>
+            <label for="city">Stadt</label>
+            <input id="city" name="city" type="text" value="{{ request.form.get('city', '') }}" required>
+        </div>
+        <div>
             <label for="password">Passwort</label>
             <input id="password" name="password" type="password" required>
         </div>
