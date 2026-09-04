@@ -107,7 +107,7 @@ docker-compose.yml          App + PostgreSQL-Service für lokalen/Produktions-Be
 
 - Python 3.14
 - PostgreSQL-Server (lokal oder über Docker)
-- API-Keys für [Groq](https://console.groq.com/) und [OpenAI](https://platform.openai.com/)
+- API-Key für [OpenAI](https://platform.openai.com/), optional für [Groq](https://console.groq.com/)
 
 ### Lokal ohne Docker
 
