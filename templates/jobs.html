@@ -120,7 +120,7 @@
                 <label for="valid_until">Gültig bis</label>
                 <input id="valid_until" name="valid_until" type="date" value="{{ editing_job.valid_until if editing_job else '' }}">
             </div>
-            <button class="subtle-btn" type="submit">{{ "Speichern" if editing_job else "Stelle anlegen" }}</button>
+            <button class="subtle-btn" type="submit">{{ "Speichern" if editing_job else "Speichern" }}</button>
         </form>
         {% if editing_job %}
         <p class="subtitle">

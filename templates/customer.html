@@ -2,8 +2,12 @@
     {% set is_admin = current_user and current_user.role == 'admin' %}
     {% set is_customer_user = current_user and current_user.role == 'customer' and current_user.customer_id %}
     {% set can_manage_customer = is_admin or (is_customer_user and editing_customer and editing_customer.id == current_user.customer_id) %}
-    <h1 id="greetings">Kunden</h1>
+    <h1 id="greetings">{{ "Bearbeiten" if is_customer_user else "Kunden" }}</h1>
+    {% if is_customer_user %}
+    <p class="subtitle">Deine Unternehmensdaten und die dazugehörigen Stellenangebote.</p>
+    {% else %}
     <p class="subtitle">Übersicht der registrierten Kunden</p>
+    {% endif %}
 
     {% if is_admin or editing_customer %}
     <details class="entity-form" {% if editing_customer %}open{% endif %}>
@@ -86,6 +90,7 @@
     </details>
     {% endif %}
 
+    {% if not is_customer_user %}
     <table class="user-table">
         <thead>
             <tr>
@@ -148,4 +153,5 @@
             </select>
         </form>
     </div>
+    {% endif %}
 </div>

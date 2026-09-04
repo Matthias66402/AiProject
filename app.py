@@ -435,6 +435,12 @@ def customers():
 
         return redirect(url_for('customers'))
 
+    # 'customer'-Nutzer mit zugeordnetem Stellenanbieter bekommen statt der Liste
+    # aller Stellenanbieter direkt ihr eigenes Bearbeiten-Formular samt eigenen Stellen.
+    own_customer_id = session.get("user_customer_id") if session.get("user_role") == "customer" else None
+    if own_customer_id:
+        return redirect(url_for('edit_customer', customer_id=own_customer_id))
+
     customers_list, page, per_page, total_pages = _paginate_customers()
     return render_template('index.html', content_template='customer.html', customers=customers_list, editing_customer=None, customer_jobs=None, page=page, per_page=per_page, total_pages=total_pages, per_page_options=CUSTOMERS_PER_PAGE_OPTIONS)
 
