@@ -1,4 +1,4 @@
-<div class="scroll wide">
+<div class="scroll full">
     {% set is_admin = current_user and current_user.role == 'admin' %}
     {% set is_customer_user = current_user and current_user.role == 'customer' and current_user.customer_id %}
     {% set can_manage_job = is_admin or (is_customer_user and (not editing_job or editing_job.customer_id == current_user.customer_id)) %}
@@ -160,7 +160,6 @@
                 <th>Kunde</th>
                 <th>Gültig von</th>
                 <th>Gültig bis</th>
-                <th>Erstellt am</th>
                 <th></th>
             </tr>
         </thead>
@@ -172,14 +171,15 @@
                 <td>{{ job.customer_name }}</td>
                 <td>{{ job.valid_from or "-" }}</td>
                 <td>{{ job.valid_until or "-" }}</td>
-                <td>{{ job.created_at }}</td>
-                <td class="row-actions">
-                    <a href="{{ url_for('edit_job', job_id=job.id) }}"><i class="fa-solid {{ 'fa-pen' if row_can_manage else 'fa-eye' }}"></i> {{ "Bearbeiten" if row_can_manage else "Ansehen" }}</a>
-                    {% if row_can_manage %}
-                    <form action="{{ url_for('delete_job', job_id=job.id) }}" method="POST" onsubmit="return confirm('Stelle wirklich löschen?');">
-                        <button type="submit" class="link-button"><i class="fa-solid fa-trash"></i> Löschen</button>
-                    </form>
-                    {% endif %}
+                <td>
+                    <div class="row-actions">
+                        <a href="{{ url_for('edit_job', job_id=job.id) }}"><i class="fa-solid {{ 'fa-pen' if row_can_manage else 'fa-eye' }}"></i> {{ "Bearbeiten" if row_can_manage else "Ansehen" }}</a>
+                        {% if row_can_manage %}
+                        <form action="{{ url_for('delete_job', job_id=job.id) }}" method="POST" onsubmit="return confirm('Stelle wirklich löschen?');">
+                            <button type="submit" class="link-button"><i class="fa-solid fa-trash"></i> Löschen</button>
+                        </form>
+                        {% endif %}
+                    </div>
                 </td>
             </tr>
             {% else %}
@@ -189,6 +189,41 @@
             {% endfor %}
         </tbody>
     </table>
+
+    {% macro pager_url(p) -%}
+    {%- if came_from_customer -%}
+    {{ url_for(request.endpoint, job_id=editing_job.id, from_customer=editing_job.customer_id, page=p, per_page=per_page) }}
+    {%- else -%}
+    {{ url_for(request.endpoint, page=p, per_page=per_page, **request.view_args) }}
+    {%- endif -%}
+    {%- endmacro %}
+
+    <div class="pager">
+        <div class="pager-nav">
+            {% if page > 1 %}
+            <a class="subtle-btn" href="{{ pager_url(page - 1) }}"><i class="fa-solid fa-angle-left"></i> Zurück</a>
+            {% else %}
+            <span class="subtle-btn disabled"><i class="fa-solid fa-angle-left"></i> Zurück</span>
+            {% endif %}
+            <span class="pager-status">Seite {{ page }} von {{ total_pages }}</span>
+            {% if page < total_pages %}
+            <a class="subtle-btn" href="{{ pager_url(page + 1) }}">Weiter <i class="fa-solid fa-angle-right"></i></a>
+            {% else %}
+            <span class="subtle-btn disabled">Weiter <i class="fa-solid fa-angle-right"></i></span>
+            {% endif %}
+        </div>
+        <form method="GET" action="{{ url_for(request.endpoint, **request.view_args) }}" class="pager-per-page">
+            <label for="per_page">Einträge pro Seite</label>
+            <select id="per_page" name="per_page" onchange="this.form.submit()">
+                {% for opt in per_page_options %}
+                <option value="{{ opt }}" {% if opt == per_page %}selected{% endif %}>{{ opt }}</option>
+                {% endfor %}
+            </select>
+            {% if came_from_customer %}
+            <input type="hidden" name="from_customer" value="{{ editing_job.customer_id }}">
+            {% endif %}
+        </form>
+    </div>
 </div>
 
 <script>

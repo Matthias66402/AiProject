@@ -112,6 +112,10 @@ nav summary::marker {
     max-width: 1100px;
 }
 
+.scroll.full {
+    max-width: 1600px;
+}
+
 .entity-form {
     margin-bottom: 24px;
 }
@@ -191,8 +195,9 @@ nav summary::marker {
 
 .row-actions {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 14px;
+    gap: 6px 14px;
 }
 
 .row-actions form {
@@ -404,6 +409,49 @@ textarea:focus {
 
 .user-table a {
     color: #ffe9a8;
+}
+
+.pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-top: -8px;
+    margin-bottom: 20px;
+}
+
+.pager-nav {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.pager-status {
+    color: #d9c9ff;
+    font-size: 0.9rem;
+}
+
+.pager .subtle-btn.disabled {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+.pager-per-page {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+}
+
+.pager-per-page label {
+    color: #d9c9ff;
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+.pager-per-page select {
+    width: auto;
 }
 
 .spinner {

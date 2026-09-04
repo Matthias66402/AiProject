@@ -1,4 +1,4 @@
-<div class="scroll wide">
+<div class="scroll full">
     {% set is_admin = current_user and current_user.role == 'admin' %}
     {% set is_customer_user = current_user and current_user.role == 'customer' and current_user.customer_id %}
     {% set can_manage_customer = is_admin or (is_customer_user and editing_customer and editing_customer.id == current_user.customer_id) %}
@@ -68,8 +68,10 @@
                         <td>{{ job.position }}</td>
                         <td>{{ job.valid_from or "-" }}</td>
                         <td>{{ job.valid_until or "-" }}</td>
-                        <td class="row-actions">
-                            <a href="{{ url_for('edit_job', job_id=job.id, from_customer=editing_customer.id) }}"><i class="fa-solid {{ 'fa-pen' if can_manage_customer else 'fa-eye' }}"></i> {{ "Bearbeiten" if can_manage_customer else "Ansehen" }}</a>
+                        <td>
+                            <div class="row-actions">
+                                <a href="{{ url_for('edit_job', job_id=job.id, from_customer=editing_customer.id) }}"><i class="fa-solid {{ 'fa-pen' if can_manage_customer else 'fa-eye' }}"></i> {{ "Bearbeiten" if can_manage_customer else "Ansehen" }}</a>
+                            </div>
                         </td>
                     </tr>
                     {% else %}
@@ -104,13 +106,15 @@
                 <td>{{ customer.zip }}</td>
                 <td>{{ customer.city }}</td>
                 <td>{{ customer.created_at }}</td>
-                <td class="row-actions">
-                    <a href="{{ url_for('edit_customer', customer_id=customer.id) }}"><i class="fa-solid {{ 'fa-pen' if row_can_manage else 'fa-eye' }}"></i> {{ "Bearbeiten" if row_can_manage else "Ansehen" }}</a>
-                    {% if is_admin %}
-                    <form action="{{ url_for('delete_customer', customer_id=customer.id) }}" method="POST" onsubmit="return confirm('Kunde wirklich löschen?');">
-                        <button type="submit" class="link-button"><i class="fa-solid fa-trash"></i> Löschen</button>
-                    </form>
-                    {% endif %}
+                <td>
+                    <div class="row-actions">
+                        <a href="{{ url_for('edit_customer', customer_id=customer.id) }}"><i class="fa-solid {{ 'fa-pen' if row_can_manage else 'fa-eye' }}"></i> {{ "Bearbeiten" if row_can_manage else "Ansehen" }}</a>
+                        {% if is_admin %}
+                        <form action="{{ url_for('delete_customer', customer_id=customer.id) }}" method="POST" onsubmit="return confirm('Kunde wirklich löschen?');">
+                            <button type="submit" class="link-button"><i class="fa-solid fa-trash"></i> Löschen</button>
+                        </form>
+                        {% endif %}
+                    </div>
                 </td>
             </tr>
             {% else %}
@@ -120,4 +124,28 @@
             {% endfor %}
         </tbody>
     </table>
+
+    <div class="pager">
+        <div class="pager-nav">
+            {% if page > 1 %}
+            <a class="subtle-btn" href="{{ url_for(request.endpoint, page=page - 1, per_page=per_page, **request.view_args) }}"><i class="fa-solid fa-angle-left"></i> Zurück</a>
+            {% else %}
+            <span class="subtle-btn disabled"><i class="fa-solid fa-angle-left"></i> Zurück</span>
+            {% endif %}
+            <span class="pager-status">Seite {{ page }} von {{ total_pages }}</span>
+            {% if page < total_pages %}
+            <a class="subtle-btn" href="{{ url_for(request.endpoint, page=page + 1, per_page=per_page, **request.view_args) }}">Weiter <i class="fa-solid fa-angle-right"></i></a>
+            {% else %}
+            <span class="subtle-btn disabled">Weiter <i class="fa-solid fa-angle-right"></i></span>
+            {% endif %}
+        </div>
+        <form method="GET" action="{{ url_for(request.endpoint, **request.view_args) }}" class="pager-per-page">
+            <label for="per_page">Einträge pro Seite</label>
+            <select id="per_page" name="per_page" onchange="this.form.submit()">
+                {% for opt in per_page_options %}
+                <option value="{{ opt }}" {% if opt == per_page %}selected{% endif %}>{{ opt }}</option>
+                {% endfor %}
+            </select>
+        </form>
+    </div>
 </div>

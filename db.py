@@ -235,36 +235,63 @@ def get_user(user_id):
         conn.close()
 
 
-def list_customers():
+def list_customers(limit=None, offset=None):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT * FROM customers ORDER BY company_name")
+            query = "SELECT * FROM customers ORDER BY company_name"
+            params = []
+            if limit is not None:
+                query += " LIMIT %s OFFSET %s"
+                params.extend([limit, offset or 0])
+            cur.execute(query, params)
             return cur.fetchall()
     finally:
         conn.close()
 
 
-def list_jobs(customer_id=None):
+def count_customers():
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) AS n FROM customers")
+            return cur.fetchone()["n"]
+    finally:
+        conn.close()
+
+
+def list_jobs(customer_id=None, limit=None, offset=None):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            query = """
+                SELECT jobs.*, customers.company_name AS customer_name
+                FROM jobs
+                JOIN customers ON customers.id = jobs.customer_id
+            """
+            params = []
+            if customer_id:
+                query += " WHERE jobs.customer_id = %s"
+                params.append(customer_id)
+            query += " ORDER BY jobs.created_at DESC"
+            if limit is not None:
+                query += " LIMIT %s OFFSET %s"
+                params.extend([limit, offset or 0])
+            cur.execute(query, params)
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+
+def count_jobs(customer_id=None):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             if customer_id:
-                cur.execute("""
-                    SELECT jobs.*, customers.company_name AS customer_name
-                    FROM jobs
-                    JOIN customers ON customers.id = jobs.customer_id
-                    WHERE jobs.customer_id = %s
-                    ORDER BY jobs.created_at DESC
-                """, (customer_id,))
+                cur.execute("SELECT COUNT(*) AS n FROM jobs WHERE customer_id = %s", (customer_id,))
             else:
-                cur.execute("""
-                    SELECT jobs.*, customers.company_name AS customer_name
-                    FROM jobs
-                    JOIN customers ON customers.id = jobs.customer_id
-                    ORDER BY jobs.created_at DESC
-                """)
-            return cur.fetchall()
+                cur.execute("SELECT COUNT(*) AS n FROM jobs")
+            return cur.fetchone()["n"]
     finally:
         conn.close()
 

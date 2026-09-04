@@ -301,6 +301,25 @@ def _own_customer_for_session():
     return None
 
 
+JOBS_PER_PAGE_DEFAULT = 10
+JOBS_PER_PAGE_OPTIONS = [10, 25, 50, 100]
+
+
+def _paginate_jobs(customer_id=None):
+    """Liest page/per_page aus der Query-String (per_page begrenzt auf
+    JOBS_PER_PAGE_OPTIONS, sonst Default 10; page begrenzt auf die tatsächliche
+    Seitenzahl) und gibt (jobs, page, per_page, total_pages) zurück."""
+    per_page = request.args.get("per_page", type=int)
+    if per_page not in JOBS_PER_PAGE_OPTIONS:
+        per_page = JOBS_PER_PAGE_DEFAULT
+    total = db.count_jobs(customer_id)
+    total_pages = max((total + per_page - 1) // per_page, 1)
+    page = max(request.args.get("page", type=int) or 1, 1)
+    page = min(page, total_pages)
+    jobs_list = db.list_jobs(customer_id, limit=per_page, offset=(page - 1) * per_page)
+    return jobs_list, page, per_page, total_pages
+
+
 @app.route('/jobs', methods=["GET", "POST"])
 def jobs():
     if request.method == "POST":
@@ -323,7 +342,8 @@ def jobs():
 
         return redirect(url_for('jobs'))
 
-    return render_template('index.html', content_template='jobs.html', jobs=db.list_jobs(), customers=db.list_customers(), editing_job=None, own_customer=_own_customer_for_session())
+    jobs_list, page, per_page, total_pages = _paginate_jobs()
+    return render_template('index.html', content_template='jobs.html', jobs=jobs_list, customers=db.list_customers(), editing_job=None, own_customer=_own_customer_for_session(), page=page, per_page=per_page, total_pages=total_pages, per_page_options=JOBS_PER_PAGE_OPTIONS)
 
 
 @app.route('/jobs/<int:job_id>/edit', methods=["GET", "POST"])
@@ -351,10 +371,10 @@ def edit_job(job_id):
     job = db.get_job(job_id)
     from_customer_id = request.args.get("from_customer", type=int)
     came_from_customer = bool(job and from_customer_id and from_customer_id == job["customer_id"])
-    jobs = db.list_jobs(job["customer_id"]) if came_from_customer else db.list_jobs()
+    jobs_list, page, per_page, total_pages = _paginate_jobs(job["customer_id"] if came_from_customer else None)
     matching_resumes = db.find_matching_resumes(job["embedding"], top_k=5) if job and job.get("embedding") else []
 
-    return render_template('index.html', content_template='jobs.html', jobs=jobs, customers=db.list_customers(), editing_job=job, came_from_customer=came_from_customer, matching_resumes=matching_resumes, own_customer=_own_customer_for_session())
+    return render_template('index.html', content_template='jobs.html', jobs=jobs_list, customers=db.list_customers(), editing_job=job, came_from_customer=came_from_customer, matching_resumes=matching_resumes, own_customer=_own_customer_for_session(), page=page, per_page=per_page, total_pages=total_pages, per_page_options=JOBS_PER_PAGE_OPTIONS)
 
 
 @app.route('/jobs/<int:job_id>/delete', methods=["POST"])
@@ -365,6 +385,24 @@ def delete_job(job_id):
         return redirect(url_for('jobs'))
     db.delete_job(job_id)
     return redirect(url_for('jobs'))
+
+CUSTOMERS_PER_PAGE_DEFAULT = 10
+CUSTOMERS_PER_PAGE_OPTIONS = [5, 10, 25, 50]
+
+
+def _paginate_customers():
+    """Liest page/per_page aus der Query-String (per_page begrenzt auf
+    CUSTOMERS_PER_PAGE_OPTIONS, sonst Default; page begrenzt auf die tatsächliche
+    Seitenzahl) und gibt (customers, page, per_page, total_pages) zurück."""
+    per_page = request.args.get("per_page", type=int)
+    if per_page not in CUSTOMERS_PER_PAGE_OPTIONS:
+        per_page = CUSTOMERS_PER_PAGE_DEFAULT
+    total = db.count_customers()
+    total_pages = max((total + per_page - 1) // per_page, 1)
+    page = max(request.args.get("page", type=int) or 1, 1)
+    page = min(page, total_pages)
+    customers_list = db.list_customers(limit=per_page, offset=(page - 1) * per_page)
+    return customers_list, page, per_page, total_pages
 
 
 @app.route('/customers', methods=["GET", "POST"])
@@ -384,7 +422,8 @@ def customers():
 
         return redirect(url_for('customers'))
 
-    return render_template('index.html', content_template='customer.html', customers=db.list_customers(), editing_customer=None, customer_jobs=None)
+    customers_list, page, per_page, total_pages = _paginate_customers()
+    return render_template('index.html', content_template='customer.html', customers=customers_list, editing_customer=None, customer_jobs=None, page=page, per_page=per_page, total_pages=total_pages, per_page_options=CUSTOMERS_PER_PAGE_OPTIONS)
 
 
 def _can_manage_customer(customer_id):
@@ -413,7 +452,8 @@ def edit_customer(customer_id):
 
         return redirect(url_for('customers'))
 
-    return render_template('index.html', content_template='customer.html', customers=db.list_customers(), editing_customer=db.get_customer(customer_id), customer_jobs=db.list_jobs(customer_id))
+    customers_list, page, per_page, total_pages = _paginate_customers()
+    return render_template('index.html', content_template='customer.html', customers=customers_list, editing_customer=db.get_customer(customer_id), customer_jobs=db.list_jobs(customer_id), page=page, per_page=per_page, total_pages=total_pages, per_page_options=CUSTOMERS_PER_PAGE_OPTIONS)
 
 
 @app.route('/customers/<int:customer_id>/delete', methods=["POST"])
