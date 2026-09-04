@@ -1,5 +1,7 @@
 <div class="scroll wide">
     {% set is_admin = current_user and current_user.role == 'admin' %}
+    {% set is_customer_user = current_user and current_user.role == 'customer' and current_user.customer_id %}
+    {% set can_manage_job = is_admin or (is_customer_user and (not editing_job or editing_job.customer_id == current_user.customer_id)) %}
     <h1 id="greetings">Stellenangebote</h1>
     {% if came_from_customer %}
     <p class="subtitle">Stellenangebote von {{ editing_job.customer_name }} &middot; <a href="{{ url_for('jobs') }}">alle anzeigen</a></p>
@@ -7,15 +9,15 @@
     <p class="subtitle">Übersicht der Stellenangebote</p>
     {% endif %}
 
-    {% if is_admin or editing_job %}
+    {% if can_manage_job or editing_job %}
     <details class="entity-form" {% if editing_job %}open{% endif %}>
         {% if not editing_job %}
         <summary class="subtle-btn">
-            {% if editing_job %}{{ "Stelle bearbeiten" if is_admin else "Stelle ansehen" }}{% else %} Stelle anlegen{% endif %}
+            {% if editing_job %}{{ "Stelle bearbeiten" if can_manage_job else "Stelle ansehen" }}{% else %} Stelle anlegen{% endif %}
         </summary>
         {% endif %}
 
-        {% if editing_job and not is_admin %}
+        {% if editing_job and not can_manage_job %}
         <div class="entity-view">
             <div>
                 <label>Position</label>
@@ -81,12 +83,16 @@
             </div>
             <div>
                 <label for="customer_id">Kunde</label>
+                {% if is_admin %}
                 <select id="customer_id" name="customer_id" required>
                     <option value="" disabled {% if not editing_job %}selected{% endif %}>Bitte wählen</option>
                     {% for customer in customers %}
                     <option value="{{ customer.id }}" {% if editing_job and editing_job.customer_id == customer.id %}selected{% endif %}>{{ customer.company_name }}</option>
                     {% endfor %}
                 </select>
+                {% else %}
+                <p>{{ editing_job.customer_name if editing_job else (own_customer.company_name if own_customer else "-") }}</p>
+                {% endif %}
             </div>
             <div>
                 <label for="zip">PLZ</label>
@@ -160,6 +166,7 @@
         </thead>
         <tbody>
             {% for job in jobs %}
+            {% set row_can_manage = is_admin or (is_customer_user and job.customer_id == current_user.customer_id) %}
             <tr>
                 <td>{{ job.position }}</td>
                 <td>{{ job.customer_name }}</td>
@@ -167,8 +174,8 @@
                 <td>{{ job.valid_until or "-" }}</td>
                 <td>{{ job.created_at }}</td>
                 <td class="row-actions">
-                    <a href="{{ url_for('edit_job', job_id=job.id) }}"><i class="fa-solid {{ 'fa-pen' if is_admin else 'fa-eye' }}"></i> {{ "Bearbeiten" if is_admin else "Ansehen" }}</a>
-                    {% if is_admin %}
+                    <a href="{{ url_for('edit_job', job_id=job.id) }}"><i class="fa-solid {{ 'fa-pen' if row_can_manage else 'fa-eye' }}"></i> {{ "Bearbeiten" if row_can_manage else "Ansehen" }}</a>
+                    {% if row_can_manage %}
                     <form action="{{ url_for('delete_job', job_id=job.id) }}" method="POST" onsubmit="return confirm('Stelle wirklich löschen?');">
                         <button type="submit" class="link-button"><i class="fa-solid fa-trash"></i> Löschen</button>
                     </form>

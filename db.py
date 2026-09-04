@@ -29,7 +29,6 @@ _JOB_COLUMNS = {
 }
 
 _USER_COLUMNS = {
-    "document_link": "VARCHAR(500)",
     "zip": "VARCHAR(10)",
     "city": "VARCHAR(100)",
 }
@@ -99,7 +98,6 @@ def init_db():
                     email VARCHAR(255) NOT NULL UNIQUE,
                     password_hash VARCHAR(255) NOT NULL,
                     role VARCHAR(20) NOT NULL DEFAULT '{DEFAULT_ROLE}',
-                    document_link VARCHAR(500),
                     zip VARCHAR(10),
                     city VARCHAR(100),
                     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -115,7 +113,12 @@ def init_db():
                 FOR EACH ROW EXECUTE FUNCTION set_updated_at()
             """)
 
-            # Migration für users-Tabellen, die vor Einführung von document_link angelegt wurden.
+            # document_link auf users war ein Relikt aus der Zeit vor der resumes-Tabelle
+            # (einzelner "letzter Lebenslauf" direkt am Nutzer) - inzwischen unbenutzt,
+            # da resumes mehrere Lebensläufe pro Nutzer sauber über user_id abbildet.
+            cur.execute("ALTER TABLE users DROP COLUMN IF EXISTS document_link")
+
+            # Migration für users-Tabellen, die vor Einführung von zip/city angelegt wurden.
             cur.execute("""
                 SELECT column_name FROM information_schema.columns
                 WHERE table_schema = current_schema() AND table_name = 'users'
@@ -152,6 +155,12 @@ def init_db():
             for column, definition in _CUSTOMER_COLUMNS.items():
                 if column not in existing_customer_columns:
                     cur.execute(f"ALTER TABLE customers ADD COLUMN {column} {definition}")
+
+            # customer_id in users referenziert customers (Zuordnung für Rolle 'customer',
+            # bei anderen Rollen NULL) - separat migriert statt über _USER_COLUMNS, da
+            # customers erst hier existiert.
+            if "customer_id" not in existing_user_columns:
+                cur.execute("ALTER TABLE users ADD COLUMN customer_id INT REFERENCES customers(id)")
 
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS jobs (
@@ -407,22 +416,22 @@ def get_user_by_email(email):
         conn.close()
 
 
-def create_user(first_name, last_name, short_name, email, password_hash, role=DEFAULT_ROLE, zip_code=None, city=None):
+def create_user(first_name, last_name, short_name, email, password_hash, role=DEFAULT_ROLE, zip_code=None, city=None, customer_id=None):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO users (first_name, last_name, short_name, email, password_hash, role, zip, city)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO users (first_name, last_name, short_name, email, password_hash, role, zip, city, customer_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
-                (first_name, last_name, short_name, email, password_hash, role, zip_code, city),
+                (first_name, last_name, short_name, email, password_hash, role, zip_code, city, customer_id),
             )
     finally:
         conn.close()
 
 
-def update_user(user_id, first_name, last_name, short_name, email, role, password_hash=None, zip_code=None, city=None):
+def update_user(user_id, first_name, last_name, short_name, email, role, password_hash=None, zip_code=None, city=None, customer_id=None):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -430,29 +439,20 @@ def update_user(user_id, first_name, last_name, short_name, email, role, passwor
                 cur.execute(
                     """
                     UPDATE users
-                    SET first_name = %s, last_name = %s, short_name = %s, email = %s, role = %s, password_hash = %s, zip = %s, city = %s
+                    SET first_name = %s, last_name = %s, short_name = %s, email = %s, role = %s, password_hash = %s, zip = %s, city = %s, customer_id = %s
                     WHERE id = %s
                     """,
-                    (first_name, last_name, short_name, email, role, password_hash, zip_code, city, user_id),
+                    (first_name, last_name, short_name, email, role, password_hash, zip_code, city, customer_id, user_id),
                 )
             else:
                 cur.execute(
                     """
                     UPDATE users
-                    SET first_name = %s, last_name = %s, short_name = %s, email = %s, role = %s, zip = %s, city = %s
+                    SET first_name = %s, last_name = %s, short_name = %s, email = %s, role = %s, zip = %s, city = %s, customer_id = %s
                     WHERE id = %s
                     """,
-                    (first_name, last_name, short_name, email, role, zip_code, city, user_id),
+                    (first_name, last_name, short_name, email, role, zip_code, city, customer_id, user_id),
                 )
-    finally:
-        conn.close()
-
-
-def set_user_document_link(user_id, document_link):
-    conn = get_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("UPDATE users SET document_link = %s WHERE id = %s", (document_link, user_id))
     finally:
         conn.close()
 

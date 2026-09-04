@@ -42,6 +42,7 @@ def inject_current_user():
         "id": user_id,
         "short_name": session.get("user_short_name"),
         "role": session.get("user_role"),
+        "customer_id": session.get("user_customer_id"),
     }}
 
 
@@ -49,6 +50,7 @@ def _log_in_user(user):
     session["user_id"] = user["id"]
     session["user_short_name"] = user["short_name"]
     session["user_role"] = user["role"]
+    session["user_customer_id"] = user.get("customer_id")
 
 # Verfügbare Zauberer (KI-Modelle). Key = Groq-Modell-ID, Value = Anzeigename.
 # Weitere Modelle können hier einfach ergänzt werden.
@@ -93,10 +95,10 @@ PAGE_DESCRIPTIONS = {
     "login": "Anmeldeseite für bestehende Nutzer. Erreichbar über das Konto-Menü oben rechts in der Navigation (Symbol + Beschriftung 'Konto'), dort auf 'Anmelden' klicken - nur sichtbar, wenn niemand eingeloggt ist",
     "register": "Registrierungsseite für neue Nutzer. Erreichbar über das Konto-Menü oben rechts in der Navigation (Symbol + Beschriftung 'Konto'), dort auf 'Registrieren' klicken - nur sichtbar, wenn niemand eingeloggt ist",
     "logout": "Abmelden. Erreichbar über das Konto-Menü oben rechts in der Navigation - dort steht im eingeloggten Zustand nicht 'Konto', sondern der Kurzname des angemeldeten Nutzers; darauf klicken, um das Menü zu öffnen, dort erscheint 'Abmelden'",
-    "users": "Nutzerverwaltung: Liste aller Nutzer + neuen Nutzer anlegen, inkl. Rollenvergabe. Nur für Admins, im Hauptmenü als 'Benutzer' verlinkt",
+    "users": "Nutzerverwaltung: Liste aller Nutzer + neuen Nutzer anlegen, inkl. Rollenvergabe. Nur für Admins, im Hauptmenü als 'Nutzer' verlinkt",
     "edit_user": "Einen bestehenden Nutzer bearbeiten, inkl. Rollenvergabe. Nur für Admins",
-    "jobs": "Stellenangebote: Liste für alle sichtbar (auch nicht eingeloggt), im Hauptmenü als 'Stellenangebote' verlinkt. Neue Stelle anlegen nur für Admins - dabei kann optional ein Stellenangebot-Dokument (PDF, .docx, .odt) hochgeladen werden, das Position, PLZ, Stadt und eine Zusammenfassung als Beschreibung automatisch befüllt",
-    "edit_job": "Ein bestehendes Stellenangebot ansehen. Für Admins ein Bearbeiten-Formular, für alle anderen nur eine Leseansicht (Position, Kunde, PLZ/Stadt, Gültigkeit als Text, bei KI-generierten Stellen zusätzlich das PDF eingebettet) ohne Speichern-Möglichkeit",
+    "jobs": "Stellenangebote: Liste für alle sichtbar (auch nicht eingeloggt), im Hauptmenü als 'Stellenangebote' verlinkt. Neue Stelle anlegen für Admins (beliebiger Kunde) sowie für Nutzer mit Rolle 'customer' und zugeordnetem Stellenanbieter (nur für den eigenen Kunden) - dabei kann optional ein Stellenangebot-Dokument (PDF, .docx, .odt) hochgeladen werden, das Position, PLZ, Stadt und eine Zusammenfassung als Beschreibung automatisch befüllt",
+    "edit_job": "Ein bestehendes Stellenangebot ansehen. Admins sowie 'customer'-Nutzer für ihren eigenen Stellenanbieter bekommen ein Bearbeiten-Formular (inkl. Löschen), für alle anderen nur eine Leseansicht (Position, Kunde, PLZ/Stadt, Gültigkeit als Text, bei KI-generierten Stellen zusätzlich das PDF eingebettet) ohne Speichern-Möglichkeit",
     "delete_job": "Ein Stellenangebot löschen. Nur für Admins",
     "customers": "Stellenanbieter (Kunden): Liste für alle sichtbar, im Hauptmenü als 'Stellenanbieter' verlinkt. Neuen Stellenanbieter anlegen nur für Admins",
     "edit_customer": "Einen bestehenden Stellenanbieter ansehen. Für Admins ein Bearbeiten-Formular, für alle anderen nur eine Leseansicht (Firma, Adresse, PLZ, Stadt als Text) ohne Speichern-Möglichkeit. Darunter zusätzlich die Liste der zu diesem Stellenanbieter gehörenden Stellenangebote",
@@ -237,13 +239,16 @@ def users():
             role = DEFAULT_ROLE
         zip_code = request.form.get("zip", "").strip() or None
         city = request.form.get("city", "").strip() or None
+        customer_id = request.form.get("customer_id") or None
+        if role != "customer":
+            customer_id = None
 
         if first_name and last_name and short_name and email and password:
-            db.create_user(first_name, last_name, short_name, email, generate_password_hash(password), role, zip_code, city)
+            db.create_user(first_name, last_name, short_name, email, generate_password_hash(password), role, zip_code, city, customer_id)
 
         return redirect(url_for('users'))
 
-    return render_template('index.html', content_template='user.html', users=db.list_users(), editing_user=None, roles=ROLES, resumes=[])
+    return render_template('index.html', content_template='user.html', users=db.list_users(), editing_user=None, roles=ROLES, customers=db.list_customers(), resumes=[])
 
 
 @app.route('/users/<int:user_id>/edit', methods=["GET", "POST"])
@@ -263,26 +268,51 @@ def edit_user(user_id):
         password_hash = generate_password_hash(password) if password else None
         zip_code = request.form.get("zip", "").strip() or None
         city = request.form.get("city", "").strip() or None
+        customer_id = request.form.get("customer_id") or None
+        if role != "customer":
+            customer_id = None
 
         if first_name and last_name and short_name and email:
-            db.update_user(user_id, first_name, last_name, short_name, email, role, password_hash, zip_code, city)
+            db.update_user(user_id, first_name, last_name, short_name, email, role, password_hash, zip_code, city, customer_id)
 
         return redirect(url_for('users'))
 
-    return render_template('index.html', content_template='user.html', users=db.list_users(), editing_user=db.get_user(user_id), roles=ROLES, resumes=db.list_resumes_for_user(user_id))
+    return render_template('index.html', content_template='user.html', users=db.list_users(), editing_user=db.get_user(user_id), roles=ROLES, customers=db.list_customers(), resumes=db.list_resumes_for_user(user_id))
+
+
+def _job_management_permission():
+    """Gibt zurück, für welche customer_id der eingeloggte Nutzer Stellen anlegen/
+    bearbeiten/löschen darf: den String 'admin' für Admins (alle Kunden erlaubt),
+    eine customer_id (int) für Rolle 'customer' mit zugeordnetem Stellenanbieter,
+    sonst None (keine Berechtigung)."""
+    role = session.get("user_role")
+    if role == "admin":
+        return "admin"
+    if role == "customer" and session.get("user_customer_id"):
+        return session["user_customer_id"]
+    return None
+
+
+def _own_customer_for_session():
+    """Der dem eingeloggten Nutzer zugeordnete Stellenanbieter (Rolle 'customer'),
+    für die Anzeige im Stellen-Formular. None für alle anderen Rollen/ohne Zuordnung."""
+    if session.get("user_role") == "customer" and session.get("user_customer_id"):
+        return db.get_customer(session["user_customer_id"])
+    return None
 
 
 @app.route('/jobs', methods=["GET", "POST"])
 def jobs():
     if request.method == "POST":
-        if session.get("user_role") != "admin":
+        permission = _job_management_permission()
+        if not permission:
             return redirect(url_for('jobs'))
 
         position = request.form.get("position", "").strip()
         content = request.form.get("content", "").strip()
         valid_from = request.form.get("valid_from") or None
         valid_until = request.form.get("valid_until") or None
-        customer_id = request.form.get("customer_id")
+        customer_id = request.form.get("customer_id") if permission == "admin" else permission
         zip_code = request.form.get("zip", "").strip() or None
         city = request.form.get("city", "").strip() or None
         document_link = request.form.get("document_link", "").strip() or None
@@ -293,20 +323,22 @@ def jobs():
 
         return redirect(url_for('jobs'))
 
-    return render_template('index.html', content_template='jobs.html', jobs=db.list_jobs(), customers=db.list_customers(), editing_job=None)
+    return render_template('index.html', content_template='jobs.html', jobs=db.list_jobs(), customers=db.list_customers(), editing_job=None, own_customer=_own_customer_for_session())
 
 
 @app.route('/jobs/<int:job_id>/edit', methods=["GET", "POST"])
 def edit_job(job_id):
     if request.method == "POST":
-        if session.get("user_role") != "admin":
+        job = db.get_job(job_id)
+        permission = _job_management_permission()
+        if not job or not (permission == "admin" or permission == job["customer_id"]):
             return redirect(url_for('jobs'))
 
         position = request.form.get("position", "").strip()
         content = request.form.get("content", "").strip()
         valid_from = request.form.get("valid_from") or None
         valid_until = request.form.get("valid_until") or None
-        customer_id = request.form.get("customer_id")
+        customer_id = request.form.get("customer_id") if permission == "admin" else job["customer_id"]
         zip_code = request.form.get("zip", "").strip() or None
         city = request.form.get("city", "").strip() or None
 
@@ -322,12 +354,14 @@ def edit_job(job_id):
     jobs = db.list_jobs(job["customer_id"]) if came_from_customer else db.list_jobs()
     matching_resumes = db.find_matching_resumes(job["embedding"], top_k=5) if job and job.get("embedding") else []
 
-    return render_template('index.html', content_template='jobs.html', jobs=jobs, customers=db.list_customers(), editing_job=job, came_from_customer=came_from_customer, matching_resumes=matching_resumes)
+    return render_template('index.html', content_template='jobs.html', jobs=jobs, customers=db.list_customers(), editing_job=job, came_from_customer=came_from_customer, matching_resumes=matching_resumes, own_customer=_own_customer_for_session())
 
 
 @app.route('/jobs/<int:job_id>/delete', methods=["POST"])
 def delete_job(job_id):
-    if session.get("user_role") != "admin":
+    job = db.get_job(job_id)
+    permission = _job_management_permission()
+    if not job or not (permission == "admin" or permission == job["customer_id"]):
         return redirect(url_for('jobs'))
     db.delete_job(job_id)
     return redirect(url_for('jobs'))
@@ -503,7 +537,7 @@ def extract_job_upload():
     """Liest ein hochgeladenes Stellenangebot-Dokument (PDF/.docx/.odt) aus und lässt
     per KI eine Zusammenfassung sowie ggf. Position/PLZ/Stadt daraus extrahieren, zur
     Vorbefüllung des 'Stelle anlegen'-Formulars. Legt selbst noch keine Stelle an."""
-    if session.get("user_role") != "admin":
+    if not _job_management_permission():
         return jsonify(error="Nicht berechtigt."), 403
 
     uploaded_file = request.files.get("job_file")

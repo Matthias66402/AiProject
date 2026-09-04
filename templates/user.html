@@ -1,6 +1,6 @@
 <div class="scroll wide">
-    <h1 id="greetings">{{ "Benutzer bearbeiten" if editing_user else "Benutzer" }}</h1>
-    <p class="subtitle">Verwalte die registrierten Benutzer</p>
+    <h1 id="greetings">{{ "Nutzer bearbeiten" if editing_user else "Nutzer" }}</h1>
+    <p class="subtitle">Verwalte die registrierten Nutzer</p>
 
     <table class="user-table">
         <thead>
@@ -23,7 +23,7 @@
             </tr>
             {% else %}
             <tr>
-                <td colspan="5">Noch keine Benutzer angelegt.</td>
+                <td colspan="5">Noch keine Nutzer angelegt.</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -62,6 +62,15 @@
                 {% endfor %}
             </select>
         </div>
+        <div id="customer-id-field" hidden>
+            <label for="customer_id">Stellenanbieter</label>
+            <select id="customer_id" name="customer_id">
+                <option value="">Kein Stellenanbieter zugeordnet</option>
+                {% for customer in customers %}
+                <option value="{{ customer.id }}" {% if editing_user and editing_user.customer_id == customer.id %}selected{% endif %}>{{ customer.company_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
         {% if editing_user and resumes %}
         <div>
             <label>Lebensläufe</label>
@@ -76,9 +85,24 @@
             <label for="password">{{ "Neues Passwort (optional)" if editing_user else "Passwort" }}</label>
             <input id="password" name="password" type="password" {% if not editing_user %}required{% endif %}>
         </div>
-        <button class="{{ 'subtle-btn' if editing_user else 'special-btn' }}" type="submit">{{ "Speichern" if editing_user else "Benutzer anlegen" }}</button>
+        <button class="{{ 'subtle-btn' if editing_user else 'special-btn' }}" type="submit">{{ "Speichern" if editing_user else "Nutzer anlegen" }}</button>
     </form>
     {% if editing_user %}
     <p class="subtitle"><a href="{{ url_for('users') }}">Abbrechen</a></p>
     {% endif %}
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var roleSelect = document.getElementById('role');
+        var customerField = document.getElementById('customer-id-field');
+        if (!roleSelect || !customerField) return;
+
+        function syncCustomerField() {
+            customerField.hidden = roleSelect.value !== 'customer';
+        }
+
+        roleSelect.addEventListener('change', syncCustomerField);
+        syncCustomerField();
+    });
+</script>
