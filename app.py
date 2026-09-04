@@ -28,7 +28,12 @@ app = Flask(__name__)
 app.secret_key = os.environ["SECRET_KEY"]
 # Begrenzt die Größe hochgeladener Lebenslauf-Dateien (Schutz vor überdimensionierten Uploads).
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
-client = Groq(api_key=os.environ["GROQ_API_KEY"])
+# Groq ist optional: ohne (nicht-leeren) GROQ_API_KEY bleibt client None und
+# darüber erreichbare Modelle werden weiter unten aus AVAILABLE_MODELS/
+# AVAILABE_MODEL_NAMES/MODEL_CLIENTS herausgefiltert, statt einen Client mit
+# leerem Key zu erzeugen, der erst beim ersten Aufruf fehlschlagen würde.
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "").strip()
+client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 openai_client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 db.init_db()
 
@@ -86,6 +91,14 @@ MODEL_CLIENTS = {
     "gpt-4.1-mini": openai_client,
 }
 
+# Ohne Groq-Client (siehe GROQ_API_KEY oben) aus allen drei Dicts entfernen,
+# damit Groq-Modelle weder in der Auswahl auftauchen noch anfragbar sind.
+if client is None:
+    _unavailable_models = {model_id for model_id, model_client in MODEL_CLIENTS.items() if model_client is None}
+    AVAILABLE_MODELS = {k: v for k, v in AVAILABLE_MODELS.items() if k not in _unavailable_models}
+    AVAILABE_MODEL_NAMES = {k: v for k, v in AVAILABE_MODEL_NAMES.items() if k not in _unavailable_models}
+    MODEL_CLIENTS = {k: v for k, v in MODEL_CLIENTS.items() if k not in _unavailable_models}
+
 # Kurzbeschreibung je Route für den KI-Assistenten. Die Website ist noch im
 # Aufbau, deshalb wird die eigentliche Seitenliste (URL + erlaubte Methoden)
 # unten automatisch aus den registrierten Flask-Routen erzeugt - hier muss
@@ -137,7 +150,7 @@ def home():  # put application's code here
             selected_model = DEFAULT_MODEL
 
         wizard_name = AVAILABE_MODEL_NAMES.get(selected_model, "KI-Modelle")
-        active_client = MODEL_CLIENTS.get(selected_model, client)
+        active_client = MODEL_CLIENTS.get(selected_model, openai_client)
 
         try:
             response = active_client.chat.completions.create(

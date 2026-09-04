@@ -6,9 +6,9 @@ Die Website ist noch im Aufbau, Struktur und Funktionsumfang können sich häufi
 
 ## Funktionen
 
-- **KI-Assistent** (Startseite): beantwortet Fragen zur Website über wählbare KI-Modelle. Der System-Prompt bekommt bei jeder Anfrage automatisch die aktuelle Seitenstruktur (aus den registrierten Flask-Routen erzeugt) mitgegeben, damit der Assistent nichts über nicht existierende Funktionen erfindet.
-  - Modelle über [Groq](https://groq.com/) (`openai/gpt-oss-20b`, `openai/gpt-oss-120b`, `qwen/qwen3.6-27b`, `groq/compound-mini`)
-  - Modelle über [OpenAI](https://platform.openai.com/) (`gpt-5-mini`, `gpt-4o-mini`, `gpt-4.1-mini`)
+- **KI-Assistent** (Startseite): beantwortet Fragen zur Website über wählbare KI-Modelle. Der System-Prompt bekommt bei jeder Anfrage automatisch die aktuelle Seitenstruktur (aus den registrierten Flask-Routen erzeugt) mitgegeben, damit der Assistent nichts über nicht existierende Funktionen erfindet. Ohne explizite Auswahl (z.B. bei internen KI-Aufgaben wie dem Extrahieren einer hochgeladenen Stellenanzeige) wird immer `DEFAULT_MODEL` (`gpt-4.1-mini`, OpenAI) verwendet.
+  - Modelle über [Groq](https://groq.com/) (`openai/gpt-oss-20b`, `openai/gpt-oss-120b`, `qwen/qwen3.6-27b`, `groq/compound-mini`) — **optional**: ohne (nicht-leeren) `GROQ_API_KEY` in `.env` werden diese Modelle automatisch aus der Auswahl entfernt und der Groq-Client gar nicht erst erzeugt (`app.py`, `client`)
+  - Modelle über [OpenAI](https://platform.openai.com/) (`gpt-5-mini`, `gpt-4o-mini`, `gpt-4.1-mini`) — `OPENAI_API_KEY` ist Pflicht, da auch die Embeddings darüber laufen
 - **Login/Registrierung**: Nutzer registrieren sich (immer mit Rolle `user`), melden sich an/ab; Passwörter werden gehasht (Werkzeug) gespeichert.
 - **Rollen**: `user` (Standard bei Registrierung), `customer`, `admin` — Liste zentral in `db.py` (`ROLES`). `admin` vergibt Rollen und hat vollen Schreibzugriff auf Nutzer-, Stellenanbieter- und Stellenverwaltung. `customer`-Nutzer sind über `users.customer_id` (nullable FK auf `customers`, Zuweisung durch einen Admin im Nutzerformular) genau einem Stellenanbieter zugeordnet und dürfen dadurch **nur ihre eigenen** Stellenangebote anlegen/bearbeiten/löschen sowie ihren eigenen Stellenanbieter-Datensatz bearbeiten (Anlegen/Löschen von Stellenanbietern bleibt `admin` vorbehalten).
 - **Nutzerverwaltung** (`/users`, nur `admin`): Nutzer anlegen, bearbeiten, Rolle zuweisen, optional PLZ/Stadt hinterlegen. Bei Rolle `customer` erscheint zusätzlich eine Selectbox zur Zuordnung eines Stellenanbieters. Zeigt außerdem alle für diesen Nutzer generierten/hochgeladenen Lebensläufe (Tabelle `resumes`, FK auf `users`), falls vorhanden.
@@ -133,12 +133,20 @@ docker compose up --build
 
 Startet App und PostgreSQL zusammen; die DB-Daten liegen in einem benannten Volume (`aiproject_postgres_data`), generierte PDFs unter `./data` (Bind-Mount, direkt im Projektordner sichtbar).
 
+`docker-compose.yml` lädt `.env` per `env_file` **einmalig beim Erstellen des App-Containers** in dessen Umgebung — nicht laufend. Änderungen an `.env` (egal welche Variable) werden erst wirksam, wenn der Container neu erstellt wird:
+
+```bash
+docker compose up -d app
+```
+
+Reine Python-/Template-Änderungen übernimmt dagegen der Flask-Debug-Reloader automatisch (kein Recreate nötig) — der läuft aber innerhalb desselben Containers weiter mit der zuvor geladenen Umgebung, holt sich also bei einem Neustart durch den Reloader keine aktualisierte `.env`.
+
 ### Umgebungsvariablen (`.env`)
 
 | Variable | Bedeutung |
 |---|---|
-| `GROQ_API_KEY` | API-Key für Groq (Chat-Modelle) |
-| `OPENAI_API_KEY` | API-Key für OpenAI (Chat-Modelle + Embeddings) |
+| `GROQ_API_KEY` | API-Key für Groq (Chat-Modelle). **Optional**: leer/fehlend lassen blendet die darüber erreichbaren Modelle in der KI-Assistent-Auswahl automatisch aus, statt die App abstürzen zu lassen |
+| `OPENAI_API_KEY` | API-Key für OpenAI (Chat-Modelle + Embeddings). Pflicht |
 | `DB_HOST` / `DB_PORT` / `DB_NAME` / `DB_USER` / `DB_PASSWORD` | Verbindungsdaten zur PostgreSQL-Datenbank |
 | `SECRET_KEY` | Flask-Session-Secret |
 
@@ -156,6 +164,6 @@ docker compose exec app python migrate_mysql_to_postgres.py
 
 ## KI-Assistent erweitern
 
-Neue Modelle in `app.py` ergänzen: Eintrag in `AVAILABLE_MODELS` (Anzeigename), `AVAILABE_MODEL_NAMES` (Kurzname für Fehlermeldungen) und `MODEL_CLIENTS` (welcher Client — `client` für Groq, `openai_client` für OpenAI — zuständig ist).
+Neue Modelle in `app.py` ergänzen: Eintrag in `AVAILABLE_MODELS` (Anzeigename), `AVAILABE_MODEL_NAMES` (Kurzname für Fehlermeldungen) und `MODEL_CLIENTS` (welcher Client — `client` für Groq, `openai_client` für OpenAI — zuständig ist). Ein neues Groq-Modell wird automatisch mit ausgeblendet, solange kein `GROQ_API_KEY` gesetzt ist (`client` ist dann `None`) — dafür ist an dieser Stelle nichts weiter zu tun.
 
 Neue Seiten/Routen tauchen automatisch im System-Prompt des Assistenten auf (`build_site_map()` liest live aus `app.url_map`). Für eine sprechende Beschreibung im Prompt zusätzlich einen Eintrag in `PAGE_DESCRIPTIONS` ergänzen — fehlt er, erscheint die Route trotzdem mit Platzhalter, damit der Assistent ihre Existenz nicht ignoriert oder erfindet.
