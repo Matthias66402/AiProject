@@ -43,7 +43,7 @@ _RESUME_COLUMNS = {
 # 0.75+, thematisch unverwandte Kombinationen bleiben meist unter 0.6 -
 # ohne Schwellwert würden bei fehlenden echten Treffern trotzdem die
 # "am wenigsten unpassenden" Ergebnisse als Match erscheinen.
-MIN_MATCH_SIMILARITY = 0.65
+MIN_MATCH_SIMILARITY = 0.60
 
 
 def get_connection():

@@ -116,6 +116,65 @@ nav summary::marker {
     margin-bottom: 24px;
 }
 
+.dropzone {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 32px 20px;
+    text-align: center;
+    border: 2px dashed rgba(255, 215, 130, 0.45);
+    border-radius: 14px;
+    background: rgba(10, 4, 26, 0.35);
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.dropzone:hover,
+.dropzone.dragover {
+    border-color: rgba(255, 215, 130, 0.9);
+    background: rgba(255, 215, 130, 0.08);
+}
+
+.dropzone-icon {
+    font-size: 1.8rem;
+    color: #76a250;
+}
+
+.dropzone-text {
+    color: #f1e9ff;
+}
+
+.dropzone-hint {
+    font-size: 0.8rem;
+    color: rgba(241, 233, 255, 0.6);
+}
+
+.dropzone-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.resume-actions-row {
+    display: flex;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 24px;
+}
+
+.resume-actions-row > .entity-form {
+    flex: 1 1 320px;
+}
+
 .entity-form > summary {
     list-style: none;
     display: inline-block;

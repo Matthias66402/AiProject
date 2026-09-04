@@ -13,6 +13,7 @@ import os
 import db
 from db import ROLES, DEFAULT_ROLE
 from embeddings import embed_text, strip_html_to_text
+from resume_extraction import extract_resume_text, ALLOWED_RESUME_UPLOAD_EXTENSIONS
 
 THINK_BLOCK_RE = re.compile(r"<think>.*?</think>\s*", re.DOTALL)
 CODE_FENCE_RE = re.compile(r"^```[a-zA-Z]*\s*\n?|\n?```\s*$")
@@ -25,6 +26,8 @@ load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.environ["SECRET_KEY"]
+# Begrenzt die Größe hochgeladener Lebenslauf-Dateien (Schutz vor überdimensionierten Uploads).
+app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
 client = Groq(api_key=os.environ["GROQ_API_KEY"])
 openai_client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 db.init_db()
@@ -100,7 +103,7 @@ PAGE_DESCRIPTIONS = {
     "delete_customer": "Einen Stellenanbieter löschen. Nur für Admins",
     "generate_resume": "Lebenslauf für einen bestehenden, per Auswahlliste gewählten Nutzer generieren (personalisiert mit dessen echtem Namen/Wohnort, falls bei ihm PLZ und Stadt hinterlegt sind, sonst komplett fiktiv). Nur für Admins, erreichbar über das 'Tools'-Menü in der Navigation",
     "generate_joboffer": "Stellenangebot für einen per Auswahlliste gewählten Stellenanbieter generieren; legt dabei automatisch auch einen passenden Eintrag unter 'Stellenangebote' an. Nur für Admins, erreichbar über das 'Tools'-Menü in der Navigation",
-    "my_resumes": "Eigene Lebensläufe des eingeloggten Nutzers ansehen: der neueste als PDF eingebettet, per Auswahlliste sind auch ältere Versionen abrufbar. Nur für eingeloggte Nutzer mit Rolle 'user', erreichbar über das Konto-Menü oben rechts in der Navigation",
+    "my_resumes": "Eigene Lebensläufe des eingeloggten Nutzers ansehen: der neueste eingebettet (PDF direkt, andere Formate als Download-Link), per Auswahlliste sind auch ältere Versionen abrufbar. Neue Lebensläufe entweder per KI generieren lassen oder eine eigene Datei (PDF, .docx, .odt) hochladen - beides wird für die Stellen-Empfehlung vektorisiert. Nur für eingeloggte Nutzer mit Rolle 'user', erreichbar über das Konto-Menü oben rechts in der Navigation",
 }
 
 
@@ -429,6 +432,25 @@ def _generate_resume_document(user_id, spec):
     return db.create_resume(resume_text, file_url, user_id, embedding=embedding)
 
 
+def _create_resume_from_upload(user_id, uploaded_file):
+    """Liest eine hochgeladene Lebenslauf-Datei (PDF/.docx/.odt) aus, speichert sie
+    unverändert samt Embedding auf Basis des ausgelesenen Texts als neuen Eintrag in
+    resumes und gibt dessen id zurück. Gibt None zurück, wenn sich kein Text
+    extrahieren ließ (z.B. gescanntes PDF ohne Textebene)."""
+    resume_text = extract_resume_text(uploaded_file.filename, uploaded_file.stream).strip()
+    if not resume_text:
+        return None
+
+    ext = os.path.splitext(uploaded_file.filename)[1].lower()
+    os.makedirs(RESUME_DIR, exist_ok=True)
+    filename = f"lebenslauf_{datetime.now():%Y%m%d_%H%M%S}{ext}"
+    uploaded_file.stream.seek(0)
+    uploaded_file.save(os.path.join(RESUME_DIR, filename))
+    file_url = url_for('view_resume', filename=filename)
+    embedding = embed_text(openai_client, strip_html_to_text(resume_text), app.logger)
+    return db.create_resume(resume_text, file_url, user_id, embedding=embedding)
+
+
 @app.route('/tools/resume', methods=["GET", "POST"])
 def generate_resume():
     if session.get("user_role") != "admin":
@@ -555,16 +577,32 @@ def my_resumes():
     message = None
     newest_id = None
     if request.method == "POST":
-        spec = request.form.get("spec", "").strip()
-        if not spec:
-            message = "Bitte beschreibe, was dein Lebenslauf enthalten soll."
+        uploaded_file = request.files.get("resume_file")
+        if uploaded_file and uploaded_file.filename:
+            ext = os.path.splitext(uploaded_file.filename)[1].lower()
+            if ext not in ALLOWED_RESUME_UPLOAD_EXTENSIONS:
+                message = "Bitte eine Datei im PDF-, Word- (.docx) oder LibreOffice-Format (.odt) hochladen."
+            else:
+                try:
+                    newest_id = _create_resume_from_upload(session["user_id"], uploaded_file)
+                    if newest_id is None:
+                        message = "In der Datei konnte kein Text gefunden werden. Bitte eine Datei mit auslesbarem Text hochladen."
+                    else:
+                        message = "Dein Lebenslauf wurde hochgeladen:"
+                except Exception as e:
+                    app.logger.warning("Fehler beim Auslesen des hochgeladenen Lebenslaufs: %s", e)
+                    message = "Die Datei konnte nicht gelesen werden. Bitte Format und Inhalt prüfen."
         else:
-            try:
-                newest_id = _generate_resume_document(session["user_id"], spec)
-                message = "Dein Lebenslauf wurde erstellt:"
-            except (GroqAPIStatusError, OpenAIAPIStatusError) as e:
-                app.logger.warning("API error %s: %s", e.status_code, e.body)
-                message = "Der Lebenslauf konnte gerade nicht erstellt werden. Bitte später erneut versuchen."
+            spec = request.form.get("spec", "").strip()
+            if not spec:
+                message = "Bitte beschreibe, was dein Lebenslauf enthalten soll."
+            else:
+                try:
+                    newest_id = _generate_resume_document(session["user_id"], spec)
+                    message = "Dein Lebenslauf wurde erstellt:"
+                except (GroqAPIStatusError, OpenAIAPIStatusError) as e:
+                    app.logger.warning("API error %s: %s", e.status_code, e.body)
+                    message = "Der Lebenslauf konnte gerade nicht erstellt werden. Bitte später erneut versuchen."
 
     resumes = db.list_resumes_for_user(session["user_id"])
     selected_id = newest_id or request.args.get("resume_id", type=int)
