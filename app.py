@@ -2,7 +2,7 @@ import json
 import re
 from datetime import datetime, timedelta
 
-from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, jsonify
 from weasyprint import HTML
 from groq import Groq, APIStatusError as GroqAPIStatusError
 from openai import OpenAI, APIStatusError as OpenAIAPIStatusError
@@ -13,7 +13,7 @@ import os
 import db
 from db import ROLES, DEFAULT_ROLE
 from embeddings import embed_text, strip_html_to_text
-from resume_extraction import extract_resume_text, ALLOWED_RESUME_UPLOAD_EXTENSIONS
+from document_extraction import extract_document_text, ALLOWED_DOCUMENT_UPLOAD_EXTENSIONS
 
 THINK_BLOCK_RE = re.compile(r"<think>.*?</think>\s*", re.DOTALL)
 CODE_FENCE_RE = re.compile(r"^```[a-zA-Z]*\s*\n?|\n?```\s*$")
@@ -95,7 +95,7 @@ PAGE_DESCRIPTIONS = {
     "logout": "Abmelden. Erreichbar über das Konto-Menü oben rechts in der Navigation - dort steht im eingeloggten Zustand nicht 'Konto', sondern der Kurzname des angemeldeten Nutzers; darauf klicken, um das Menü zu öffnen, dort erscheint 'Abmelden'",
     "users": "Nutzerverwaltung: Liste aller Nutzer + neuen Nutzer anlegen, inkl. Rollenvergabe. Nur für Admins, im Hauptmenü als 'Benutzer' verlinkt",
     "edit_user": "Einen bestehenden Nutzer bearbeiten, inkl. Rollenvergabe. Nur für Admins",
-    "jobs": "Stellenangebote: Liste für alle sichtbar (auch nicht eingeloggt), im Hauptmenü als 'Stellenangebote' verlinkt. Neue Stelle anlegen nur für Admins",
+    "jobs": "Stellenangebote: Liste für alle sichtbar (auch nicht eingeloggt), im Hauptmenü als 'Stellenangebote' verlinkt. Neue Stelle anlegen nur für Admins - dabei kann optional ein Stellenangebot-Dokument (PDF, .docx, .odt) hochgeladen werden, das Position, PLZ, Stadt und eine Zusammenfassung als Beschreibung automatisch befüllt",
     "edit_job": "Ein bestehendes Stellenangebot ansehen. Für Admins ein Bearbeiten-Formular, für alle anderen nur eine Leseansicht (Position, Kunde, PLZ/Stadt, Gültigkeit als Text, bei KI-generierten Stellen zusätzlich das PDF eingebettet) ohne Speichern-Möglichkeit",
     "delete_job": "Ein Stellenangebot löschen. Nur für Admins",
     "customers": "Stellenanbieter (Kunden): Liste für alle sichtbar, im Hauptmenü als 'Stellenanbieter' verlinkt. Neuen Stellenanbieter anlegen nur für Admins",
@@ -285,10 +285,11 @@ def jobs():
         customer_id = request.form.get("customer_id")
         zip_code = request.form.get("zip", "").strip() or None
         city = request.form.get("city", "").strip() or None
+        document_link = request.form.get("document_link", "").strip() or None
 
         if position and content and customer_id:
             embedding = embed_text(openai_client, f"{position}\n\n{strip_html_to_text(content)}", app.logger)
-            db.create_job(position, content, valid_from, valid_until, int(customer_id), zip_code=zip_code, city=city, embedding=embedding)
+            db.create_job(position, content, valid_from, valid_until, int(customer_id), document_link=document_link, zip_code=zip_code, city=city, embedding=embedding)
 
         return redirect(url_for('jobs'))
 
@@ -452,7 +453,7 @@ def _create_resume_from_upload(user_id, uploaded_file):
     unverändert samt Embedding auf Basis des ausgelesenen Texts als neuen Eintrag in
     resumes und gibt dessen id zurück. Gibt None zurück, wenn sich kein Text
     extrahieren ließ (z.B. gescanntes PDF ohne Textebene)."""
-    resume_text = extract_resume_text(uploaded_file.filename, uploaded_file.stream).strip()
+    resume_text = extract_document_text(uploaded_file.filename, uploaded_file.stream).strip()
     if not resume_text:
         return None
 
@@ -495,6 +496,73 @@ def view_resume(filename):
     if session.get("user_role") != "admin":
         return redirect(url_for('home'))
     return send_from_directory(RESUME_DIR, filename)
+
+
+@app.route('/jobs/extract-upload', methods=["POST"])
+def extract_job_upload():
+    """Liest ein hochgeladenes Stellenangebot-Dokument (PDF/.docx/.odt) aus und lässt
+    per KI eine Zusammenfassung sowie ggf. Position/PLZ/Stadt daraus extrahieren, zur
+    Vorbefüllung des 'Stelle anlegen'-Formulars. Legt selbst noch keine Stelle an."""
+    if session.get("user_role") != "admin":
+        return jsonify(error="Nicht berechtigt."), 403
+
+    uploaded_file = request.files.get("job_file")
+    if not uploaded_file or not uploaded_file.filename:
+        return jsonify(error="Keine Datei ausgewählt."), 400
+
+    ext = os.path.splitext(uploaded_file.filename)[1].lower()
+    if ext not in ALLOWED_DOCUMENT_UPLOAD_EXTENSIONS:
+        return jsonify(error="Bitte eine Datei im PDF-, Word- (.docx) oder LibreOffice-Format (.odt) hochladen."), 400
+
+    try:
+        document_text = extract_document_text(uploaded_file.filename, uploaded_file.stream).strip()
+    except Exception as e:
+        app.logger.warning("Fehler beim Auslesen des hochgeladenen Stellenangebots: %s", e)
+        return jsonify(error="Die Datei konnte nicht gelesen werden. Bitte Format und Inhalt prüfen."), 400
+
+    if not document_text:
+        return jsonify(error="In der Datei konnte kein Text gefunden werden."), 400
+
+    try:
+        response = openai_client.chat.completions.create(
+            model=DEFAULT_MODEL,
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": (
+                    "Du bekommst den Text eines hochgeladenen Stellenangebot-Dokuments. Fasse die "
+                    "Stellenbeschreibung sinnvoll zusammen und extrahiere, falls im Text eindeutig erkennbar, "
+                    "weitere Angaben - erfinde nichts frei hinzu. "
+                    "Antworte ausschließlich mit einem JSON-Objekt mit genau vier Feldern: "
+                    "\"position\" (kurze Stellenbezeichnung als Klartext, leerer String falls nicht erkennbar), "
+                    "\"zip\" (Postleitzahl des Arbeitsortes als Text, leerer String falls nicht erkennbar), "
+                    "\"city\" (Stadt des Arbeitsortes als Text, leerer String falls nicht erkennbar) und "
+                    "\"content\" (eine sinnvoll gekürzte Zusammenfassung der Stellenbeschreibung als formatiertes "
+                    "HTML mit Überschriften/Aufzählungen), ohne zusätzliche Erklärungen außerhalb des JSON."
+                )},
+                {"role": "user", "content": document_text},
+            ],
+        )
+        raw = _strip_code_fence(THINK_BLOCK_RE.sub("", response.choices[0].message.content).strip())
+        data = json.loads(raw)
+    except (GroqAPIStatusError, OpenAIAPIStatusError) as e:
+        app.logger.warning("API error %s: %s", e.status_code, e.body)
+        return jsonify(error="Die Datei konnte gerade nicht verarbeitet werden. Bitte später erneut versuchen."), 502
+    except (json.JSONDecodeError, ValueError) as e:
+        app.logger.warning("Unerwartetes KI-Antwortformat: %s", e)
+        return jsonify(error="Die Datei konnte gerade nicht verarbeitet werden. Bitte später erneut versuchen."), 502
+
+    os.makedirs(JOBOFFER_DIR, exist_ok=True)
+    filename = f"stellenangebot_{datetime.now():%Y%m%d_%H%M%S}{ext}"
+    uploaded_file.stream.seek(0)
+    uploaded_file.save(os.path.join(JOBOFFER_DIR, filename))
+
+    return jsonify(
+        position=(data.get("position") or "").strip(),
+        zip=(data.get("zip") or "").strip(),
+        city=(data.get("city") or "").strip(),
+        content=(data.get("content") or "").strip(),
+        document_link=url_for('view_joboffer', filename=filename),
+    )
 
 
 @app.route('/tools/joboffer', methods=["GET", "POST"])
@@ -595,7 +663,7 @@ def my_resumes():
         uploaded_file = request.files.get("resume_file")
         if uploaded_file and uploaded_file.filename:
             ext = os.path.splitext(uploaded_file.filename)[1].lower()
-            if ext not in ALLOWED_RESUME_UPLOAD_EXTENSIONS:
+            if ext not in ALLOWED_DOCUMENT_UPLOAD_EXTENSIONS:
                 message = "Bitte eine Datei im PDF-, Word- (.docx) oder LibreOffice-Format (.odt) hochladen."
             else:
                 try:

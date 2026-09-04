@@ -43,6 +43,7 @@ services:
       - ./app.py:/app/app.py
       - ./db.py:/app/db.py
       - ./embeddings.py:/app/embeddings.py
+      - ./document_extraction.py:/app/document_extraction.py
       - ./backfill_embeddings.py:/app/backfill_embeddings.py
       - ./migrate_mysql_to_postgres.py:/app/migrate_mysql_to_postgres.py
       - ./templates:/app/templates

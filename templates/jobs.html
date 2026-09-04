@@ -35,8 +35,11 @@
             </div>
             <div>
                 <label>Beschreibung</label>
-                {% if editing_job.document_link %}
+                {% if editing_job.document_link and editing_job.document_link.rsplit('.', 1)[-1] | lower == 'pdf' %}
                 <iframe class="pdf-embed" src="{{ editing_job.document_link }}" title="Stellenangebot PDF"></iframe>
+                {% elif editing_job.document_link %}
+                <p>{{ editing_job.content }}</p>
+                <p><a href="{{ editing_job.document_link }}" target="_blank" rel="noopener">Original-Dokument herunterladen ({{ editing_job.document_link.rsplit('.', 1)[-1] | upper }})</a></p>
                 {% else %}
                 <p>{{ editing_job.content }}</p>
                 {% endif %}
@@ -56,6 +59,22 @@
         </div>
         {% else %}
         <form action="{{ url_for('edit_job', job_id=editing_job.id) if editing_job else url_for('jobs') }}" method="POST">
+            {% if not editing_job %}
+            <div class="textarea-wrap">
+                <label class="dropzone" for="job_file_input" id="job-dropzone">
+                    <input class="dropzone-input" type="file" id="job_file_input" accept=".pdf,.docx,.odt">
+                    <i class="fa-solid fa-cloud-arrow-up dropzone-icon"></i>
+                    <span class="dropzone-text" id="job-dropzone-text">Stellenangebot-Dokument hierher ziehen oder klicken zum Auswählen</span>
+                    <span class="dropzone-hint">PDF, .docx oder .odt &middot; befüllt Position, PLZ, Stadt und Beschreibung automatisch</span>
+                </label>
+                <div class="generating-indicator" id="job-upload-indicator">
+                    <span class="spinner"></span>
+                    Dokument wird verarbeitet …
+                </div>
+            </div>
+            <p class="form-error" id="job-upload-error" hidden></p>
+            <input type="hidden" name="document_link" id="job_document_link">
+            {% endif %}
             <div>
                 <label for="position">Position</label>
                 <input id="position" name="position" type="text" value="{{ editing_job.position if editing_job else '' }}" required>
@@ -80,7 +99,7 @@
             {% if editing_job and editing_job.document_link %}
             <div>
                 <label>Dokument</label>
-                <p><a href="{{ editing_job.document_link }}" target="_blank" rel="noopener">PDF öffnen</a></p>
+                <p><a href="{{ editing_job.document_link }}" target="_blank" rel="noopener">Dokument öffnen ({{ editing_job.document_link.rsplit('.', 1)[-1] | upper }})</a></p>
             </div>
             {% endif %}
             <div>
@@ -164,3 +183,85 @@
         </tbody>
     </table>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var dropzone = document.getElementById('job-dropzone');
+        var fileInput = document.getElementById('job_file_input');
+        if (!dropzone || !fileInput) return;
+
+        var dropzoneText = document.getElementById('job-dropzone-text');
+        var defaultDropzoneText = dropzoneText ? dropzoneText.textContent : '';
+        var indicator = document.getElementById('job-upload-indicator');
+        var errorBox = document.getElementById('job-upload-error');
+        var submitBtn = dropzone.closest('form').querySelector('button[type="submit"]');
+
+        function setField(id, value) {
+            var el = document.getElementById(id);
+            if (el && value) el.value = value;
+        }
+
+        function processFile(file) {
+            if (!file) return;
+            dropzoneText.textContent = file.name;
+            errorBox.hidden = true;
+            indicator.classList.add('visible');
+            if (submitBtn) submitBtn.disabled = true;
+
+            var formData = new FormData();
+            formData.append('job_file', file);
+
+            fetch('{{ url_for("extract_job_upload") }}', { method: 'POST', body: formData })
+                .then(function (resp) {
+                    return resp.json().then(function (data) { return { ok: resp.ok, data: data }; });
+                })
+                .then(function (result) {
+                    indicator.classList.remove('visible');
+                    if (submitBtn) submitBtn.disabled = false;
+                    if (!result.ok) {
+                        errorBox.textContent = result.data.error || 'Die Datei konnte nicht verarbeitet werden.';
+                        errorBox.hidden = false;
+                        return;
+                    }
+                    setField('position', result.data.position);
+                    setField('zip', result.data.zip);
+                    setField('city', result.data.city);
+                    setField('content', result.data.content);
+                    setField('job_document_link', result.data.document_link);
+                })
+                .catch(function () {
+                    indicator.classList.remove('visible');
+                    if (submitBtn) submitBtn.disabled = false;
+                    errorBox.textContent = 'Die Datei konnte nicht verarbeitet werden. Bitte später erneut versuchen.';
+                    errorBox.hidden = false;
+                });
+        }
+
+        fileInput.addEventListener('change', function () {
+            processFile(fileInput.files[0]);
+        });
+
+        ['dragenter', 'dragover'].forEach(function (evt) {
+            dropzone.addEventListener(evt, function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzone.classList.add('dragover');
+            });
+        });
+
+        ['dragleave', 'drop'].forEach(function (evt) {
+            dropzone.addEventListener(evt, function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzone.classList.remove('dragover');
+            });
+        });
+
+        dropzone.addEventListener('drop', function (e) {
+            if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                fileInput.files = e.dataTransfer.files;
+                processFile(e.dataTransfer.files[0]);
+            }
+        });
+    });
+</script>
