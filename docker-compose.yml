@@ -43,6 +43,7 @@ services:
       - ./app.py:/app/app.py
       - ./db:/app/db
       - ./models:/app/models
+      - ./services:/app/services
       - ./embeddings.py:/app/embeddings.py
       - ./document_extraction.py:/app/document_extraction.py
       - ./backfill_embeddings.py:/app/backfill_embeddings.py

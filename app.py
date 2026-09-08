@@ -1,9 +1,7 @@
 import json
-import re
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, jsonify
-from weasyprint import HTML
 from groq import Groq, APIStatusError as GroqAPIStatusError
 from openai import OpenAI, APIStatusError as OpenAIAPIStatusError
 from dotenv import load_dotenv
@@ -14,13 +12,8 @@ import db
 from db import ROLES, DEFAULT_ROLE
 from embeddings import embed_text, strip_html_to_text
 from document_extraction import extract_document_text, ALLOWED_DOCUMENT_UPLOAD_EXTENSIONS
-
-THINK_BLOCK_RE = re.compile(r"<think>.*?</think>\s*", re.DOTALL)
-CODE_FENCE_RE = re.compile(r"^```[a-zA-Z]*\s*\n?|\n?```\s*$")
-
-
-def _strip_code_fence(text):
-    return CODE_FENCE_RE.sub("", text.strip()).strip()
+from services import resume_service, joboffer_service
+from services.text_utils import strip_think_block
 
 load_dotenv()
 
@@ -173,9 +166,7 @@ def home():  # put application's code here
                      "content": question}
                 ]
             )
-            answer = response.choices[0].message.content
-            # Manche Modelle (z.B. Qwen) geben ihre Denkschritte in <think>-Tags aus.
-            answer = THINK_BLOCK_RE.sub("", answer).strip()
+            answer = strip_think_block(response.choices[0].message.content)
         except (GroqAPIStatusError, OpenAIAPIStatusError) as e:
             if e.status_code == 429:
                 app.logger.warning("API 429 details: %s", e.body)
@@ -483,90 +474,8 @@ def delete_customer(customer_id):
     return redirect(url_for('customers'))
 
 
-RESUME_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "resumes")
-JOBOFFER_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "joboffers")
-
-
-def _write_html_as_pdf(html_fragment, output_path):
-    document = f"<!DOCTYPE html><html><head><meta charset=\"utf-8\"></head><body>{html_fragment}</body></html>"
-    HTML(string=document).write_pdf(output_path)
-
-
-def _generate_resume_document(user_id, spec):
-    """Erzeugt per LLM einen Lebenslauf-PDF für user_id auf Basis von spec, speichert
-    ihn (inkl. Embedding) als neuen Eintrag in resumes und gibt dessen id zurück.
-    Lässt GroqAPIStatusError/OpenAIAPIStatusError zum Aufrufer durch."""
-    selected_user = db.get_user(user_id)
-    if selected_user and selected_user.get("zip") and selected_user.get("city"):
-        system_content = (
-            "Du erstellst einen Lebenslauf auf Basis der Vorgaben des Nutzers. "
-            "Name und Wohnort sind vorgegeben und müssen unverändert übernommen werden, "
-            "alle weiteren Angaben (Ausbildung, Erfahrung, Qualifikationen) darfst du frei "
-            "und kreativ erfinden. "
-            "Antworte ausschließlich mit dem fertigen Lebenslauf im HTML-Format, "
-            "ohne zusätzliche Erklärungen."
-        )
-        user_content = (
-            f"Name: {selected_user['first_name']} {selected_user['last_name']}\n"
-            f"Wohnort: {selected_user['zip']} {selected_user['city']}\n\n"
-            f"{spec}"
-        )
-    elif selected_user:
-        system_content = (
-            "Du erstellst einen Lebenslauf auf Basis der Vorgaben des Nutzers. "
-            "Der Name ist vorgegeben und muss unverändert übernommen werden. Einen Wohnort hat "
-            "der Nutzer nicht hinterlegt - den darfst du ebenso wie alle weiteren Angaben "
-            "(Ausbildung, Erfahrung, Qualifikationen) frei und kreativ erfinden. "
-            "Antworte ausschließlich mit dem fertigen Lebenslauf im HTML-Format, "
-            "ohne zusätzliche Erklärungen."
-        )
-        user_content = (
-            f"Name: {selected_user['first_name']} {selected_user['last_name']}\n\n"
-            f"{spec}"
-        )
-    else:
-        system_content = (
-            "Du erstellst einen Dummy-Lebenslauf mit frei erfundenen, kreativen Personendaten  "
-            "(keine echten Personen) auf Basis der Vorgaben des Nutzers. "
-            "Antworte ausschließlich mit dem fertigen Lebenslauf im HTML-Format, "
-            "ohne zusätzliche Erklärungen."
-        )
-        user_content = spec
-
-    response = openai_client.chat.completions.create(
-        model=DEFAULT_MODEL,
-        messages=[
-            {"role": "system", "content": system_content},
-            {"role": "user", "content": user_content},
-        ],
-    )
-    resume_text = _strip_code_fence(THINK_BLOCK_RE.sub("", response.choices[0].message.content).strip())
-
-    os.makedirs(RESUME_DIR, exist_ok=True)
-    filename = f"lebenslauf_{datetime.now():%Y%m%d_%H%M%S}.pdf"
-    _write_html_as_pdf(resume_text, os.path.join(RESUME_DIR, filename))
-    file_url = url_for('view_resume', filename=filename)
-    embedding = embed_text(openai_client, strip_html_to_text(resume_text), app.logger)
-    return db.create_resume(resume_text, file_url, user_id, embedding=embedding)
-
-
-def _create_resume_from_upload(user_id, uploaded_file):
-    """Liest eine hochgeladene Lebenslauf-Datei (PDF/.docx/.odt) aus, speichert sie
-    unverändert samt Embedding auf Basis des ausgelesenen Texts als neuen Eintrag in
-    resumes und gibt dessen id zurück. Gibt None zurück, wenn sich kein Text
-    extrahieren ließ (z.B. gescanntes PDF ohne Textebene)."""
-    resume_text = extract_document_text(uploaded_file.filename, uploaded_file.stream).strip()
-    if not resume_text:
-        return None
-
-    ext = os.path.splitext(uploaded_file.filename)[1].lower()
-    os.makedirs(RESUME_DIR, exist_ok=True)
-    filename = f"lebenslauf_{datetime.now():%Y%m%d_%H%M%S}{ext}"
-    uploaded_file.stream.seek(0)
-    uploaded_file.save(os.path.join(RESUME_DIR, filename))
-    file_url = url_for('view_resume', filename=filename)
-    embedding = embed_text(openai_client, strip_html_to_text(resume_text), app.logger)
-    return db.create_resume(resume_text, file_url, user_id, embedding=embedding)
+RESUME_DIR = resume_service.RESUME_DIR
+JOBOFFER_DIR = joboffer_service.JOBOFFER_DIR
 
 
 @app.route('/tools/resume', methods=["GET", "POST"])
@@ -583,7 +492,7 @@ def generate_resume():
             message = "Bitte zuerst einen Nutzer wählen und beschreiben, was der Lebenslauf enthalten soll."
         else:
             try:
-                resume_id = _generate_resume_document(int(user_id), spec)
+                resume_id = resume_service.generate_resume_document(openai_client, DEFAULT_MODEL, int(user_id), spec, app.logger)
                 file_url = db.get_resume(resume_id)["document_link"]
                 message = "Lebenslauf wurde erstellt und dem Nutzer zugeordnet:"
             except (GroqAPIStatusError, OpenAIAPIStatusError) as e:
@@ -626,26 +535,7 @@ def extract_job_upload():
         return jsonify(error="In der Datei konnte kein Text gefunden werden."), 400
 
     try:
-        response = openai_client.chat.completions.create(
-            model=DEFAULT_MODEL,
-            response_format={"type": "json_object"},
-            messages=[
-                {"role": "system", "content": (
-                    "Du bekommst den Text eines hochgeladenen Stellenangebot-Dokuments. Fasse die "
-                    "Stellenbeschreibung sinnvoll zusammen und extrahiere, falls im Text eindeutig erkennbar, "
-                    "weitere Angaben - erfinde nichts frei hinzu. "
-                    "Antworte ausschließlich mit einem JSON-Objekt mit genau vier Feldern: "
-                    "\"position\" (kurze Stellenbezeichnung als Klartext, leerer String falls nicht erkennbar), "
-                    "\"zip\" (Postleitzahl des Arbeitsortes als Text, leerer String falls nicht erkennbar), "
-                    "\"city\" (Stadt des Arbeitsortes als Text, leerer String falls nicht erkennbar) und "
-                    "\"content\" (eine sinnvoll gekürzte Zusammenfassung der Stellenbeschreibung als formatiertes "
-                    "HTML mit Überschriften/Aufzählungen), ohne zusätzliche Erklärungen außerhalb des JSON."
-                )},
-                {"role": "user", "content": document_text},
-            ],
-        )
-        raw = _strip_code_fence(THINK_BLOCK_RE.sub("", response.choices[0].message.content).strip())
-        data = json.loads(raw)
+        data = joboffer_service.extract_joboffer_from_text(openai_client, DEFAULT_MODEL, document_text)
     except (GroqAPIStatusError, OpenAIAPIStatusError) as e:
         app.logger.warning("API error %s: %s", e.status_code, e.body)
         return jsonify(error="Die Datei konnte gerade nicht verarbeitet werden. Bitte später erneut versuchen."), 502
@@ -681,69 +571,7 @@ def generate_joboffer():
             message = "Bitte zuerst einen Stellenanbieter wählen und beschreiben, was das Stellenangebot enthalten soll."
         else:
             try:
-                selected_customer = db.get_customer(int(customer_id))
-                if selected_customer:
-                    company_block = (
-                        f"{selected_customer['company_name']}\n"
-                        f"{selected_customer['street']} {selected_customer['street_number']}\n"
-                        f"{selected_customer['zip']} {selected_customer['city']}"
-                    )
-                    system_content = (
-                        "Du erstellst ein Stellenangebot auf Basis der Vorgaben des Nutzers. "
-                        "Unternehmensname und Adresse sind vorgegeben und müssen unverändert als Kontaktdaten "
-                        "im Stellenangebot übernommen werden, alle weiteren Angaben (Aufgaben, Anforderungen, "
-                        "Benefits etc.) darfst du frei und kreativ erfinden. "
-                        "Antworte ausschließlich mit einem JSON-Objekt mit genau zwei Feldern: "
-                        "\"position\" (kurze Stellenbezeichnung als Klartext, z.B. \"Softwareentwickler (m/w/d)\") und "
-                        "\"content\" (das vollständige Stellenangebot als formatiertes HTML mit Überschriften, "
-                        "Aufzählungen etc., inklusive der vorgegebenen Kontaktdaten), "
-                        "ohne zusätzliche Erklärungen außerhalb des JSON."
-                    )
-                    user_content = f"Unternehmen:\n{company_block}\n\n{spec}"
-                else:
-                    system_content = (
-                        "Du erstellst ein Dummy-Stellenangebot mit frei erfundenen, kreativen Angaben "
-                        "(kein echtes Unternehmen) auf Basis der Vorgaben des Nutzers. "
-                        "Antworte ausschließlich mit einem JSON-Objekt mit genau vier Feldern: "
-                        "\"position\" (kurze Stellenbezeichnung als Klartext, z.B. \"Softwareentwickler (m/w/d)\"), "
-                        "\"zip\" (Postleitzahl des Arbeitsortes als Text), "
-                        "\"city\" (Stadt des Arbeitsortes als Text) und "
-                        "\"content\" (das vollständige Stellenangebot als formatiertes HTML mit Überschriften, Aufzählungen etc.), "
-                        "ohne zusätzliche Erklärungen außerhalb des JSON."
-                    )
-                    user_content = spec
-
-                response = openai_client.chat.completions.create(
-                    model=DEFAULT_MODEL,
-                    response_format={"type": "json_object"},
-                    messages=[
-                        {"role": "system", "content": system_content},
-                        {"role": "user", "content": user_content},
-                    ],
-                )
-                raw = _strip_code_fence(THINK_BLOCK_RE.sub("", response.choices[0].message.content).strip())
-                data = json.loads(raw)
-                position = (data.get("position") or "").strip()
-                joboffer_text = (data.get("content") or "").strip()
-                if selected_customer:
-                    zip_code = selected_customer["zip"]
-                    city = selected_customer["city"]
-                else:
-                    zip_code = (data.get("zip") or "").strip() or None
-                    city = (data.get("city") or "").strip() or None
-                valid_from = datetime.now().date()
-                valid_until = valid_from + timedelta(days=30)
-
-                if not position or not joboffer_text:
-                    raise ValueError("Antwort enthielt kein position/content-Feld.")
-
-                os.makedirs(JOBOFFER_DIR, exist_ok=True)
-                filename = f"stellenangebot_{datetime.now():%Y%m%d_%H%M%S}.pdf"
-                _write_html_as_pdf(joboffer_text, os.path.join(JOBOFFER_DIR, filename))
-                file_url = url_for('view_joboffer', filename=filename)
-                embedding = embed_text(openai_client, f"{position}\n\n{strip_html_to_text(joboffer_text)}", app.logger)
-                db.create_job(position, joboffer_text, valid_from, valid_until, int(customer_id), file_url, zip_code, city, embedding=embedding)
-
+                file_url = joboffer_service.generate_joboffer(openai_client, DEFAULT_MODEL, int(customer_id), spec, app.logger)
                 message = "Stellenangebot wurde erstellt und als Stelle angelegt:"
             except (GroqAPIStatusError, OpenAIAPIStatusError) as e:
                 app.logger.warning("API error %s: %s", e.status_code, e.body)
@@ -769,7 +597,7 @@ def my_resumes():
                 message = "Bitte eine Datei im PDF-, Word- (.docx) oder LibreOffice-Format (.odt) hochladen."
             else:
                 try:
-                    newest_id = _create_resume_from_upload(session["user_id"], uploaded_file)
+                    newest_id = resume_service.create_resume_from_upload(openai_client, session["user_id"], uploaded_file, app.logger)
                     if newest_id is None:
                         message = "In der Datei konnte kein Text gefunden werden. Bitte eine Datei mit auslesbarem Text hochladen."
                     else:
@@ -783,7 +611,7 @@ def my_resumes():
                 message = "Bitte beschreibe, was dein Lebenslauf enthalten soll."
             else:
                 try:
-                    newest_id = _generate_resume_document(session["user_id"], spec)
+                    newest_id = resume_service.generate_resume_document(openai_client, DEFAULT_MODEL, session["user_id"], spec, app.logger)
                     message = "Dein Lebenslauf wurde erstellt:"
                 except (GroqAPIStatusError, OpenAIAPIStatusError) as e:
                     app.logger.warning("API error %s: %s", e.status_code, e.body)

@@ -83,6 +83,11 @@ models/                    SQLAlchemy-ORM-Modelle + CRUD-/Abfragefunktionen je T
   customer.py                  Modell `Customer`, zugehörige CRUD-Funktionen
   job.py                       Modell `Job`, zugehörige CRUD-Funktionen inkl. `find_matching_jobs()`
   resume.py                    Modell `Resume`, zugehörige CRUD-Funktionen inkl. `find_matching_resumes()`
+services/                  KI-/Datei-Erzeugungslogik der Tools-Seiten, aus app.py-Routen ausgelagert
+  text_utils.py                Aufbereitung von KI-Antworten (`<think>`-Blöcke, Markdown-Codefences entfernen)
+  pdf_service.py                HTML-zu-PDF-Rendering (WeasyPrint)
+  resume_service.py             Lebenslauf generieren/aus Upload anlegen (`RESUME_DIR`, inkl. Embedding)
+  joboffer_service.py           Stellenangebot generieren/aus Upload-Text extrahieren (`JOBOFFER_DIR`, inkl. Embedding)
 embeddings.py              Embedding-Erzeugung (einzeln/batch), HTML-Stripping, Cosinus-Ähnlichkeit/Top-Matches
 document_extraction.py     Textextraktion aus hochgeladenen PDF/.docx/.odt-Dateien (Lebenslauf- und Stellenangebot-Upload)
 backfill_embeddings.py     Einmaliges Nachrechnen fehlender Embeddings für Bestandsdaten
