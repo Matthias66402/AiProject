@@ -57,7 +57,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Check syntax
-        run: python -m py_compile app.py db.py
+        run: python -m py_compile app.py db/__init__.py db/db_init.py models/__init__.py models/base.py models/user.py models/customer.py models/job.py models/resume.py
 
       - name: Smoke test (App-Import inkl. DB-Migration gegen den Postgres-Service)
         run: python -c "import app"

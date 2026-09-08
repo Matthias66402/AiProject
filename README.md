@@ -10,7 +10,7 @@ Die Website ist noch im Aufbau, Struktur und Funktionsumfang können sich häufi
   - Modelle über [Groq](https://groq.com/) (`openai/gpt-oss-20b`, `openai/gpt-oss-120b`, `qwen/qwen3.6-27b`, `groq/compound-mini`) — **optional**: ohne (nicht-leeren) `GROQ_API_KEY` in `.env` werden diese Modelle automatisch aus der Auswahl entfernt und der Groq-Client gar nicht erst erzeugt (`app.py`, `client`)
   - Modelle über [OpenAI](https://platform.openai.com/) (`gpt-5-mini`, `gpt-4o-mini`, `gpt-4.1-mini`) — `OPENAI_API_KEY` ist Pflicht, da auch die Embeddings darüber laufen
 - **Login/Registrierung**: Nutzer registrieren sich (immer mit Rolle `user`), melden sich an/ab; Passwörter werden gehasht (Werkzeug) gespeichert.
-- **Rollen**: `user` (Standard bei Registrierung), `customer`, `admin` — Liste zentral in `db.py` (`ROLES`). `admin` vergibt Rollen und hat vollen Schreibzugriff auf Nutzer-, Stellenanbieter- und Stellenverwaltung. `customer`-Nutzer sind über `users.customer_id` (nullable FK auf `customers`, Zuweisung durch einen Admin im Nutzerformular) genau einem Stellenanbieter zugeordnet und dürfen dadurch **nur ihre eigenen** Stellenangebote anlegen/bearbeiten/löschen sowie ihren eigenen Stellenanbieter-Datensatz bearbeiten (Anlegen/Löschen von Stellenanbietern bleibt `admin` vorbehalten).
+- **Rollen**: `user` (Standard bei Registrierung), `customer`, `admin` — Liste zentral in `models/user.py` (`ROLES`). `admin` vergibt Rollen und hat vollen Schreibzugriff auf Nutzer-, Stellenanbieter- und Stellenverwaltung. `customer`-Nutzer sind über `users.customer_id` (nullable FK auf `customers`, Zuweisung durch einen Admin im Nutzerformular) genau einem Stellenanbieter zugeordnet und dürfen dadurch **nur ihre eigenen** Stellenangebote anlegen/bearbeiten/löschen sowie ihren eigenen Stellenanbieter-Datensatz bearbeiten (Anlegen/Löschen von Stellenanbietern bleibt `admin` vorbehalten).
 - **Nutzerverwaltung** (`/users`, nur `admin`): Nutzer anlegen, bearbeiten, Rolle zuweisen, optional PLZ/Stadt hinterlegen. Bei Rolle `customer` erscheint zusätzlich eine Selectbox zur Zuordnung eines Stellenanbieters. Zeigt außerdem alle für diesen Nutzer generierten/hochgeladenen Lebensläufe (Tabelle `resumes`, FK auf `users`), falls vorhanden.
 - **Eigener Lebenslauf** (`/resumes`, für jeden eingeloggten Nutzer mit Rolle `user`): zeigt den aktuellsten eigenen Lebenslauf (PDF eingebettet, andere Formate als Download-Link); eine Selectbox erlaubt den Zugriff auf ältere Versionen, ein Löschbutton entfernt den ausgewählten Lebenslauf inkl. Datei. Zwei Wege für einen neuen Lebenslauf:
   - **Generieren** — dieselbe KI-Logik wie das Admin-Tool `/tools/resume`: verwendet immer den echten Namen des Nutzers, der Wohnort wird nur übernommen, wenn PLZ **und** Stadt hinterlegt sind (sonst frei erfunden).
@@ -41,7 +41,7 @@ Jeder Job (`jobs.embedding`) und jeder Lebenslauf (`resumes.embedding`) bekommt 
 - `embed_text()` / `embed_texts()` — einzelnes bzw. batch-weises Embedding über die OpenAI-API; API-Fehler (Status-, Verbindungs-, Timeout-Fehler) werden abgefangen und geloggt, statt das eigentliche Anlegen/Ändern zu blockieren
 - `to_vector_literal()` — formatiert ein Embedding als pgvector-Text-Literal zum Schreiben über einen `::vector`-Cast
 
-`db.find_matching_jobs(embedding, top_k)` / `db.find_matching_resumes(embedding, top_k)` liefern die ähnlichsten Einträge (Cosine Similarity, SQL-nativ, ab einer Mindest-Ähnlichkeit `MIN_MATCH_SIMILARITY` in `db.py`) — Grundlage für das Matching zwischen Kandidat und Stellenangebot: passende Stellenangebote erscheinen auf `/resumes` beim jeweiligen Lebenslauf, passende Kandidaten auf der Bearbeiten-Ansicht eines Stellenangebots (`/jobs/<id>/edit`, nur für Admins bzw. den zuständigen `customer`-Nutzer).
+`db.find_matching_jobs(embedding, top_k)` / `db.find_matching_resumes(embedding, top_k)` liefern die ähnlichsten Einträge (Cosine Similarity über `Vector.cosine_distance()`, SQL-nativ, ab einer Mindest-Ähnlichkeit `MIN_MATCH_SIMILARITY` in `models/base.py`) — Grundlage für das Matching zwischen Kandidat und Stellenangebot: passende Stellenangebote erscheinen auf `/resumes` beim jeweiligen Lebenslauf, passende Kandidaten auf der Bearbeiten-Ansicht eines Stellenangebots (`/jobs/<id>/edit`, nur für Admins bzw. den zuständigen `customer`-Nutzer).
 
 ## Datei-Uploads (Lebenslauf & Stellenangebot)
 
@@ -61,7 +61,7 @@ docker compose exec app python backfill_embeddings.py
 ## Tech-Stack
 
 - **Backend**: Flask (Python 3.14)
-- **Datenbank**: PostgreSQL 16 (Image `pgvector/pgvector:pg16`) über psycopg2, inkl. [pgvector](https://github.com/pgvector/pgvector)-Extension für die Ähnlichkeitssuche; Schema wird beim App-Start automatisch angelegt und migriert (`db.init_db()`)
+- **Datenbank**: PostgreSQL 16 (Image `pgvector/pgvector:pg16`), inkl. [pgvector](https://github.com/pgvector/pgvector)-Extension für die Ähnlichkeitssuche. Schema-Erstellung/Migration (`db.init_db()`, `db/db_init.py`) läuft direkt über psycopg2; alle CRUD-/Abfragefunktionen darüber (`models/`) über [SQLAlchemy](https://pypi.org/project/SQLAlchemy/) mit dem [pgvector](https://pypi.org/project/pgvector/)-Python-Paket für den `vector`-Spaltentyp (`Vector(1536)`, `cosine_distance()`)
 - **KI**: [Groq](https://pypi.org/project/groq/)- und [OpenAI](https://pypi.org/project/openai/)-Python-SDKs
 - **PDF-Erzeugung**: [WeasyPrint](https://pypi.org/project/weasyprint/) rendert vom KI-Modell geliefertes HTML zu PDF. Benötigt native Pango/Cairo-Bibliotheken (siehe unten) — im `Dockerfile` und in der CI bereits per `apt` eingerichtet
 - **Datei-Parsing**: [pypdf](https://pypi.org/project/pypdf/), [python-docx](https://pypi.org/project/python-docx/), [odfpy](https://pypi.org/project/odfpy/) — Textextraktion aus hochgeladenen PDF/.docx/.odt-Dateien, reines Python ohne native Abhängigkeiten
@@ -73,7 +73,16 @@ docker compose exec app python backfill_embeddings.py
 
 ```
 app.py                     Flask-Routen, KI-Assistent-Logik, Modellauswahl
-db.py                      DB-Verbindung, Schema-Erstellung/Migration, CRUD-Funktionen
+db/                        DB-Verbindung & Schema (siehe unten), von außen weiterhin per `import db` als Einheit genutzt
+  __init__.py                Re-Export der öffentlichen Funktionen/Konstanten aus db_init.py und models/
+  db_init.py                  DB-Verbindung (`get_connection()`, psycopg2), Schema-Erstellung/Migration (`init_db()`)
+models/                    SQLAlchemy-ORM-Modelle + CRUD-/Abfragefunktionen je Tabelle
+  __init__.py                Re-Export der Modelle/Funktionen aller Untermodule
+  base.py                     Engine/Session (`get_session()`), `Base`, `MIN_MATCH_SIMILARITY`, `to_dict()`-Hilfsfunktion
+  user.py                      Modell `User`, Rollen (`ROLES`, `DEFAULT_ROLE`), zugehörige CRUD-Funktionen
+  customer.py                  Modell `Customer`, zugehörige CRUD-Funktionen
+  job.py                       Modell `Job`, zugehörige CRUD-Funktionen inkl. `find_matching_jobs()`
+  resume.py                    Modell `Resume`, zugehörige CRUD-Funktionen inkl. `find_matching_resumes()`
 embeddings.py              Embedding-Erzeugung (einzeln/batch), HTML-Stripping, Cosinus-Ähnlichkeit/Top-Matches
 document_extraction.py     Textextraktion aus hochgeladenen PDF/.docx/.odt-Dateien (Lebenslauf- und Stellenangebot-Upload)
 backfill_embeddings.py     Einmaliges Nachrechnen fehlender Embeddings für Bestandsdaten

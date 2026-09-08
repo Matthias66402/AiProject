@@ -3,6 +3,8 @@ groq
 openai
 python-dotenv
 psycopg2-binary
+SQLAlchemy
+pgvector
 weasyprint
 pypdf
 python-docx
