@@ -105,9 +105,9 @@ export default function JobEditPage() {
             <p className="subtitle">
               {fromCustomer && (
                 <>
-                  <a href={`${API_BASE}/customers/${job.customer_id}/edit`}>
+                  <Link to={`/customers/${job.customer_id}/edit`}>
                     <i className="fa-solid fa-arrow-left" /> Zurück zu {job.customer_name}
-                  </a>{' '}
+                  </Link>{' '}
                   ·{' '}
                 </>
               )}
@@ -161,9 +161,9 @@ export default function JobEditPage() {
               <p>{job.valid_until || '-'}</p>
             </div>
             {fromCustomer && (
-              <a className="subtle-btn" href={`${API_BASE}/customers/${job.customer_id}/edit`}>
+              <Link className="subtle-btn" to={`/customers/${job.customer_id}/edit`}>
                 <i className="fa-solid fa-arrow-left" /> Zurück zu {job.customer_name}
-              </a>
+              </Link>
             )}
             <Link className="subtle-btn" to="/jobs">
               Schließen

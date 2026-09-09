@@ -5,6 +5,10 @@ import App from './App.jsx'
 import HomePage from './pages/HomePage.jsx'
 import JobsPage from './pages/JobsPage.jsx'
 import JobEditPage from './pages/JobEditPage.jsx'
+import CustomersPage from './pages/CustomersPage.jsx'
+import CustomerEditPage from './pages/CustomerEditPage.jsx'
+import UsersPage from './pages/UsersPage.jsx'
+import UserEditPage from './pages/UserEditPage.jsx'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
@@ -14,6 +18,10 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <Route index element={<HomePage />} />
           <Route path="jobs" element={<JobsPage />} />
           <Route path="jobs/:jobId/edit" element={<JobEditPage />} />
+          <Route path="customers" element={<CustomersPage />} />
+          <Route path="customers/:customerId/edit" element={<CustomerEditPage />} />
+          <Route path="users" element={<UsersPage />} />
+          <Route path="users/:userId/edit" element={<UserEditPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

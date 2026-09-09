@@ -25,6 +25,14 @@ export default function App() {
         <Link to="/jobs" style={{ color: '#ffe9a8' }}>
           <i className="fa-solid fa-briefcase" /> Stellenangebote
         </Link>
+        <Link to="/customers" style={{ color: '#ffe9a8' }}>
+          <i className="fa-solid fa-building" /> Stellenanbieter
+        </Link>
+        {user?.role === 'admin' && (
+          <Link to="/users" style={{ color: '#ffe9a8' }}>
+            <i className="fa-solid fa-users" /> Nutzer
+          </Link>
+        )}
         <a href={API_BASE + '/'} style={{ color: '#ffe9a8', marginLeft: 'auto' }}>
           Zur klassischen Seite
         </a>

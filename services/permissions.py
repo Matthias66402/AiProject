@@ -22,3 +22,14 @@ def own_customer_for_session():
     if session.get("user_role") == "customer" and session.get("user_customer_id"):
         return db.get_customer(session["user_customer_id"])
     return None
+
+
+def customer_management_permission(customer_id):
+    """True, wenn der eingeloggte Nutzer diesen Stellenanbieter anlegen/bearbeiten/
+    löschen darf: Admins immer, Nutzer mit Rolle 'customer' nur den ihnen
+    zugeordneten (Anlegen/Löschen bleibt Admins vorbehalten, das prüfen die
+    aufrufenden Routen zusätzlich selbst)."""
+    role = session.get("user_role")
+    if role == "admin":
+        return True
+    return role == "customer" and session.get("user_customer_id") == customer_id

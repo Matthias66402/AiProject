@@ -16,10 +16,12 @@ from document_extraction import extract_document_text, ALLOWED_DOCUMENT_UPLOAD_E
 from services import resume_service, joboffer_service
 from services.ai_clients import openai_client
 from services.assistant_service import AVAILABLE_MODELS, DEFAULT_MODEL, ask_assistant
-from services.permissions import job_management_permission, own_customer_for_session
+from services.permissions import customer_management_permission, job_management_permission, own_customer_for_session
 from api.auth import auth_api
 from api.jobs import jobs_api
 from api.assistant import assistant_api
+from api.customers import customers_api
+from api.users import users_api
 
 load_dotenv()
 
@@ -44,6 +46,8 @@ CORS(app, resources={
 app.register_blueprint(auth_api)
 app.register_blueprint(jobs_api)
 app.register_blueprint(assistant_api)
+app.register_blueprint(customers_api)
+app.register_blueprint(users_api)
 db.init_db()
 
 
@@ -360,19 +364,10 @@ def customers():
     return render_template('index.html', content_template='customer.html', customers=customers_list, editing_customer=None, customer_jobs=None, page=page, per_page=per_page, total_pages=total_pages, per_page_options=CUSTOMERS_PER_PAGE_OPTIONS)
 
 
-def _can_manage_customer(customer_id):
-    """Admins dürfen jeden Stellenanbieter bearbeiten, Nutzer mit Rolle 'customer'
-    nur den ihnen zugeordneten (Anlegen/Löschen bleibt Admins vorbehalten)."""
-    role = session.get("user_role")
-    if role == "admin":
-        return True
-    return role == "customer" and session.get("user_customer_id") == customer_id
-
-
 @app.route('/customers/<int:customer_id>/edit', methods=["GET", "POST"])
 def edit_customer(customer_id):
     if request.method == "POST":
-        if not _can_manage_customer(customer_id):
+        if not customer_management_permission(customer_id):
             return redirect(url_for('customers'))
 
         company_name = request.form.get("company_name", "").strip()
