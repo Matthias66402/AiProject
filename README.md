@@ -2,134 +2,91 @@
 
 Generative-AI-Testprojekt: eine Flask-Webanwendung zur Verwaltung von Stellenanbietern (Kunden), Stellenangeboten und Nutzern, mit einem integrierten KI-Assistenten, der Fragen zur Website, Stellenbewerbung und Stellenveröffentlichung beantwortet.
 
-Die Website ist noch im Aufbau, Struktur und Funktionsumfang können sich häufig ändern.
+Jede Seite existiert doppelt: klassisch als Jinja-Template und als React-SPA (`frontend/`) über eine JSON-API (`api/`). **React ist die Standard-Oberfläche** — siehe [Frontend](#frontend-react--klassisch) unten. Die Website ist noch im Aufbau, Struktur und Funktionsumfang können sich häufig ändern.
 
 ## Funktionen
 
-- **KI-Assistent** (Startseite — klassisch unter `/`, ebenso im React-PoC unter `frontend/`): beantwortet Fragen zur Website über wählbare KI-Modelle. Der System-Prompt bekommt bei jeder Anfrage automatisch die aktuelle Seitenstruktur (aus den registrierten Flask-Routen erzeugt) mitgegeben, damit der Assistent nichts über nicht existierende Funktionen erfindet. Ohne explizite Auswahl (z.B. bei internen KI-Aufgaben wie dem Extrahieren einer hochgeladenen Stellenanzeige) wird immer `DEFAULT_MODEL` (`gpt-4.1-mini`, OpenAI) verwendet. Modell-Konfiguration und Anfrage-Logik liegen zentral in `services/assistant_service.py` (`ask_assistant()`), genutzt sowohl von der klassischen Route als auch vom JSON-Endpunkt `/api/assistant/ask` für React.
-  - Modelle über [Groq](https://groq.com/) (`openai/gpt-oss-20b`, `openai/gpt-oss-120b`, `qwen/qwen3.6-27b`, `groq/compound-mini`) — **optional**: ohne (nicht-leeren) `GROQ_API_KEY` in `.env` werden diese Modelle automatisch aus der Auswahl entfernt und der Groq-Client gar nicht erst erzeugt (`services/assistant_service.py`, `groq_client`)
-  - Modelle über [OpenAI](https://platform.openai.com/) (`gpt-5-mini`, `gpt-4o-mini`, `gpt-4.1-mini`) — `OPENAI_API_KEY` ist Pflicht, da auch die Embeddings darüber laufen
-- **Login/Registrierung** (`/login`, `/register` — klassisch, ebenso im React-PoC): Nutzer registrieren sich (immer mit Rolle `user`), melden sich an/ab; Passwörter werden gehasht (Werkzeug) gespeichert.
-- **Rollen**: `user` (Standard bei Registrierung), `customer`, `admin` — Liste zentral in `models/user.py` (`ROLES`). `admin` vergibt Rollen und hat vollen Schreibzugriff auf Nutzer-, Stellenanbieter- und Stellenverwaltung. `customer`-Nutzer sind über `users.customer_id` (nullable FK auf `customers`, Zuweisung durch einen Admin im Nutzerformular) genau einem Stellenanbieter zugeordnet und dürfen dadurch **nur ihre eigenen** Stellenangebote anlegen/bearbeiten/löschen sowie ihren eigenen Stellenanbieter-Datensatz bearbeiten (Anlegen/Löschen von Stellenanbietern bleibt `admin` vorbehalten).
-- **Nutzerverwaltung** (`/users` — klassisch, ebenso im React-PoC; nur `admin`): Nutzer anlegen, bearbeiten, Rolle zuweisen, optional PLZ/Stadt hinterlegen. Bei Rolle `customer` erscheint zusätzlich eine Selectbox zur Zuordnung eines Stellenanbieters. Zeigt außerdem alle für diesen Nutzer generierten/hochgeladenen Lebensläufe (Tabelle `resumes`, FK auf `users`), falls vorhanden. Kein Löschen (weder klassisch noch React) — dafür gibt es bislang keine Funktion.
-- **Eigener Lebenslauf** (`/resumes` — klassisch, ebenso im React-PoC; für jeden eingeloggten Nutzer mit Rolle `user`): zeigt den aktuellsten eigenen Lebenslauf (PDF eingebettet, andere Formate als Download-Link); eine Selectbox erlaubt den Zugriff auf ältere Versionen, ein Löschbutton entfernt den ausgewählten Lebenslauf inkl. Datei. Zwei Wege für einen neuen Lebenslauf:
-  - **Generieren** — dieselbe KI-Logik wie das Admin-Tool `/tools/resume`: verwendet immer den echten Namen des Nutzers, der Wohnort wird nur übernommen, wenn PLZ **und** Stadt hinterlegt sind (sonst frei erfunden).
-  - **Hochladen** (Dropzone mit Drag & Drop) — eigene Datei als PDF/.docx/.odt hochladen; der Text wird ausgelesen (`document_extraction.py`) und wie bei der Generierung vektorisiert.
-
-  Die Dateiauslieferung prüft Besitzerschaft (nur die eigenen Lebensläufe, unabhängig vom Admin-Zugriff auf `/tools/resume/<datei>`).
-- **Stellenangebote** (`/jobs`): Stellenanzeigen mit Gültigkeitszeitraum, PLZ/Stadt und Zuordnung zu einem Stellenanbieter. Liste paginiert (Standard 10/Seite, per Selectbox auf 10/25/50/100 einstellbar).
-  - `admin`: anlegen/bearbeiten/löschen für jeden Stellenanbieter.
-  - `customer`-Nutzer mit zugeordnetem Stellenanbieter: anlegen/bearbeiten/löschen nur für den eigenen Stellenanbieter — serverseitig erzwungen, unabhängig vom Formularinhalt.
-  - Alle anderen (inkl. nicht eingeloggt): nur Liste + Lesemodus ("Ansehen") pro Stelle — Position, Kunde, PLZ/Stadt, Gültigkeitszeitraum als Text, bei KI-generierten/hochgeladenen Stellen zusätzlich das Dokument eingebettet (PDF) bzw. als Download-Link (andere Formate) statt der reinen Textbeschreibung.
-  - Beim Anlegen kann optional ein Stellenangebot-Dokument (PDF/.docx/.odt) per Dropzone hochgeladen werden (`/jobs/extract-upload`): die KI fasst den Inhalt als Beschreibung zusammen und befüllt Position/PLZ/Stadt, sofern im Text eindeutig erkennbar.
-- **Stellenanbieter** (`/customers` — klassisch, ebenso im React-PoC): Kunden (Unternehmen) mit Adresse. Liste paginiert (Standard testweise 2/Seite in der klassischen Ansicht, `CUSTOMERS_PER_PAGE_DEFAULT` in `app.py`; 10/Seite im React-PoC, `api/customers.py`).
-  - `admin`: anlegen, bearbeiten, löschen.
-  - `customer`-Nutzer mit zugeordnetem Stellenanbieter: dürfen nur ihren eigenen Datensatz bearbeiten (nicht anlegen/löschen).
-  - Alle anderen: nur Liste + Lesemodus ("Ansehen"), kein Bearbeiten/Löschen.
-  - Die Bearbeiten-Ansicht zeigt zusätzlich die zu diesem Stellenanbieter gehörenden Stellenangebote.
-  - Anlegen von neuen Stellen per Dokumenten-Upload wird automatisch dem eingeloggten Stellenanbieter zugeordnet.
-- **Tools-Menü** (nur für Rolle `admin` — klassisch, ebenso im React-PoC): lässt die KI Inhalte als HTML formulieren und rendert sie per WeasyPrint zu PDF, mit dezentem Lade-Spinner während der Generierung und Link zum Öffnen der fertigen Datei in einem neuen Tab.
-  - **Lebenslauf generieren** (`/tools/resume`): ein bestehender Nutzer wird per Selectbox ausgewählt. Sind bei ihm PLZ **und** Stadt hinterlegt, übernimmt die KI dessen echten Namen und Wohnort unverändert (Rest frei erfunden); ansonsten ein komplett fiktiver Dummy-Lebenslauf. Das PDF wird unter `data/resumes/` abgelegt und als neuer Eintrag in `resumes` (FK auf den Nutzer) gespeichert.
-  - **Stellenangebot generieren** (`/tools/joboffer`): ein Stellenanbieter wird per Selectbox ausgewählt. Die KI liefert Position, PLZ, Stadt und den Stellentext strukturiert als JSON zurück; das PDF wird unter `data/joboffers/` abgelegt und automatisch ein passender Eintrag in `/jobs` angelegt (inkl. `document_link`, Gültigkeit heute bis +30 Tage).
-  - ⚠️ Läuft nur, wo WeasyPrints native Abhängigkeiten (Pango/Cairo) vorhanden sind — siehe [WeasyPrint unter Windows](#weasyprint-unter-windows) weiter unten. Im Docker-Image ist das bereits eingerichtet.
+- **KI-Assistent** (Startseite `/`): beantwortet Fragen zur Website über wählbare KI-Modelle. Der System-Prompt bekommt bei jeder Anfrage automatisch die aktuelle Seitenstruktur mitgegeben (`build_site_map()` in `app.py`, live aus `app.url_map`), damit der Assistent nichts über nicht existierende Funktionen erfindet. Modell-Logik zentral in `services/assistant_service.py` (`ask_assistant()`).
+  - Modelle über [Groq](https://groq.com/) — **optional**: ohne `GROQ_API_KEY` werden diese Modelle automatisch ausgeblendet.
+  - Modelle über [OpenAI](https://platform.openai.com/) — `OPENAI_API_KEY` ist Pflicht, da auch die Embeddings darüber laufen.
+- **Login/Registrierung** (`/login`, `/register`): Nutzer registrieren sich (immer mit Rolle `user`), melden sich an/ab; Passwörter gehasht (Werkzeug).
+- **Rollen**: `user` (Standard), `customer`, `admin` (`models/user.py`, `ROLES`). `admin` hat vollen Schreibzugriff. `customer`-Nutzer sind über `users.customer_id` genau einem Stellenanbieter zugeordnet und dürfen dadurch **nur ihre eigenen** Stellenangebote und ihren eigenen Stellenanbieter-Datensatz bearbeiten.
+- **Nutzerverwaltung** (`/users`, nur `admin`): anlegen, bearbeiten, Rolle zuweisen, Stellenanbieter-Zuordnung bei Rolle `customer`, Übersicht der Lebensläufe des Nutzers. Kein Löschen — dafür gibt es keine Funktion.
+- **Eigener Lebenslauf** (`/resumes`, jeder eingeloggte Nutzer): aktuellster Lebenslauf eingebettet (PDF) bzw. als Download; Selectbox für ältere Versionen; Löschen. Neuen Lebenslauf per KI **generieren** (echter Name, Wohnort nur bei hinterlegter PLZ+Stadt) oder eigene Datei **hochladen** (Dropzone, PDF/.docx/.odt, Text via `document_extraction.py` ausgelesen und vektorisiert).
+- **Stellenangebote** (`/jobs`): Stellenanzeigen mit Gültigkeitszeitraum, PLZ/Stadt, Stellenanbieter-Zuordnung; paginierte Liste.
+  - `admin`: anlegen/bearbeiten/löschen für jeden Stellenanbieter. `customer`-Nutzer: nur für den eigenen (serverseitig erzwungen). Alle anderen: nur Lesemodus.
+  - Optionaler Dokumenten-Upload (PDF/.docx/.odt) beim Anlegen (`/jobs/extract-upload`): KI fasst Inhalt zusammen und befüllt Position/PLZ/Stadt.
+- **Stellenanbieter** (`/customers`): Kunden (Unternehmen) mit Adresse, paginierte Liste, inkl. Liste der zugehörigen Stellenangebote in der Bearbeiten-Ansicht.
+  - `admin`: anlegen/bearbeiten/löschen. `customer`-Nutzer: nur der eigene Datensatz bearbeiten. Alle anderen: nur Lesemodus.
+- **Tools-Menü** (nur `admin`): lässt die KI Inhalte als HTML formulieren und rendert sie per WeasyPrint zu PDF.
+  - **Lebenslauf generieren** (`/tools/resume`): Nutzer per Selectbox wählen, PDF wird unter `resumes` gespeichert.
+  - **Stellenangebot generieren** (`/tools/joboffer`): Stellenanbieter per Selectbox wählen, legt automatisch einen passenden Eintrag unter `/jobs` an.
+  - ⚠️ Läuft nur, wo WeasyPrints native Abhängigkeiten (Pango/Cairo) vorhanden sind — siehe [WeasyPrint unter Windows](#weasyprint-unter-windows). Im Docker-Image bereits eingerichtet.
 
 ## Embeddings (RAG-Grundlage)
 
-Jeder Job (`jobs.embedding`) und jeder Lebenslauf (`resumes.embedding`) bekommt beim Anlegen/Ändern automatisch ein OpenAI-Embedding (`text-embedding-3-small`) berechnet und als [pgvector](https://github.com/pgvector/pgvector) `vector(1536)`-Spalte gespeichert — sowohl bei manueller Eingabe als auch bei KI-Generierung über die Tools-Seiten. Die Ähnlichkeitssuche läuft nativ in SQL über den Cosine-Distance-Operator `<=>`, indiziert per HNSW-Index (`idx_jobs_embedding_hnsw`/`idx_resumes_embedding_hnsw`), statt Embeddings nach Python zu laden. Zuständig ist `embeddings.py`:
+Jeder Job und jeder Lebenslauf bekommt beim Anlegen/Ändern automatisch ein OpenAI-Embedding (`text-embedding-3-small`) und wird als [pgvector](https://github.com/pgvector/pgvector) `vector(1536)` gespeichert. Die Ähnlichkeitssuche läuft nativ in SQL über Cosine-Distance, indiziert per HNSW-Index. Zuständig ist `embeddings.py` (`strip_html_to_text()`, `embed_text()`/`embed_texts()`, `to_vector_literal()`); API-Fehler werden abgefangen/geloggt statt das Anlegen zu blockieren.
 
-- `strip_html_to_text()` — bereitet die HTML-Inhalte (`content`) für ein sauberes Embedding auf
-- `embed_text()` / `embed_texts()` — einzelnes bzw. batch-weises Embedding über die OpenAI-API; API-Fehler (Status-, Verbindungs-, Timeout-Fehler) werden abgefangen und geloggt, statt das eigentliche Anlegen/Ändern zu blockieren
-- `to_vector_literal()` — formatiert ein Embedding als pgvector-Text-Literal zum Schreiben über einen `::vector`-Cast
+`db.find_matching_jobs()` / `db.find_matching_resumes()` liefern die ähnlichsten Einträge ab einer Mindest-Ähnlichkeit (`MIN_MATCH_SIMILARITY`, `models/base.py`) — Grundlage für das Matching zwischen Kandidat und Stellenangebot (angezeigt auf `/resumes` bzw. `/jobs/<id>/edit`).
 
-`db.find_matching_jobs(embedding, top_k)` / `db.find_matching_resumes(embedding, top_k)` liefern die ähnlichsten Einträge (Cosine Similarity über `Vector.cosine_distance()`, SQL-nativ, ab einer Mindest-Ähnlichkeit `MIN_MATCH_SIMILARITY` in `models/base.py`) — Grundlage für das Matching zwischen Kandidat und Stellenangebot: passende Stellenangebote erscheinen auf `/resumes` beim jeweiligen Lebenslauf, passende Kandidaten auf der Bearbeiten-Ansicht eines Stellenangebots (`/jobs/<id>/edit`, nur für Admins bzw. den zuständigen `customer`-Nutzer).
-
-## Datei-Uploads (Lebenslauf & Stellenangebot)
-
-Sowohl `/resumes` (eigener Lebenslauf) als auch `/jobs` (Stelle anlegen) bieten neben der KI-Generierung eine Dropzone zum Hochladen einer eigenen Datei — PDF, Word (`.docx`) oder LibreOffice/OpenDocument (`.odt`); das alte binäre `.doc`-Format wird bewusst nicht unterstützt. Zuständig ist `document_extraction.py`:
-
-- `extract_document_text(filename, file_stream)` — liest den reinen Text aus PDF (`pypdf`), `.docx` (`python-docx`) oder `.odt` (`odfpy`) aus
-- `ALLOWED_DOCUMENT_UPLOAD_EXTENSIONS` — die erlaubten Endungen, zentral für beide Upload-Flows
-
-Beim Lebenslauf wird der ausgelesene Text direkt gespeichert und vektorisiert. Beim Stellenangebot (`/jobs/extract-upload`) durchläuft der Text zusätzlich eine KI-Zusammenfassung (JSON-Antwort mit `position`/`zip`/`city`/`content`), die das Formular vorbefüllt, bevor der Admin bzw. `customer`-Nutzer die Stelle final anlegt. In beiden Fällen wird die Originaldatei unverändert unter `data/resumes/` bzw. `data/joboffers/` abgelegt (`app.config["MAX_CONTENT_LENGTH"]` begrenzt Uploads auf 10 MB).
-
-`backfill_embeddings.py` berechnet einmalig Embeddings für bestehende Jobs/Lebensläufe ohne Embedding nach (z.B. nach der Einführung dieses Features oder bei einem Modellwechsel):
+`backfill_embeddings.py` berechnet einmalig fehlende Embeddings für Bestandsdaten nach:
 
 ```bash
 docker compose exec app python backfill_embeddings.py
 ```
 
+## Datei-Uploads
+
+`/resumes` und `/jobs` (Anlegen) bieten neben der KI-Generierung eine Dropzone für PDF/.docx/.odt (`.doc` bewusst nicht unterstützt). `document_extraction.py` liest den Text aus (`pypdf`/`python-docx`/`odfpy`). Beim Stellenangebot durchläuft der Text zusätzlich eine KI-Zusammenfassung. Originaldateien landen unverändert unter `data/resumes/` bzw. `data/joboffers/` (Uploads auf 10 MB begrenzt).
+
 ## Tech-Stack
 
 - **Backend**: Flask (Python 3.14)
-- **Datenbank**: PostgreSQL 16 (Image `pgvector/pgvector:pg16`), inkl. [pgvector](https://github.com/pgvector/pgvector)-Extension für die Ähnlichkeitssuche. Schema-Erstellung/Migration (`db.init_db()`, `db/db_init.py`) läuft direkt über psycopg2; alle CRUD-/Abfragefunktionen darüber (`models/`) über [SQLAlchemy](https://pypi.org/project/SQLAlchemy/) mit dem [pgvector](https://pypi.org/project/pgvector/)-Python-Paket für den `vector`-Spaltentyp (`Vector(1536)`, `cosine_distance()`)
-- **KI**: [Groq](https://pypi.org/project/groq/)- und [OpenAI](https://pypi.org/project/openai/)-Python-SDKs
-- **PDF-Erzeugung**: [WeasyPrint](https://pypi.org/project/weasyprint/) rendert vom KI-Modell geliefertes HTML zu PDF. Benötigt native Pango/Cairo-Bibliotheken (siehe unten) — im `Dockerfile` und in der CI bereits per `apt` eingerichtet
-- **Datei-Parsing**: [pypdf](https://pypi.org/project/pypdf/), [python-docx](https://pypi.org/project/python-docx/), [odfpy](https://pypi.org/project/odfpy/) — Textextraktion aus hochgeladenen PDF/.docx/.odt-Dateien, reines Python ohne native Abhängigkeiten
-- **Frontend (klassisch)**: Jinja2-Templates, Tailwind-Klassen, Font Awesome (lokal in `static/fontawesome`)
-- **Frontend (React-PoC)**: [React](https://react.dev/) + [Vite](https://vitejs.dev/) + [react-router-dom](https://reactrouter.com/) (`frontend/`, siehe [Frontend-Migration](#frontend-migration-react-poc) unten) — teilt sich `static/style.css` mit den klassischen Templates für optische Parität
-- **Rich-Text-Editor**: [Quill](https://quilljs.com/) für die HTML-Beschreibung von Stellenangeboten, in beiden Frontends (React über npm, klassisch per CDN in `templates/index.html`); [DOMPurify](https://github.com/cure53/DOMPurify) sanitisiert das gespeicherte HTML vor jeder Anzeige/Editor-Befüllung
+- **Datenbank**: PostgreSQL 16 (`pgvector/pgvector:pg16`) + [pgvector](https://github.com/pgvector/pgvector). Schema/Migration über psycopg2 (`db/db_init.py`); CRUD über [SQLAlchemy](https://pypi.org/project/SQLAlchemy/) (`models/`)
+- **KI**: [Groq](https://pypi.org/project/groq/)- und [OpenAI](https://pypi.org/project/openai/)-SDKs
+- **PDF-Erzeugung**: [WeasyPrint](https://pypi.org/project/weasyprint/) (HTML → PDF), braucht native Pango/Cairo-Bibliotheken (im Dockerfile eingerichtet)
+- **Datei-Parsing**: [pypdf](https://pypi.org/project/pypdf/), [python-docx](https://pypi.org/project/python-docx/), [odfpy](https://pypi.org/project/odfpy/)
+- **Frontend (klassisch)**: Jinja2-Templates, Tailwind-Klassen, Font Awesome
+- **Frontend (React)**: [React](https://react.dev/) + [Vite](https://vitejs.dev/) + [react-router-dom](https://reactrouter.com/) (`frontend/`) — teilt sich `static/style.css` mit den klassischen Templates
+- **Rich-Text-Editor**: [Quill](https://quilljs.com/) (Stellenangebot-Beschreibung, beide Frontends) + [DOMPurify](https://github.com/cure53/DOMPurify) zur Sanitisierung
 - **Deployment**: Docker + docker-compose (App + PostgreSQL + React-Dev-Server)
-- **CI**: GitHub Actions (Syntaxcheck, Smoke-Test, Docker-Build) — siehe `.github/workflows/main.yml`
+- **CI**: GitHub Actions (Syntaxcheck, Smoke-Test, Docker-Build) — `.github/workflows/main.yml`
 
 ## Projektstruktur
 
 ```
-app.py                     Flask-Routen (klassische Jinja-Seiten), registriert die api/-Blueprints
-api/                       JSON-API für das React-PoC-Frontend (frontend/), läuft parallel zu den klassischen Routen
-  auth.py                     /api/auth/me + /api/auth/login + /api/auth/register + /api/auth/logout - JSON-Pendant zu den klassischen Login-/Registrierungs-/Abmelden-Routen, teilt sich die Session-Erzeugung mit app.py über services/auth_service.py (log_in_user())
-  jobs.py                      /api/jobs-Endpunkte (Liste/Anlegen/Bearbeiten/Löschen), ersetzt für React die Jobs-Logik aus app.py
-  customers.py                  /api/customers-Endpunkte (Liste/Anlegen/Bearbeiten/Löschen), ersetzt für React die Customers-Logik aus app.py
-  users.py                      /api/users-Endpunkte (Liste/Anlegen/Bearbeiten, kein Löschen), ersetzt für React die Users-Logik aus app.py; entfernt password_hash aus jeder Antwort
-  tools.py                      /api/tools/resume + /api/tools/joboffer (KI-Generierung), ruft dieselben services/*_service.py-Funktionen wie /tools/resume + /tools/joboffer in app.py auf
-  resumes.py                     /api/resumes-Endpunkte (Liste/Anzeige/Generieren/Hochladen/Löschen), ersetzt für React die my_resumes()-Logik aus app.py
-  assistant.py                  /api/assistant(/ask)-Endpunkte (Modellliste, Frage stellen) für die React-Startseite
-db/                        DB-Verbindung & Schema (siehe unten), von außen weiterhin per `import db` als Einheit genutzt
-  __init__.py                Re-Export der öffentlichen Funktionen/Konstanten aus db_init.py und models/
-  db_init.py                  DB-Verbindung (`get_connection()`, psycopg2), Schema-Erstellung/Migration (`init_db()`)
-models/                    SQLAlchemy-ORM-Modelle + CRUD-/Abfragefunktionen je Tabelle
-  __init__.py                Re-Export der Modelle/Funktionen aller Untermodule
-  base.py                     Engine/Session (`get_session()`), `Base`, `MIN_MATCH_SIMILARITY`, `to_dict()`-Hilfsfunktion
-  user.py                      Modell `User`, Rollen (`ROLES`, `DEFAULT_ROLE`), zugehörige CRUD-Funktionen
-  customer.py                  Modell `Customer`, zugehörige CRUD-Funktionen
-  job.py                       Modell `Job`, zugehörige CRUD-Funktionen inkl. `find_matching_jobs()`
-  resume.py                    Modell `Resume`, zugehörige CRUD-Funktionen inkl. `find_matching_resumes()`
-services/                  KI-/Datei-Erzeugungslogik der Tools-Seiten, aus app.py-Routen ausgelagert
-  text_utils.py                Aufbereitung von KI-Antworten (`<think>`-Blöcke, Markdown-Codefences entfernen)
-  assistant_service.py          KI-Assistent: Modell-Konfiguration + `ask_assistant()`, von app.py (`/`) und api/assistant.py (`/api/assistant/ask`) genutzt
-  auth_service.py               `log_in_user()` (Session befüllen), von app.py und api/auth.py genutzt
-  pdf_service.py                HTML-zu-PDF-Rendering (WeasyPrint)
-  resume_service.py             Lebenslauf generieren/aus Upload anlegen (`RESUME_DIR`, inkl. Embedding)
-  joboffer_service.py           Stellenangebot generieren/aus Upload-Text extrahieren (`JOBOFFER_DIR`, inkl. Embedding)
-  ai_clients.py                 Zentrale OpenAI-Client-Instanz (von app.py und api/jobs.py genutzt)
-  permissions.py                Rollen-/Berechtigungslogik für Stellenangebote + Stellenanbieter (von app.py und api/jobs.py bzw. api/customers.py genutzt)
-frontend/                  React-PoC (Vite) - inzwischen alle Seiten umgezogen (Startseite/KI-Assistent, Stellenangebote, Stellenanbieter, Nutzer, Admin-Tools, eigener Lebenslauf, Login/Registrieren) - siehe "Frontend-Migration" unten
-  src/pages/                    HomePage.jsx, JobsPage.jsx, JobEditPage.jsx, CustomersPage.jsx, CustomerEditPage.jsx, UsersPage.jsx, UserEditPage.jsx, ToolResumePage.jsx, ToolJobofferPage.jsx, MyResumesPage.jsx, LoginPage.jsx, RegisterPage.jsx - je eine Komponente pro migrierter Seite
-  src/components/               JobForm.jsx, JobTable.jsx, JobUploadDropzone.jsx, CustomerForm.jsx, CustomerTable.jsx, UserForm.jsx, UserTable.jsx, Pager.jsx, RichTextEditor.jsx (Quill-Wrapper)
-embeddings.py              Embedding-Erzeugung (einzeln/batch), HTML-Stripping, Cosinus-Ähnlichkeit/Top-Matches
-document_extraction.py     Textextraktion aus hochgeladenen PDF/.docx/.odt-Dateien (Lebenslauf- und Stellenangebot-Upload)
-backfill_embeddings.py     Einmaliges Nachrechnen fehlender Embeddings für Bestandsdaten
-migrate_mysql_to_postgres.py Einmaliges Migrationsskript für den Umstieg von MySQL auf PostgreSQL (Bestandsdaten inkl. IDs übernehmen)
-templates/
-  index.html                Basis-Layout, bindet navigation.html + content_template ein
-  navigation.html            Navigationsleiste inkl. Konto-Dropdown (Anmelden/Registrieren/Abmelden/eigener Lebenslauf), "Nutzer"-Link und Tools-Dropdown (beide nur Admin)
-  home.html                  KI-Assistent-Formular (Startseite), auch als React-Variante verfügbar (frontend/src/pages/HomePage.jsx)
-  login.html, register.html  Anmeldung/Registrierung (Registrierung fragt PLZ/Stadt verpflichtend ab)
-  user.html                  Nutzerverwaltung, inkl. Stellenanbieter-Zuordnung für Rolle 'customer'
-  jobs.html                  Stellenangebote, inkl. Upload-Dropzone, Pager und Quill-Rich-Text-Editor für die Beschreibung
-  customer.html              Stellenanbieter, inkl. Pager
-  resume.html                 Tools: Lebenslauf generieren (nur Admin)
-  joboffer.html                Tools: Stellenangebot generieren (nur Admin)
-  my_resumes.html              Eigener Lebenslauf ansehen/generieren/hochladen/löschen (jeder eingeloggte Nutzer)
-static/
-  style.css                  eigenes Stylesheet, wird unverändert auch vom React-Frontend eingebunden (optische Parität)
-  fontawesome/                lokal eingebundene Icon-Bibliothek
-data/                        generierte und hochgeladene Lebenslauf-/Stellenangebot-Dateien, von Git ausgeschlossen; im Docker-Setup per Bind-Mount (./data:/app/data) persistent auf dem Host
-  resumes/
-  joboffers/
-Dockerfile                  Python-3.14-slim-Image für die App
-docker-compose.yml          App + PostgreSQL-Service für lokalen/Produktions-Betrieb, mountet ./data in den App-Container
-.github/workflows/main.yml  CI: Syntaxcheck, Smoke-Test, Docker-Build
-.env.example                Vorlage für benötigte Umgebungsvariablen
+app.py                     Flask-Routen (klassische Jinja-Seiten), React-Default-Redirect, registriert die api/-Blueprints
+api/                       JSON-API fürs React-Frontend, läuft parallel zu den klassischen Routen
+  auth.py                     /api/auth/me + login/register/logout
+  jobs.py                     /api/jobs-Endpunkte
+  customers.py                /api/customers-Endpunkte
+  users.py                    /api/users-Endpunkte (kein Löschen; entfernt password_hash aus jeder Antwort)
+  resumes.py                  /api/resumes-Endpunkte (Liste/Anzeige/Generieren/Hochladen/Löschen)
+  tools.py                    /api/tools/resume + /api/tools/joboffer (KI-Generierung)
+  assistant.py                /api/assistant(/ask) für die Startseite
+db/                        DB-Verbindung & Schema, von außen per `import db` genutzt
+models/                    SQLAlchemy-ORM-Modelle + CRUD je Tabelle (user/customer/job/resume, base.py mit Engine/Session)
+services/                  Von app.py und api/ gemeinsam genutzte Logik
+  assistant_service.py        KI-Assistent-Logik (`ask_assistant()`)
+  auth_service.py              Login-Session befüllen (`log_in_user()`)
+  permissions.py                Rollen-/Berechtigungslogik
+  resume_service.py / joboffer_service.py   KI-Generierung + Uploads (inkl. Embedding)
+  pdf_service.py                HTML-zu-PDF (WeasyPrint)
+  ai_clients.py / text_utils.py Client-Instanzen, KI-Antworten aufbereiten
+frontend/                  React-SPA (Vite) - alle Seiten umgezogen, siehe "Frontend" unten
+  src/pages/                   je eine Komponente pro Seite (Home, Jobs, Customers, Users, Tools, Resumes, Login, Register)
+  src/components/              JobForm/-Table, CustomerForm/-Table, UserForm/-Table, JobUploadDropzone, Pager, RichTextEditor (Quill)
+embeddings.py              Embedding-Erzeugung, HTML-Stripping, Ähnlichkeits-Matching
+document_extraction.py     Textextraktion aus PDF/.docx/.odt-Uploads
+backfill_embeddings.py     Einmaliges Nachrechnen fehlender Embeddings
+migrate_mysql_to_postgres.py  Einmaliges Migrationsskript MySQL → PostgreSQL
+templates/                 Klassische Jinja-Seiten (index.html als Layout, navigation.html, home/jobs/customer/user/login/register/my_resumes/resume/joboffer.html)
+static/                    style.css (gemeinsam mit React genutzt), lokales Font Awesome
+data/                      Generierte/hochgeladene Dateien, von Git ausgeschlossen, per Bind-Mount persistent (./data)
+Dockerfile                 Python-3.14-slim-Image für die App
+docker-compose.yml         App + PostgreSQL + React-Dev-Server
+.github/workflows/main.yml CI: Syntaxcheck, Smoke-Test, Docker-Build
+.env.example                Vorlage für Umgebungsvariablen
 ```
 
 ## Setup
@@ -150,19 +107,11 @@ python app.py
 
 Die App läuft danach auf `http://localhost:5003`.
 
-⚠️ Ohne separat laufenden React-Dev-Server (`frontend/`, Standard-Port 5173, siehe
-[Frontend-Migration](#frontend-migration-react-poc) unten) läuft dabei ins Leere: React
-ist seit dem in dieser Anleitung nicht enthaltenen `redirect_to_react_by_default()`-Hook
-(`app.py`) die Standard-Oberfläche, `http://localhost:5003/jobs` etc. leiten also auf das
-(hier nicht gestartete) `:5173` um. Entweder zusätzlich `npm install && npm run dev` in
-`frontend/` ausführen, oder dauerhaft bei der klassischen Ansicht bleiben:
-`http://localhost:5003/?classic=1` einmal aufrufen.
+⚠️ React ist die Standard-Oberfläche (siehe [Frontend](#frontend-react--klassisch)) — ohne separat laufenden React-Dev-Server (`frontend/`, Port 5173) leiten `http://localhost:5003/...`-Aufrufe ins Leere. Entweder zusätzlich `npm install && npm run dev` in `frontend/` starten, oder einmalig `http://localhost:5003/?classic=1` aufrufen, um dauerhaft bei der klassischen Ansicht zu bleiben.
 
 #### WeasyPrint unter Windows
 
-`pip install weasyprint` reicht unter Windows **nicht** aus: Der Import schlägt mit `OSError: cannot load library ... libgobject-2.0-0.dll` fehl, weil WeasyPrint zur Laufzeit native GTK-Bibliotheken (Pango/Cairo/GObject) über `cffi` lädt, die kein reines Python-Package sind. Betroffen sind ausschließlich die beiden Tools-Seiten (`/tools/resume`, `/tools/joboffer`) — der Rest der App läuft davon unberührt, **außer** der komplette App-Import schlägt fehl, weil `from weasyprint import HTML` ganz oben in `app.py` steht.
-
-Lokale Entwicklung unter Windows ohne Docker wird für dieses Feature aktuell nicht unterstützt/dokumentiert — für die Tools-Seiten (und damit zum vollständigen Start der App) bitte über Docker Compose laufen lassen; dort ist alles Nötige bereits eingerichtet.
+`pip install weasyprint` reicht unter Windows **nicht**: Der Import schlägt fehl, weil WeasyPrint native GTK-Bibliotheken (Pango/Cairo/GObject) lädt, die kein reines Python-Package sind. Betroffen sind nur die Tools-Seiten — **außer** der komplette App-Import schlägt fehl (`from weasyprint import HTML` steht ganz oben in `app.py`). Lokale Entwicklung unter Windows ohne Docker wird dafür nicht unterstützt — bitte über Docker Compose laufen lassen, dort ist alles eingerichtet.
 
 ### Mit Docker Compose
 
@@ -171,132 +120,41 @@ cp .env.example .env   # Werte eintragen
 docker compose up --build
 ```
 
-Startet App, PostgreSQL und den React-Dev-Server (`frontend`-Service, Port 5173) zusammen; die DB-Daten liegen in einem benannten Volume (`aiproject_postgres_data`), generierte PDFs unter `./data` (Bind-Mount, direkt im Projektordner sichtbar). `http://localhost:5003` leitet danach automatisch auf `http://localhost:5173` weiter (siehe [React als Standard-Oberfläche](#react-als-standard-oberfläche) weiter unten) — beide Adressen funktionieren.
+Startet App, PostgreSQL und den React-Dev-Server zusammen; DB-Daten in einem benannten Volume (`aiproject_postgres_data`), generierte PDFs unter `./data`. `http://localhost:5003` leitet automatisch auf `http://localhost:5173` weiter — beide Adressen funktionieren.
 
-`docker-compose.yml` lädt `.env` per `env_file` **einmalig beim Erstellen des App-Containers** in dessen Umgebung — nicht laufend. Änderungen an `.env` (egal welche Variable) werden erst wirksam, wenn der Container neu erstellt wird:
-
-```bash
-docker compose up -d app
-```
-
-Reine Python-/Template-Änderungen übernimmt dagegen der Flask-Debug-Reloader automatisch (kein Recreate nötig) — der läuft aber innerhalb desselben Containers weiter mit der zuvor geladenen Umgebung, holt sich also bei einem Neustart durch den Reloader keine aktualisierte `.env`.
+`docker-compose.yml` lädt `.env` nur **einmalig beim Erstellen** des App-Containers. Änderungen werden erst nach `docker compose up -d app` (Neuerstellung) wirksam. Reine Python-/Template-Änderungen übernimmt dagegen der Flask-Debug-Reloader automatisch.
 
 ### Umgebungsvariablen (`.env`)
 
 | Variable | Bedeutung |
 |---|---|
-| `GROQ_API_KEY` | API-Key für Groq (Chat-Modelle). **Optional**: leer/fehlend lassen blendet die darüber erreichbaren Modelle in der KI-Assistent-Auswahl automatisch aus, statt die App abstürzen zu lassen |
+| `GROQ_API_KEY` | API-Key für Groq. **Optional**: leer/fehlend blendet die darüber erreichbaren Modelle automatisch aus |
 | `OPENAI_API_KEY` | API-Key für OpenAI (Chat-Modelle + Embeddings). Pflicht |
 | `DB_HOST` / `DB_PORT` / `DB_NAME` / `DB_USER` / `DB_PASSWORD` | Verbindungsdaten zur PostgreSQL-Datenbank |
 | `SECRET_KEY` | Flask-Session-Secret |
 
 `.env` ist per `.gitignore` von Git ausgeschlossen — nur `.env.example` wird versioniert.
 
-## Frontend-Migration (React-PoC)
+## Frontend (React + klassisch)
 
-Das Projekt wird schrittweise von serverseitig gerenderten Jinja-Templates auf ein
-React-Frontend umgestellt, das Flask nur noch als JSON-API anspricht — Seite für
-Seite, nicht als Big-Bang-Rewrite. Bislang umgezogen:
+Alle Seiten sind sowohl als klassisches Jinja-Template als auch als React-Komponente (`frontend/`, eigenständiges Vite-Projekt, Port 5173) verfügbar; beide sprechen dieselbe Flask-Session (CORS via `FRONTEND_ORIGIN`) und dieselbe Business-Logik in `services/`. React ruft ausschließlich die JSON-API unter `api/` an — es wird an keiner Stelle zur klassischen Darstellung gesprungen; ein "Klassisch"-Link im React-Menü bleibt als bewusster Ausstieg bestehen.
 
-- **Startseite / KI-Assistent** (`/`, `frontend/src/pages/HomePage.jsx`): Frage-Formular
-  + Modellauswahl + Antwortanzeige, funktional identisch zur klassischen `home.html`.
-- **Stellenangebote** (`/jobs`), vollständig inkl. Anlegen/Bearbeiten/Löschen,
-  Rollen-Berechtigungen, Datei-Upload-Dropzone mit KI-Extraktion, Quill-Rich-Text-
-  Editor für die Beschreibung und der Matching-Kandidaten-Anzeige.
-- **Stellenanbieter** (`/customers`), vollständig inkl. Anlegen/Bearbeiten/Löschen,
-  Rollen-Berechtigungen (inkl. automatischer Weiterleitung von `customer`-Nutzern
-  auf ihren eigenen Datensatz) und der Liste der zugehörigen Stellenangebote mit
-  Link auf die jeweilige React-Job-Bearbeiten-Seite.
-- **Nutzer** (`/users`, nur `admin` — die React-Navigation zeigt den Menüpunkt
-  entsprechend nur eingeloggten Admins), vollständig inkl. Anlegen/Bearbeiten,
-  Rollenvergabe mit bedingt eingeblendeter Stellenanbieter-Zuordnung (Rolle
-  `customer`) und Anzeige der Lebensläufe des Nutzers. Der Passwort-Hash verlässt
-  die API nie (`api/users.py` entfernt ihn aus jeder Antwort); Löschen gibt es wie
-  in der klassischen Ansicht nicht.
-- **Admin-Tools** (`/tools/resume`, `/tools/joboffer`, nur `admin`): Lebenslauf
-  bzw. Stellenangebot per KI generieren, inkl. Lade-Spinner während der
-  WeasyPrint-PDF-Erzeugung und Link zum fertigen PDF (öffnet die weiterhin
-  klassische `/tools/resume/<datei>`-Auslieferungsroute in einem neuen Tab -
-  funktioniert dort per direkter Browser-Navigation auch ohne CORS auf dieser
-  Route). `api/tools.py` ruft dieselben `services/resume_service.py`- und
-  `services/joboffer_service.py`-Funktionen wie die klassischen Routen auf.
-- **Eigener Lebenslauf** (`/resumes`, für jeden eingeloggten Nutzer): Versions-
-  Selectbox, eingebettetes PDF (bzw. Download-Link für andere Formate),
-  Löschen, Generieren per KI und Hochladen (Dropzone mit Drag & Drop, inkl.
-  Übernahme der gedroppten Datei in den nativen `<input type="file">` fürs
-  Formular - sonst würde die HTML5-`required`-Prüfung beim Absenden
-  fehlschlagen) sowie die Liste passender Stellenangebote. `api/resumes.py`
-  ruft dieselben `resume_service.py`-Funktionen wie die klassische
-  `my_resumes()`-Route auf und entfernt embedding/content aus jeder Antwort.
-  Die PDF-Auslieferung bleibt die klassische, besitzerschaftsgeprüfte Route
-  `/resumes/<id>/file`.
-- **Login/Registrieren** (`/login`, `/register`): eigene React-Formulare,
-  rufen `POST /api/auth/login` bzw. `POST /api/auth/register` auf und
-  aktualisieren danach den Login-Status (`App.jsx` gibt `refreshUser()` per
-  Outlet-Context an die Seiten weiter). `api/auth.py` teilt sich die
-  Session-Erzeugung (`services/auth_service.py`, `log_in_user()`) mit den
-  weiterhin bestehenden klassischen `/login`- und `/register`-Routen in
-  `app.py`. **Abmelden** läuft im React-Konto-Menü über `POST
-  /api/auth/logout` als Button (kein Seitenwechsel mehr nötig); die
-  klassische GET-Route `/logout` bleibt für die klassische Seite bestehen.
-
-Alle neun Seiten laufen komplett innerhalb der React-SPA (client-seitiges
-Routing via `react-router-dom`) — es wird an keiner Stelle automatisch zur
-klassischen Flask-Darstellung gesprungen; ein Link "Klassisch" bleibt als
-bewusster, expliziter Ausstieg bestehen (siehe "React als Standard-Oberfläche"
-unten für den Umkehr-Mechanismus).
-
-- **`api/`** stellt die dafür nötigen JSON-Endpunkte bereit (`/api/jobs/...`,
-  `/api/customers/...`, `/api/users/...`, `/api/tools/...`, `/api/resumes/...`,
-  `/api/auth/...`, `/api/assistant(/ask)`), parallel zu den bestehenden
-  Template-Routen in `app.py` — die klassischen Seiten funktionieren
-  unverändert weiter, beide Varianten teilen sich die zugrundeliegende Logik
-  in `services/` (z.B. `customer_management_permission()` für die
-  Bearbeiten-Rechte der Stellenanbieter, `resume_service.py`/
-  `joboffer_service.py` für Tools und eigenen Lebenslauf, oder
-  `auth_service.py` für die Login-Session).
-- **`frontend/`** ist ein eigenständiges Vite/React-Projekt, läuft als eigener
-  `frontend`-Service in `docker-compose.yml` auf Port 5173 (`docker compose up -d
-  frontend`, danach `http://localhost:5173`). Zusätzliche npm-Abhängigkeiten:
-  `quill` (Rich-Text-Editor) und `dompurify` (HTML-Sanitisierung vor jeder Anzeige/
-  Editor-Befüllung von gespeichertem Beschreibungs-HTML).
-- **Layout**: `App.jsx` bildet body-Navigation und Haupt-Container exakt wie im
-  klassischen `body`-Flex-Layout nach (`#root { display: contents; }` in
-  `static/style.css`, kein zusätzliches Wrapper-`<div>`) — Nav- und Content-Breite
-  bleiben dadurch wie bei Flask konstant, unabhängig vom Tabelleninhalt.
-- Da inzwischen alle Hauptseiten umgezogen sind, verlinken auch bereichsübergreifende
-  Stellen (z.B. die Kandidaten-Matching-Liste auf der Job-Bearbeiten-Seite → Nutzerbearbeitung,
-  oder der Kunde-Link auf der Job-Bearbeiten-Seite → Stellenanbieter-Bearbeiten) konsequent
-  intern über `react-router-dom`, nicht mehr auf die klassische Flask-Seite.
-
-Damit sind alle Seiten der Anwendung nach React umgezogen; die klassischen
-Jinja-Templates bleiben als vollwertige, parallel funktionierende Alternative
-bestehen (siehe "React als Standard-Oberfläche" unten für den Umschalt-Mechanismus).
+Erwähnenswerte Details:
+- **`/api/users`** entfernt `password_hash` aus jeder Antwort.
+- **`/api/resumes`** entfernt `embedding`/`content`; die PDF-Auslieferung bleibt die klassische, besitzerschaftsgeprüfte Route `/resumes/<id>/file`. Beim Datei-Upload per Drag & Drop wird die Datei zusätzlich in den nativen `<input type="file">` übernommen, sonst schlägt die HTML5-`required`-Prüfung beim Absenden fehl.
+- **Login/Registrieren/Abmelden**: eigene React-Formulare rufen `/api/auth/login` bzw. `/register` auf; `App.jsx` reicht `refreshUser()` per Outlet-Context an die Seiten weiter. Abmelden läuft im Konto-Menü als Button (`POST /api/auth/logout`), ohne Seitenwechsel.
+- **Layout**: `App.jsx` bildet das klassische `body`-Flex-Layout 1:1 nach (`#root { display: contents; }` in `static/style.css`), damit Nav- und Content-Breite wie bei Flask konstant bleiben.
+- npm-Abhängigkeiten über die Standardkomponenten hinaus: `quill`, `dompurify`.
 
 ### React als Standard-Oberfläche
 
-Ein `@app.before_request`-Hook in `app.py` (`redirect_to_react_by_default()`)
-leitet GET-Aufrufe einer klassischen Seite mit React-Entsprechung automatisch
-auf `FRONTEND_ORIGIN` um (`_REACT_PAGE_ROUTES` in `app.py` listet, welche
-Endpunkte betroffen sind, inzwischen inkl. `login`/`register` — bewusst nur
-Seiten mit echtem React-Pendant; Abmelden [reiner Redirect ohne eigene Seite],
-Datei-Auslieferungsrouten, Lösch-Endpunkte, `/api/*` und `/static/*` bleiben
-immer außen vor). POST/PUT/DELETE werden nie umgeleitet, sonst würden
-Formularabsendungen der klassischen Seiten ins Leere laufen.
+Ein `@app.before_request`-Hook in `app.py` (`redirect_to_react_by_default()`) leitet GET-Aufrufe einer klassischen Seite automatisch auf `FRONTEND_ORIGIN` um (`_REACT_PAGE_ROUTES` listet die betroffenen Endpunkte; Datei-Auslieferungsrouten, Lösch-Endpunkte, `/api/*` und `/static/*` bleiben immer außen vor). POST/PUT/DELETE werden nie umgeleitet, sonst würden Formularabsendungen der klassischen Seiten ins Leere laufen.
 
-Der "Klassisch"-Link im React-Menü hängt `?classic=1` an und merkt sich das
-in der Flask-Session (`session["ui_pref"]`) — solange diese Session-Cookie
-lebt (endet mit dem Neustart des Browsers, oder explizit durch Abmelden, das
-`session.clear()` aufruft), bleibt auch sämtliche Folgenavigation inkl.
-Formular-POST-Redirects auf der klassischen Seite. `?classic=0` auf einer
-beliebigen klassischen Seite macht diese Wahl wieder rückgängig und leitet
-sofort auf React um.
+Der "Klassisch"-Link im React-Menü hängt `?classic=1` an und merkt sich das in der Flask-Session (`session["ui_pref"]`) — bleibt bis Browser-Neustart oder Abmelden (`session.clear()`) bestehen und hält sämtliche Folgenavigation auf der klassischen Seite. `?classic=0` macht die Wahl rückgängig und leitet sofort wieder auf React um.
 
-### Von MySQL migrieren
+## Von MySQL migrieren
 
-Bis einschließlich Commit vor dieser Umstellung lief das Projekt auf MySQL
-8.0. Wer noch Bestandsdaten in einer alten MySQL-DB hat, migriert sie per
-`migrate_mysql_to_postgres.py` (Details/Voraussetzungen im Skript-Docstring):
+Bis einschließlich Commit vor der Postgres-Umstellung lief das Projekt auf MySQL 8.0. Bestandsdaten migriert `migrate_mysql_to_postgres.py` (Details im Skript-Docstring):
 
 ```bash
 docker compose exec app python migrate_mysql_to_postgres.py
@@ -304,6 +162,6 @@ docker compose exec app python migrate_mysql_to_postgres.py
 
 ## KI-Assistent erweitern
 
-Neue Modelle in `services/assistant_service.py` ergänzen: Eintrag in `AVAILABLE_MODELS` (Anzeigename), `AVAILABE_MODEL_NAMES` (Kurzname für Fehlermeldungen) und `MODEL_CLIENTS` (welcher Client — `groq_client` für Groq, `openai_client` für OpenAI — zuständig ist). Ein neues Groq-Modell wird automatisch mit ausgeblendet, solange kein `GROQ_API_KEY` gesetzt ist (`groq_client` ist dann `None`) — dafür ist an dieser Stelle nichts weiter zu tun. Die Änderung wirkt automatisch sowohl auf die klassische Startseite als auch auf `/api/assistant` (React), da beide dieselbe Quelle nutzen.
+Neue Modelle in `services/assistant_service.py` ergänzen: Eintrag in `AVAILABLE_MODELS`, `AVAILABE_MODEL_NAMES` und `MODEL_CLIENTS`. Ohne `GROQ_API_KEY` werden neue Groq-Modelle automatisch ausgeblendet. Die Änderung wirkt automatisch auf klassische Startseite und React (`/api/assistant`), da beide dieselbe Quelle nutzen.
 
-Neue Seiten/Routen tauchen automatisch im System-Prompt des Assistenten auf (`build_site_map()` liest live aus `app.url_map`). Für eine sprechende Beschreibung im Prompt zusätzlich einen Eintrag in `PAGE_DESCRIPTIONS` ergänzen — fehlt er, erscheint die Route trotzdem mit Platzhalter, damit der Assistent ihre Existenz nicht ignoriert oder erfindet.
+Neue Seiten/Routen tauchen automatisch im System-Prompt auf (`build_site_map()`); für eine sprechende Beschreibung zusätzlich einen Eintrag in `PAGE_DESCRIPTIONS` ergänzen.
