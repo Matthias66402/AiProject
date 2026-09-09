@@ -2,8 +2,9 @@ import json
 from datetime import datetime
 
 from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, jsonify
-from groq import Groq, APIStatusError as GroqAPIStatusError
-from openai import OpenAI, APIStatusError as OpenAIAPIStatusError
+from flask_cors import CORS
+from groq import APIStatusError as GroqAPIStatusError
+from openai import APIStatusError as OpenAIAPIStatusError
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
@@ -13,7 +14,12 @@ from db import ROLES, DEFAULT_ROLE
 from embeddings import embed_text, strip_html_to_text
 from document_extraction import extract_document_text, ALLOWED_DOCUMENT_UPLOAD_EXTENSIONS
 from services import resume_service, joboffer_service
-from services.text_utils import strip_think_block
+from services.ai_clients import openai_client
+from services.assistant_service import AVAILABLE_MODELS, DEFAULT_MODEL, ask_assistant
+from services.permissions import job_management_permission, own_customer_for_session
+from api.auth import auth_api
+from api.jobs import jobs_api
+from api.assistant import assistant_api
 
 load_dotenv()
 
@@ -21,13 +27,23 @@ app = Flask(__name__)
 app.secret_key = os.environ["SECRET_KEY"]
 # Begrenzt die Größe hochgeladener Lebenslauf-Dateien (Schutz vor überdimensionierten Uploads).
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
-# Groq ist optional: ohne (nicht-leeren) GROQ_API_KEY bleibt client None und
-# darüber erreichbare Modelle werden weiter unten aus AVAILABLE_MODELS/
-# AVAILABE_MODEL_NAMES/MODEL_CLIENTS herausgefiltert, statt einen Client mit
-# leerem Key zu erzeugen, der erst beim ersten Aufruf fehlschlagen würde.
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "").strip()
-client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
-openai_client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+# Erlaubt dem separaten React-Frontend (anderer Port, siehe frontend/), die /api/*-Routen
+# mit Session-Cookie anzusprechen. FRONTEND_ORIGIN ist konfigurierbar, falls das Frontend
+# mal nicht mehr auf dem Vite-Standardport 5173 läuft. /jobs/extract-upload ist die einzige
+# von React genutzte Nicht-/api/*-Route (noch nicht umgezogen, liefert aber schon JSON).
+# /static/* braucht ebenfalls CORS: Browser laden @font-face-Schriften (hier Font Awesome)
+# nur dann von einem fremden Origin, wenn Access-Control-Allow-Origin gesetzt ist - sonst
+# bleiben die fa-Icons unsichtbar, obwohl die restliche style.css normal greift (die
+# benötigt kein CORS). Rein statische, öffentliche Assets, daher "*" ohne Credentials.
+_frontend_origin = os.environ.get("FRONTEND_ORIGIN", "http://localhost:5173")
+CORS(app, resources={
+    r"/api/*": {"origins": _frontend_origin, "supports_credentials": True},
+    r"/jobs/extract-upload": {"origins": _frontend_origin, "supports_credentials": True},
+    r"/static/*": {"origins": "*"},
+})
+app.register_blueprint(auth_api)
+app.register_blueprint(jobs_api)
+app.register_blueprint(assistant_api)
 db.init_db()
 
 
@@ -44,53 +60,18 @@ def inject_current_user():
     }}
 
 
+@app.context_processor
+def inject_frontend_url():
+    # Für Links aus den klassischen Templates auf bereits nach React umgezogene
+    # Seiten (aktuell nur /jobs) - siehe navigation.html.
+    return {"FRONTEND_URL": _frontend_origin}
+
+
 def _log_in_user(user):
     session["user_id"] = user["id"]
     session["user_short_name"] = user["short_name"]
     session["user_role"] = user["role"]
     session["user_customer_id"] = user.get("customer_id")
-
-# Verfügbare Zauberer (KI-Modelle). Key = Groq-Modell-ID, Value = Anzeigename.
-# Weitere Modelle können hier einfach ergänzt werden.
-AVAILABLE_MODELS = {
-    "openai/gpt-oss-20b": "Groq - gpt-oss-20b (Standard, schnell)",
-    "openai/gpt-oss-120b": "Groq - gpt-oss-120b (groß & mächtig)",
-    "qwen/qwen3.6-27b": "Qwen - qwen3.6-27b (kompakt & clever)",
-    "groq/compound-mini": "Groq - compound-mini (agentisch, mit Websuche)",
-    "gpt-5-mini": "OpenAI - gpt-5-mini",
-    "gpt-4o-mini": "OpenAI - gpt-4o-mini",
-    "gpt-4.1-mini": "OpenAI - gpt-4.1-mini",
-}
-DEFAULT_MODEL = "gpt-4.1-mini"
-
-AVAILABE_MODEL_NAMES = {
-    "openai/gpt-oss-20b": "Groq - Standard",
-    "openai/gpt-oss-120b": "Groq - Mächtig",
-    "qwen/qwen3.6-27b": "Qwen - Kompakt",
-    "groq/compound-mini": "Groq - agentisch",
-    "gpt-5-mini": "OpenAI - gpt-5-mini",
-    "gpt-4o-mini": "OpenAI - gpt-4o-mini",
-    "gpt-4.1-mini": "OpenAI - gpt-4.1-mini",
-}
-
-# Welcher Client (Groq oder OpenAI) für welches Modell zuständig ist.
-MODEL_CLIENTS = {
-    "openai/gpt-oss-20b": client,
-    "openai/gpt-oss-120b": client,
-    "qwen/qwen3.6-27b": client,
-    "groq/compound-mini": client,
-    "gpt-5-mini": openai_client,
-    "gpt-4o-mini": openai_client,
-    "gpt-4.1-mini": openai_client,
-}
-
-# Ohne Groq-Client (siehe GROQ_API_KEY oben) aus allen drei Dicts entfernen,
-# damit Groq-Modelle weder in der Auswahl auftauchen noch anfragbar sind.
-if client is None:
-    _unavailable_models = {model_id for model_id, model_client in MODEL_CLIENTS.items() if model_client is None}
-    AVAILABLE_MODELS = {k: v for k, v in AVAILABLE_MODELS.items() if k not in _unavailable_models}
-    AVAILABE_MODEL_NAMES = {k: v for k, v in AVAILABE_MODEL_NAMES.items() if k not in _unavailable_models}
-    MODEL_CLIENTS = {k: v for k, v in MODEL_CLIENTS.items() if k not in _unavailable_models}
 
 # Kurzbeschreibung je Route für den KI-Assistenten. Die Website ist noch im
 # Aufbau, deshalb wird die eigentliche Seitenliste (URL + erlaubte Methoden)
@@ -138,43 +119,7 @@ def favicon():
 def home():  # put application's code here
     if request.method == "POST":
         question = request.form.get("question")
-        selected_model = request.form.get("model")
-        if selected_model not in AVAILABLE_MODELS:
-            selected_model = DEFAULT_MODEL
-
-        wizard_name = AVAILABE_MODEL_NAMES.get(selected_model, "KI-Modelle")
-        active_client = MODEL_CLIENTS.get(selected_model, openai_client)
-
-        try:
-            response = active_client.chat.completions.create(
-                model=selected_model,
-                # messages=[
-                #     {"role": "user", "content": "Bitte gib eine originelle, nicht zu lange, falsche Antwort auf folgende Frage: " + question}
-                # ],
-                messages=[
-                    {"role": "system", "content": (
-                        "Du bist ein Assistent, der bei allgemeinen Fragen zur Website, Stellenbewerbung und Stellenveröffentlichung hilft.\n\n"
-                        "Das ist die vollständige, aktuelle Seitenstruktur der Website (Route, erlaubte HTTP-Methoden, Zweck):\n"
-                        f"{build_site_map()}\n\n"
-                        "Diese Liste ist deine einzige Wissensquelle über den Aufbau der Website. "
-                        "Wenn eine Seite, ein Menüpunkt oder eine Funktion hier nicht auftaucht, existiert sie nicht - "
-                        "erfinde in diesem Fall nichts, sondern sage klar, dass es das nicht gibt. "
-                        "Die Website ist noch im Aufbau, die Liste kann sich also häufig ändern - verlasse dich ausschließlich auf die aktuelle Liste oben, nicht auf frühere Annahmen. "
-                        "Antworte kurz und knapp in normaler Sprache (z.B. Menüpunkt-Name), ohne die technische Route (z.B. /jobs) zu nennen."
-                    )},
-                    {"role": "user",
-                     "content": question}
-                ]
-            )
-            answer = strip_think_block(response.choices[0].message.content)
-        except (GroqAPIStatusError, OpenAIAPIStatusError) as e:
-            if e.status_code == 429:
-                app.logger.warning("API 429 details: %s", e.body)
-                answer = f"🧙 {wizard_name} ist müde und hat für heute keine Zaubersprüche mehr übrig. Bitte versuche es morgen erneut."
-            else:
-                app.logger.warning("API error %s: %s", e.status_code, e.body)
-                answer = f"🧙 {wizard_name}s Kristallkugel ist gerade getrübt. Bitte versuche es später noch einmal."
-
+        answer, selected_model = ask_assistant(question, request.form.get("model"), build_site_map(), app.logger)
         return render_template('index.html', content_template='home.html', answer=answer, models=AVAILABLE_MODELS, selected_model=selected_model)
     else:
         return render_template('index.html', content_template='home.html', models=AVAILABLE_MODELS, selected_model=DEFAULT_MODEL)
@@ -284,27 +229,6 @@ def edit_user(user_id):
     return render_template('index.html', content_template='user.html', users=db.list_users(), editing_user=db.get_user(user_id), roles=ROLES, customers=db.list_customers(), resumes=db.list_resumes_for_user(user_id))
 
 
-def _job_management_permission():
-    """Gibt zurück, für welche customer_id der eingeloggte Nutzer Stellen anlegen/
-    bearbeiten/löschen darf: den String 'admin' für Admins (alle Kunden erlaubt),
-    eine customer_id (int) für Rolle 'customer' mit zugeordnetem Stellenanbieter,
-    sonst None (keine Berechtigung)."""
-    role = session.get("user_role")
-    if role == "admin":
-        return "admin"
-    if role == "customer" and session.get("user_customer_id"):
-        return session["user_customer_id"]
-    return None
-
-
-def _own_customer_for_session():
-    """Der dem eingeloggten Nutzer zugeordnete Stellenanbieter (Rolle 'customer'),
-    für die Anzeige im Stellen-Formular. None für alle anderen Rollen/ohne Zuordnung."""
-    if session.get("user_role") == "customer" and session.get("user_customer_id"):
-        return db.get_customer(session["user_customer_id"])
-    return None
-
-
 JOBS_PER_PAGE_DEFAULT = 10
 JOBS_PER_PAGE_OPTIONS = [10, 25, 50, 100]
 
@@ -327,7 +251,7 @@ def _paginate_jobs(customer_id=None):
 @app.route('/jobs', methods=["GET", "POST"])
 def jobs():
     if request.method == "POST":
-        permission = _job_management_permission()
+        permission = job_management_permission()
         if not permission:
             return redirect(url_for('jobs'))
 
@@ -347,14 +271,14 @@ def jobs():
         return redirect(url_for('jobs'))
 
     jobs_list, page, per_page, total_pages = _paginate_jobs()
-    return render_template('index.html', content_template='jobs.html', jobs=jobs_list, customers=db.list_customers(), editing_job=None, own_customer=_own_customer_for_session(), page=page, per_page=per_page, total_pages=total_pages, per_page_options=JOBS_PER_PAGE_OPTIONS)
+    return render_template('index.html', content_template='jobs.html', jobs=jobs_list, customers=db.list_customers(), editing_job=None, own_customer=own_customer_for_session(), page=page, per_page=per_page, total_pages=total_pages, per_page_options=JOBS_PER_PAGE_OPTIONS)
 
 
 @app.route('/jobs/<int:job_id>/edit', methods=["GET", "POST"])
 def edit_job(job_id):
     if request.method == "POST":
         job = db.get_job(job_id)
-        permission = _job_management_permission()
+        permission = job_management_permission()
         if not job or not (permission == "admin" or permission == job["customer_id"]):
             return redirect(url_for('jobs'))
 
@@ -378,13 +302,13 @@ def edit_job(job_id):
     jobs_list, page, per_page, total_pages = _paginate_jobs(job["customer_id"] if came_from_customer else None)
     matching_resumes = db.find_matching_resumes(job["embedding"], top_k=5) if job and job.get("embedding") else []
 
-    return render_template('index.html', content_template='jobs.html', jobs=jobs_list, customers=db.list_customers(), editing_job=job, came_from_customer=came_from_customer, matching_resumes=matching_resumes, own_customer=_own_customer_for_session(), page=page, per_page=per_page, total_pages=total_pages, per_page_options=JOBS_PER_PAGE_OPTIONS)
+    return render_template('index.html', content_template='jobs.html', jobs=jobs_list, customers=db.list_customers(), editing_job=job, came_from_customer=came_from_customer, matching_resumes=matching_resumes, own_customer=own_customer_for_session(), page=page, per_page=per_page, total_pages=total_pages, per_page_options=JOBS_PER_PAGE_OPTIONS)
 
 
 @app.route('/jobs/<int:job_id>/delete', methods=["POST"])
 def delete_job(job_id):
     job = db.get_job(job_id)
-    permission = _job_management_permission()
+    permission = job_management_permission()
     if not job or not (permission == "admin" or permission == job["customer_id"]):
         return redirect(url_for('jobs'))
     db.delete_job(job_id)
@@ -514,7 +438,7 @@ def extract_job_upload():
     """Liest ein hochgeladenes Stellenangebot-Dokument (PDF/.docx/.odt) aus und lässt
     per KI eine Zusammenfassung sowie ggf. Position/PLZ/Stadt daraus extrahieren, zur
     Vorbefüllung des 'Stelle anlegen'-Formulars. Legt selbst noch keine Stelle an."""
-    if not _job_management_permission():
+    if not job_management_permission():
         return jsonify(error="Nicht berechtigt."), 403
 
     uploaded_file = request.files.get("job_file")

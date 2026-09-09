@@ -42,7 +42,7 @@
         <ul>
             {% for m in matching_jobs %}
             <li>
-                <a href="{{ url_for('edit_job', job_id=m.id) }}">{{ m.position }} bei {{ m.customer_name }}</a>{% if m.city %} ({{ m.city }}){% endif %}
+                <a href="{{ FRONTEND_URL }}/jobs/{{ m.id }}/edit">{{ m.position }} bei {{ m.customer_name }}</a>{% if m.city %} ({{ m.city }}){% endif %}
                 &middot; {{ (m.similarity * 100) | round(1) }}% Übereinstimmung
             </li>
             {% endfor %}

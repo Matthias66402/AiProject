@@ -28,6 +28,8 @@ services:
       # den internen Port erreicht, nicht über den nach außen gemappten ${DB_PORT}.
       DB_HOST: postgres
       DB_PORT: 5432
+      # Origin des React-PoC-Frontends (frontend/) - für CORS auf den /api/*-Routen.
+      FRONTEND_ORIGIN: http://localhost:5173
     ports:
       - "5003:5003"
     volumes:
@@ -41,6 +43,7 @@ services:
       # Abhängigkeiten (requirements.txt) oder dem Dockerfile ist ein
       # Rebuild weiterhin erforderlich.
       - ./app.py:/app/app.py
+      - ./api:/app/api
       - ./db:/app/db
       - ./models:/app/models
       - ./services:/app/services
@@ -53,6 +56,25 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+  frontend:
+    image: node:20-alpine
+    container_name: aiproject_frontend
+    restart: unless-stopped
+    working_dir: /app
+    # PoC-Setup: Vite-Dev-Server direkt aus einem Node-Image, kein eigenes
+    # Dockerfile nötig. "npm install" läuft bei jedem Start erneut (node_modules
+    # ist nicht Teil des Bind-Mounts) - für den PoC in Ordnung, für Dauerbetrieb
+    # würde man das in ein eigenes Image mit vorinstallierten Abhängigkeiten packen.
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    environment:
+      VITE_API_BASE_URL: http://localhost:5003
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+    depends_on:
+      - app
 
 volumes:
   aiproject_postgres_data:

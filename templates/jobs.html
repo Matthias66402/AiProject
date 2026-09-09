@@ -40,10 +40,12 @@
                 {% if editing_job.document_link and editing_job.document_link.rsplit('.', 1)[-1] | lower == 'pdf' %}
                 <iframe class="pdf-embed" src="{{ editing_job.document_link }}" title="Stellenangebot PDF"></iframe>
                 {% elif editing_job.document_link %}
-                <p>{{ editing_job.content }}</p>
+                <div class="ql-editor job-content-view" id="job-content-view"></div>
+                <script type="application/json" id="job-content-view-data">{{ editing_job.content | tojson }}</script>
                 <p><a href="{{ editing_job.document_link }}" target="_blank" rel="noopener">Original-Dokument herunterladen ({{ editing_job.document_link.rsplit('.', 1)[-1] | upper }})</a></p>
                 {% else %}
-                <p>{{ editing_job.content }}</p>
+                <div class="ql-editor job-content-view" id="job-content-view"></div>
+                <script type="application/json" id="job-content-view-data">{{ editing_job.content | tojson }}</script>
                 {% endif %}
             </div>
             <div>
@@ -110,7 +112,12 @@
             {% endif %}
             <div>
                 <label for="content">Beschreibung</label>
-                <textarea id="content" name="content" rows="5" required>{{ editing_job.content if editing_job else '' }}</textarea>
+                <div class="rich-text-editor">
+                    <div id="content-editor"></div>
+                </div>
+                <textarea id="content" name="content" hidden></textarea>
+                <script type="application/json" id="content-editor-data">{{ (editing_job.content if editing_job else '') | tojson }}</script>
+                <p class="form-error" id="job-content-error" hidden>Bitte eine Beschreibung eingeben.</p>
             </div>
             <div>
                 <label for="valid_from">Gültig von</label>
@@ -228,6 +235,56 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        // Nur-Ansicht: gespeichertes HTML sanitisiert einblenden.
+        var viewData = document.getElementById('job-content-view-data');
+        var viewTarget = document.getElementById('job-content-view');
+        if (viewData && viewTarget) {
+            var rawView = JSON.parse(viewData.textContent);
+            viewTarget.innerHTML = DOMPurify.sanitize(rawView || '');
+        }
+
+        // Bearbeitungsformular: Quill-Editor statt Textarea, die Textarea
+        // bleibt (versteckt) als Trägerelement für den POST-Wert bestehen.
+        var contentEditorEl = document.getElementById('content-editor');
+        var contentTextarea = document.getElementById('content');
+        var quillContentEditor = null;
+        if (contentEditorEl && contentTextarea) {
+            quillContentEditor = new Quill(contentEditorEl, {
+                theme: 'snow',
+                modules: {
+                    toolbar: [
+                        [{ header: [false, 3, 4] }],
+                        ['bold', 'italic', 'underline'],
+                        [{ list: 'ordered' }, { list: 'bullet' }],
+                        ['link'],
+                        ['clean'],
+                    ],
+                },
+            });
+
+            var initialDataEl = document.getElementById('content-editor-data');
+            var initialHtml = initialDataEl ? JSON.parse(initialDataEl.textContent) : '';
+            quillContentEditor.root.innerHTML = DOMPurify.sanitize(initialHtml || '');
+            contentTextarea.value = quillContentEditor.root.innerHTML;
+
+            quillContentEditor.on('text-change', function () {
+                contentTextarea.value = quillContentEditor.getText().trim() === '' ? '' : quillContentEditor.root.innerHTML;
+            });
+
+            var jobForm = contentTextarea.closest('form');
+            var contentError = document.getElementById('job-content-error');
+            if (jobForm && contentError) {
+                jobForm.addEventListener('submit', function (e) {
+                    if (!contentTextarea.value) {
+                        e.preventDefault();
+                        contentError.hidden = false;
+                    } else {
+                        contentError.hidden = true;
+                    }
+                });
+            }
+        }
+
         var dropzone = document.getElementById('job-dropzone');
         var fileInput = document.getElementById('job_file_input');
         if (!dropzone || !fileInput) return;
@@ -239,6 +296,13 @@
         var submitBtn = dropzone.closest('form').querySelector('button[type="submit"]');
 
         function setField(id, value) {
+            if (id === 'content') {
+                if (quillContentEditor && value) {
+                    quillContentEditor.root.innerHTML = DOMPurify.sanitize(value);
+                    contentTextarea.value = quillContentEditor.root.innerHTML;
+                }
+                return;
+            }
             var el = document.getElementById(id);
             if (el && value) el.value = value;
         }

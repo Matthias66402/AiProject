@@ -72,7 +72,10 @@ docker compose exec app python backfill_embeddings.py
 ## Projektstruktur
 
 ```
-app.py                     Flask-Routen, KI-Assistent-Logik, Modellauswahl
+app.py                     Flask-Routen (klassische Jinja-Seiten + KI-Assistent-Logik), registriert die api/-Blueprints
+api/                       JSON-API für das React-PoC-Frontend (frontend/), läuft parallel zu den klassischen Routen
+  auth.py                     GET /api/auth/me - Login-Status für React (liest dieselbe Flask-Session)
+  jobs.py                      /api/jobs-Endpunkte (Liste/Anlegen/Bearbeiten/Löschen), ersetzt für React die Jobs-Logik aus app.py
 db/                        DB-Verbindung & Schema (siehe unten), von außen weiterhin per `import db` als Einheit genutzt
   __init__.py                Re-Export der öffentlichen Funktionen/Konstanten aus db_init.py und models/
   db_init.py                  DB-Verbindung (`get_connection()`, psycopg2), Schema-Erstellung/Migration (`init_db()`)
@@ -88,6 +91,9 @@ services/                  KI-/Datei-Erzeugungslogik der Tools-Seiten, aus app.p
   pdf_service.py                HTML-zu-PDF-Rendering (WeasyPrint)
   resume_service.py             Lebenslauf generieren/aus Upload anlegen (`RESUME_DIR`, inkl. Embedding)
   joboffer_service.py           Stellenangebot generieren/aus Upload-Text extrahieren (`JOBOFFER_DIR`, inkl. Embedding)
+  ai_clients.py                 Zentrale OpenAI-Client-Instanz (von app.py und api/jobs.py genutzt)
+  permissions.py                Rollen-/Berechtigungslogik für Stellenangebote (von app.py und api/jobs.py genutzt)
+frontend/                  React-PoC (Vite): erste vollständig auf die API umgezogene Seite (Stellenangebote) - siehe "Frontend-Migration" unten
 embeddings.py              Embedding-Erzeugung (einzeln/batch), HTML-Stripping, Cosinus-Ähnlichkeit/Top-Matches
 document_extraction.py     Textextraktion aus hochgeladenen PDF/.docx/.odt-Dateien (Lebenslauf- und Stellenangebot-Upload)
 backfill_embeddings.py     Einmaliges Nachrechnen fehlender Embeddings für Bestandsdaten
@@ -166,6 +172,29 @@ Reine Python-/Template-Änderungen übernimmt dagegen der Flask-Debug-Reloader a
 | `SECRET_KEY` | Flask-Session-Secret |
 
 `.env` ist per `.gitignore` von Git ausgeschlossen — nur `.env.example` wird versioniert.
+
+## Frontend-Migration (React-PoC)
+
+Das Projekt wird schrittweise von serverseitig gerenderten Jinja-Templates auf ein
+React-Frontend umgestellt, das Flask nur noch als JSON-API anspricht — Seite für
+Seite, nicht als Big-Bang-Rewrite. Bislang umgezogen: **Stellenangebote**
+(`/jobs`), vollständig inkl. Anlegen/Bearbeiten/Löschen, Rollen-Berechtigungen,
+Datei-Upload-Dropzone mit KI-Extraktion und der Matching-Kandidaten-Anzeige.
+
+- **`api/`** stellt die dafür nötigen JSON-Endpunkte bereit (`/api/jobs/...`,
+  `/api/auth/me`), parallel zu den bestehenden Template-Routen in `app.py` — die
+  klassische `/jobs`-Seite funktioniert unverändert weiter.
+- **`frontend/`** ist ein eigenständiges Vite/React-Projekt, läuft als eigener
+  `frontend`-Service in `docker-compose.yml` auf Port 5173 (`docker compose up -d
+  frontend`, danach `http://localhost:5173`).
+- **Login** läuft weiterhin über die klassische Flask-Seite (`http://localhost:5003/login`)
+  — React liest den Login-Status nur aus (`/api/auth/me`) und nutzt dieselbe
+  Session-Cookie über CORS (`FRONTEND_ORIGIN` in `docker-compose.yml`,
+  `flask_cors` in `app.py`). Ein eigenes Login-Formular in React gibt es noch nicht.
+- Verlinkungen zu noch nicht umgezogenen Seiten (z.B. Nutzerbearbeitung aus der
+  Kandidaten-Matching-Liste) zeigen bewusst auf die klassische Flask-Seite.
+
+Nächster Kandidat für den Umzug wäre analog `/customers` oder `/users`.
 
 ### Von MySQL migrieren
 

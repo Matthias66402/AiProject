@@ -1,5 +1,15 @@
 * { box-sizing: border-box; }
 
+/* React-PoC (frontend/): #root ist ein reines Mount-Element ohne eigene
+   Bedeutung im Layout. Ohne "display: contents" würde es als zusätzliche
+   Box zwischen body und nav/main hängen und body's Flex-Layout (siehe
+   unten) zu einer "shrink-to-fit"-Breite zwingen, die von der Breite des
+   Tabelleninhalts abhängt statt - wie im klassischen Flask-Layout, wo nav
+   und Content direkte body-Kinder sind - konstant zu bleiben. */
+#root {
+    display: contents;
+}
+
 body {
     min-height: 100vh;
     margin: 0;
@@ -312,6 +322,74 @@ select:focus,
 textarea:focus {
     border-color: #ffd76a;
     box-shadow: 0 0 0 3px rgba(255, 215, 130, 0.2);
+}
+
+/* Quill-Editor (Beschreibungsfeld Stellenangebote) an das bestehende
+   Formular-Styling angeglichen. */
+/* "form div" weiter oben stapelt Label+Feld-Wrapper untereinander (flex,
+   column) - das greift auch auf die von Quill selbst erzeugten <div>s
+   (Toolbar, Container) durch und würde deren Icon-Gruppen ebenfalls
+   untereinander statt nebeneinander anordnen. Für alles innerhalb des
+   Editors daher zurücksetzen, Quills eigenes CSS regelt den Rest. */
+.rich-text-editor,
+.rich-text-editor div {
+    display: revert;
+    flex-direction: revert;
+    gap: revert;
+    margin-bottom: revert;
+}
+.rich-text-editor .ql-toolbar.ql-snow {
+    background: rgba(10, 4, 26, 0.55);
+    border: 1px solid rgba(255, 215, 130, 0.4);
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+}
+.rich-text-editor .ql-container.ql-snow {
+    background: rgba(10, 4, 26, 0.55);
+    border: 1px solid rgba(255, 215, 130, 0.4);
+    border-radius: 0 0 8px 8px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.rich-text-editor .ql-editor {
+    color: #f8f1ff;
+    min-height: 140px;
+}
+.rich-text-editor .ql-editor.ql-blank::before {
+    color: #8a78b8;
+    font-style: normal;
+}
+.rich-text-editor .ql-snow .ql-stroke {
+    stroke: #cfc2ea;
+}
+.rich-text-editor .ql-snow .ql-fill {
+    fill: #cfc2ea;
+}
+.rich-text-editor .ql-snow .ql-picker {
+    color: #cfc2ea;
+}
+.rich-text-editor .ql-snow.ql-toolbar button:hover,
+.rich-text-editor .ql-snow.ql-toolbar button.ql-active,
+.rich-text-editor .ql-snow .ql-picker-label:hover {
+    color: #ffd76a;
+}
+.rich-text-editor .ql-snow.ql-toolbar button:hover .ql-stroke,
+.rich-text-editor .ql-snow.ql-toolbar button.ql-active .ql-stroke,
+.rich-text-editor .ql-snow .ql-picker-label:hover .ql-stroke {
+    stroke: #ffd76a;
+}
+.rich-text-editor .ql-snow .ql-picker-options {
+    background: #170a33;
+    border: 1px solid rgba(255, 215, 130, 0.4);
+}
+.rich-text-editor .ql-container.ql-snow:focus-within {
+    border-color: #ffd76a;
+    box-shadow: 0 0 0 3px rgba(255, 215, 130, 0.2);
+}
+.job-content-view {
+    color: #f8f1ff;
+    padding: 0;
 }
 
 #special-btn,
