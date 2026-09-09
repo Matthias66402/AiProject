@@ -1,5 +1,120 @@
 * { box-sizing: border-box; }
 
+/* Design-Tokens: Default-Werte entsprechen exakt dem bisherigen (klassischen)
+   Look, damit templates/*.html unverändert bleibt. Für die React-Oberfläche
+   (frontend/index.html setzt <html class="react-app">) überschreibt der
+   Block "html.react-app" weiter unten einen Teil dieser Variablen mit dem
+   abgenommenen, dezenteren Design (violette Umrandung statt Gold-Fläche,
+   Gold nur noch als Signalfarbe, kein Leuchten/Glow, Sora als
+   Überschriften-Font). Alle Regeln im Rest der Datei lesen ausschließlich
+   aus diesen Variablen, nie aus Literalen, damit beide Oberflächen aus
+   derselben Quelle gespeist werden. */
+:root {
+    --page-bg: #76a250;
+    --ink: #f1e9ff;
+    --ink-soft: #f8f1ff;
+    --ink-muted: #c9b8f0;
+    --ink-faint: #b8a9e0;
+    --label: #d9c9ff;
+    --label-track: 0.4px;
+
+    --nav-bg: linear-gradient(180deg, rgba(45, 22, 82, 0.85), rgba(24, 11, 46, 0.9));
+    --nav-border: rgba(255, 215, 130, 0.35);
+    --nav-glow: 0 0 12px rgba(255, 215, 130, 0.6);
+
+    --card-bg: linear-gradient(180deg, rgba(45, 22, 82, 0.85), rgba(24, 11, 46, 0.9));
+    --card-border: rgba(255, 215, 130, 0.35);
+    --card-shadow: 0 0 0 1px rgba(255, 215, 130, 0.08), 0 12px 34px rgba(0, 0, 0, 0.5), 0 0 50px rgba(147, 90, 255, 0.12);
+    --radius-card: 12px;
+    --radius-ctl: 8px;
+
+    --gold: #ffd76a;
+    --gold-2: #ffe9a8;
+
+    --field-bg: rgba(10, 4, 26, 0.55);
+    --field-border: rgba(255, 215, 130, 0.4);
+    --focus-ring: 0 0 0 3px rgba(255, 215, 130, 0.2);
+    --panel-bg: rgba(10, 4, 26, 0.35);
+    --picker-bg: #170a33;
+    --line-soft: rgba(255, 215, 130, 0.2);
+    --spinner-track: rgba(255, 215, 130, 0.25);
+
+    --danger: #ffb4b4;
+    --danger-bg: rgba(180, 40, 40, 0.25);
+    --danger-border: rgba(255, 120, 120, 0.5);
+
+    --nav-active-color: #ffffff;
+
+    --heading-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    --heading-weight: 700;
+    --heading-shadow: 0 0 14px rgba(255, 215, 130, 0.45);
+
+    --btn-primary-bg: linear-gradient(135deg, #7b3fe4, #b06cff 50%, #ffd76a 150%);
+    --btn-primary-border: transparent;
+    --btn-primary-color: #1b0f33;
+    --btn-primary-shadow: 0 6px 16px rgba(123, 63, 228, 0.35);
+    --btn-primary-hover-shadow: 0 12px 26px rgba(255, 215, 130, 0.35);
+
+    --btn-ghost-bg: rgba(118, 162, 80, 0.18);
+    --btn-ghost-border: rgba(118, 162, 80, 0.6);
+    --btn-ghost-color: #d7ecc2;
+    --btn-ghost-hover-bg: rgba(118, 162, 80, 0.32);
+    --btn-ghost-hover-border: rgba(118, 162, 80, 0.9);
+}
+
+html.react-app {
+    --page-bg: #eef4e6;
+    --ink: #241a3d;
+    --ink-soft: #1f1638;
+    --ink-muted: #5c5380;
+    --ink-faint: #837ba3;
+    --label: #4a4270;
+    --label-track: 0.08em;
+
+    --nav-bg: transparent;
+    --nav-border: rgba(34, 26, 68, 0.4);
+    --nav-glow: none;
+
+    --card-bg: transparent;
+    --card-border: rgba(34, 26, 68, 0.4);
+    --card-shadow: none;
+    --radius-card: 10px;
+    --radius-ctl: 6px;
+
+    --gold: #a9791f;
+    --gold-2: #a9791f;
+
+    --field-bg: #ffffff;
+    --field-border: rgba(34, 26, 68, 0.35);
+    --focus-ring: 0 0 0 3px rgba(169, 121, 31, 0.25);
+    --panel-bg: rgba(255, 255, 255, 0.55);
+    --picker-bg: #ffffff;
+    --line-soft: rgba(34, 26, 68, 0.18);
+    --spinner-track: rgba(34, 26, 68, 0.2);
+
+    --danger: #a83f3f;
+    --danger-bg: rgba(180, 40, 40, 0.12);
+    --danger-border: rgba(180, 40, 40, 0.35);
+
+    --nav-active-color: var(--ink-soft);
+
+    --heading-font: 'Sora', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    --heading-weight: 700;
+    --heading-shadow: none;
+
+    --btn-primary-bg: transparent;
+    --btn-primary-border: rgba(34, 26, 68, 0.7);
+    --btn-primary-color: var(--ink-soft);
+    --btn-primary-shadow: none;
+    --btn-primary-hover-shadow: none;
+
+    --btn-ghost-bg: transparent;
+    --btn-ghost-border: rgba(77, 107, 53, 0.6);
+    --btn-ghost-color: var(--ink-soft);
+    --btn-ghost-hover-bg: rgba(77, 107, 53, 0.12);
+    --btn-ghost-hover-border: rgba(77, 107, 53, 0.9);
+}
+
 /* React-PoC (frontend/): #root ist ein reines Mount-Element ohne eigene
    Bedeutung im Layout. Ohne "display: contents" würde es als zusätzliche
    Box zwischen body und nav/main hängen und body's Flex-Layout (siehe
@@ -18,12 +133,8 @@ body {
     align-items: center;
     padding: 22px 20px;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-    background:
-        #76a250 !important;
-        radial-gradient(circle at 20% 20%, rgba(255, 215, 130, 0.08), transparent 40%),
-        radial-gradient(circle at 80% 70%, rgba(160, 100, 255, 0.12), transparent 45%),
-        linear-gradient(160deg, #1b0f33 0%, #2b1454 45%, #120826 100%);
-    color: #f1e9ff;
+    background: var(--page-bg);
+    color: var(--ink);
     position: relative;
     overflow-x: hidden;
 }
@@ -44,6 +155,13 @@ body::before {
     pointer-events: none;
 }
 
+/* React: "Kein Leuchten mehr" - der funkelnde Sternenhimmel passt nicht mehr
+   zum dezenteren, glow-freien Design und wird für die React-Oberfläche
+   abgeschaltet. Klassisch bleibt unverändert. */
+html.react-app body::before {
+    display: none;
+}
+
 @keyframes twinkle {
     from { opacity: 0.35; }
     to { opacity: 0.85; }
@@ -57,13 +175,13 @@ nav {
     gap: 14px;
     margin-bottom: 16px;
     padding: 8px 16px;
-    background: linear-gradient(180deg, rgba(45, 22, 82, 0.85), rgba(24, 11, 46, 0.9));
-    border: 1px solid rgba(255, 215, 130, 0.35);
-    border-radius: 10px;
+    background: var(--nav-bg);
+    border: 1px solid var(--nav-border);
+    border-radius: var(--radius-card);
 }
 
 nav a {
-    color: #ffe9a8;
+    color: var(--gold-2);
     text-decoration: none;
     font-size: 0.78rem;
     letter-spacing: 0.4px;
@@ -74,13 +192,13 @@ nav a {
 }
 
 nav a:hover {
-    text-shadow: 0 0 12px rgba(255, 215, 130, 0.6);
+    text-shadow: var(--nav-glow);
 }
 
 nav a.active {
-    color: #ffffff;
-    border-bottom-color: #ffd76a;
-    text-shadow: 0 0 12px rgba(255, 215, 130, 0.6);
+    color: var(--nav-active-color);
+    border-bottom-color: var(--gold);
+    text-shadow: var(--nav-glow);
 }
 
 nav summary {
@@ -97,9 +215,9 @@ nav summary::marker {
 }
 
 .form-error {
-    color: #ffb4b4;
-    background: rgba(180, 40, 40, 0.25);
-    border: 1px solid rgba(255, 120, 120, 0.5);
+    color: var(--danger);
+    background: var(--danger-bg);
+    border: 1px solid var(--danger-border);
     border-radius: 8px;
     padding: 7px 12px;
     margin-bottom: 12px;
@@ -111,11 +229,11 @@ nav summary::marker {
     z-index: 1;
     width: 100%;
     max-width: 560px;
-    background: linear-gradient(180deg, rgba(45, 22, 82, 0.85), rgba(24, 11, 46, 0.9));
-    border: 1px solid rgba(255, 215, 130, 0.35);
-    border-radius: 12px;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-card);
     padding: 22px 26px;
-    box-shadow: 0 0 0 1px rgba(255, 215, 130, 0.08), 0 12px 34px rgba(0, 0, 0, 0.5), 0 0 50px rgba(147, 90, 255, 0.12);
+    box-shadow: var(--card-shadow);
     backdrop-filter: blur(4px);
 }
 
@@ -140,16 +258,16 @@ nav summary::marker {
     gap: 5px;
     padding: 18px 16px;
     text-align: center;
-    border: 2px dashed rgba(255, 215, 130, 0.45);
+    border: 2px dashed var(--field-border);
     border-radius: 10px;
-    background: rgba(10, 4, 26, 0.35);
+    background: var(--panel-bg);
     cursor: pointer;
     transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .dropzone:hover,
 .dropzone.dragover {
-    border-color: rgba(255, 215, 130, 0.9);
+    border-color: var(--gold);
     background: rgba(255, 215, 130, 0.08);
 }
 
@@ -159,13 +277,13 @@ nav summary::marker {
 }
 
 .dropzone-text {
-    color: #f1e9ff;
+    color: var(--ink);
     font-size: 0.85rem;
 }
 
 .dropzone-hint {
     font-size: 0.72rem;
-    color: rgba(241, 233, 255, 0.6);
+    color: var(--ink-faint);
 }
 
 .dropzone-input {
@@ -221,7 +339,7 @@ nav summary::marker {
     background: none;
     border: none;
     padding: 0;
-    color: #ffb4b4;
+    color: var(--danger);
     font: inherit;
     letter-spacing: 0.5px;
     cursor: pointer;
@@ -256,14 +374,16 @@ h1#greetings {
     text-align: center;
     font-size: 1.35rem;
     margin: 0 0 3px;
-    color: #ffe9a8;
-    text-shadow: 0 0 14px rgba(255, 215, 130, 0.45);
+    color: var(--gold-2);
+    font-family: var(--heading-font);
+    font-weight: var(--heading-weight);
+    text-shadow: var(--heading-shadow);
     letter-spacing: 0.3px;
 }
 
 .subtitle {
     text-align: center;
-    color: #c9b8f0;
+    color: var(--ink-muted);
     font-size: 0.8rem;
     margin: 0 0 16px;
 }
@@ -276,9 +396,9 @@ form div {
 }
 
 label {
-    color: #d9c9ff;
+    color: var(--label);
     font-size: 0.72rem;
-    letter-spacing: 0.4px;
+    letter-spacing: var(--label-track);
     text-transform: uppercase;
 }
 
@@ -289,10 +409,10 @@ input[type="date"],
 select,
 textarea {
     padding: 8px 12px;
-    border-radius: 8px;
-    border: 1px solid rgba(255, 215, 130, 0.4);
-    background: rgba(10, 4, 26, 0.55);
-    color: #f8f1ff;
+    border-radius: var(--radius-ctl);
+    border: 1px solid var(--field-border);
+    background: var(--field-bg);
+    color: var(--ink-soft);
     font-family: inherit;
     font-size: 0.9rem;
     outline: none;
@@ -311,7 +431,7 @@ textarea {
 input[type="text"]::placeholder,
 input[type="email"]::placeholder,
 input[type="password"]::placeholder {
-    color: #8a78b8;
+    color: var(--ink-faint);
 }
 
 input[type="text"]:focus,
@@ -320,8 +440,8 @@ input[type="password"]:focus,
 input[type="date"]:focus,
 select:focus,
 textarea:focus {
-    border-color: #ffd76a;
-    box-shadow: 0 0 0 3px rgba(255, 215, 130, 0.2);
+    border-color: var(--gold);
+    box-shadow: var(--focus-ring);
 }
 
 /* Quill-Editor (Beschreibungsfeld Stellenangebote) an das bestehende
@@ -339,66 +459,66 @@ textarea:focus {
     margin-bottom: revert;
 }
 .rich-text-editor .ql-toolbar.ql-snow {
-    background: rgba(10, 4, 26, 0.55);
-    border: 1px solid rgba(255, 215, 130, 0.4);
+    background: var(--field-bg);
+    border: 1px solid var(--field-border);
     border-bottom: none;
-    border-radius: 8px 8px 0 0;
+    border-radius: var(--radius-ctl) var(--radius-ctl) 0 0;
 }
 .rich-text-editor .ql-container.ql-snow {
-    background: rgba(10, 4, 26, 0.55);
-    border: 1px solid rgba(255, 215, 130, 0.4);
-    border-radius: 0 0 8px 8px;
+    background: var(--field-bg);
+    border: 1px solid var(--field-border);
+    border-radius: 0 0 var(--radius-ctl) var(--radius-ctl);
     font-family: inherit;
     font-size: 0.9rem;
     transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
 .rich-text-editor .ql-editor {
-    color: #f8f1ff;
+    color: var(--ink-soft);
     min-height: 140px;
 }
 .rich-text-editor .ql-editor.ql-blank::before {
-    color: #8a78b8;
+    color: var(--ink-faint);
     font-style: normal;
 }
 .rich-text-editor .ql-snow .ql-stroke {
-    stroke: #cfc2ea;
+    stroke: var(--ink-muted);
 }
 .rich-text-editor .ql-snow .ql-fill {
-    fill: #cfc2ea;
+    fill: var(--ink-muted);
 }
 .rich-text-editor .ql-snow .ql-picker {
-    color: #cfc2ea;
+    color: var(--ink-muted);
 }
 .rich-text-editor .ql-snow.ql-toolbar button:hover,
 .rich-text-editor .ql-snow.ql-toolbar button.ql-active,
 .rich-text-editor .ql-snow .ql-picker-label:hover {
-    color: #ffd76a;
+    color: var(--gold);
 }
 .rich-text-editor .ql-snow.ql-toolbar button:hover .ql-stroke,
 .rich-text-editor .ql-snow.ql-toolbar button.ql-active .ql-stroke,
 .rich-text-editor .ql-snow .ql-picker-label:hover .ql-stroke {
-    stroke: #ffd76a;
+    stroke: var(--gold);
 }
 .rich-text-editor .ql-snow .ql-picker-options {
-    background: #170a33;
-    border: 1px solid rgba(255, 215, 130, 0.4);
+    background: var(--picker-bg);
+    border: 1px solid var(--field-border);
 }
 .rich-text-editor .ql-container.ql-snow:focus-within {
-    border-color: #ffd76a;
-    box-shadow: 0 0 0 3px rgba(255, 215, 130, 0.2);
+    border-color: var(--gold);
+    box-shadow: var(--focus-ring);
 }
 .job-content-view {
-    color: #f8f1ff;
+    color: var(--ink-soft);
     padding: 0;
 }
 
 #special-btn,
 .special-btn {
     width: 100%;
-    background: linear-gradient(135deg, #7b3fe4, #b06cff 50%, #ffd76a 150%);
-    border: none;
-    border-radius: 8px;
-    color: #1b0f33;
+    background: var(--btn-primary-bg);
+    border: 1px solid var(--btn-primary-border);
+    border-radius: var(--radius-ctl);
+    color: var(--btn-primary-color);
     font-family: inherit;
     font-size: 0.85rem;
     font-weight: 700;
@@ -406,13 +526,13 @@ textarea:focus {
     padding: 9px 20px;
     cursor: pointer;
     transition: transform 0.15s ease, box-shadow 0.15s ease;
-    box-shadow: 0 6px 16px rgba(123, 63, 228, 0.35);
+    box-shadow: var(--btn-primary-shadow);
 }
 
 #special-btn:hover,
 .special-btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 12px 26px rgba(255, 215, 130, 0.35);
+    box-shadow: var(--btn-primary-hover-shadow);
 }
 
 #special-btn:active,
@@ -427,10 +547,10 @@ textarea:focus {
 .subtle-btn {
     display: inline-block;
     width: auto;
-    background: rgba(118, 162, 80, 0.18);
-    border: 1px solid rgba(118, 162, 80, 0.6);
-    border-radius: 8px;
-    color: #d7ecc2;
+    background: var(--btn-ghost-bg);
+    border: 1px solid var(--btn-ghost-border);
+    border-radius: var(--radius-ctl);
+    color: var(--btn-ghost-color);
     font-family: inherit;
     font-size: 0.85rem;
     font-weight: 600;
@@ -442,8 +562,8 @@ textarea:focus {
 
 #subtle-btn:hover,
 .subtle-btn:hover {
-    background: rgba(118, 162, 80, 0.32);
-    border-color: rgba(118, 162, 80, 0.9);
+    background: var(--btn-ghost-hover-bg);
+    border-color: var(--btn-ghost-hover-border);
     transform: translateY(-1px);
 }
 
@@ -454,9 +574,9 @@ textarea:focus {
     margin: 16px 0 0;
     padding: 12px 14px;
     border-radius: 10px;
-    background: rgba(10, 4, 26, 0.55);
-    border: 1px dashed rgba(255, 215, 130, 0.45);
-    color: #f1e9ff;
+    background: var(--field-bg);
+    border: 1px dashed var(--field-border);
+    color: var(--ink);
     font-size: 0.9rem;
     line-height: 1.5;
     min-height: 18px;
@@ -477,11 +597,11 @@ textarea:focus {
 .user-table td {
     text-align: left;
     padding: 6px 10px;
-    border-bottom: 1px solid rgba(255, 215, 130, 0.2);
+    border-bottom: 1px solid var(--line-soft);
 }
 
 .user-table th {
-    color: #b8a9e0;
+    color: var(--ink-faint);
     font-size: 0.66rem;
     letter-spacing: 0.4px;
     text-transform: uppercase;
@@ -489,7 +609,7 @@ textarea:focus {
 }
 
 .user-table a {
-    color: #ffe9a8;
+    color: var(--gold-2);
 }
 
 .pager {
@@ -509,7 +629,7 @@ textarea:focus {
 }
 
 .pager-status {
-    color: #b8a9e0;
+    color: var(--ink-faint);
     font-size: 0.78rem;
 }
 
@@ -526,7 +646,7 @@ textarea:focus {
 }
 
 .pager-per-page label {
-    color: #b8a9e0;
+    color: var(--ink-faint);
     font-size: 0.75rem;
     white-space: nowrap;
 }
@@ -539,8 +659,8 @@ textarea:focus {
     display: inline-block;
     width: 36px;
     height: 36px;
-    border: 3px solid rgba(255, 215, 130, 0.25);
-    border-top-color: #ffd76a;
+    border: 3px solid var(--spinner-track);
+    border-top-color: var(--gold);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
 }
@@ -563,8 +683,8 @@ textarea:focus {
     gap: 10px;
     margin: 0;
     border-radius: 10px;
-    background: rgba(10, 4, 26, 0.55);
-    color: #c9b8f0;
+    background: var(--field-bg);
+    color: var(--ink-muted);
     font-size: 0.85rem;
     font-style: italic;
     pointer-events: none;
@@ -584,10 +704,10 @@ textarea:focus {
 .entity-view p {
     margin: 0;
     padding: 8px 12px;
-    border-radius: 8px;
-    border: 1px solid rgba(255, 215, 130, 0.4);
-    background: rgba(10, 4, 26, 0.35);
-    color: #f8f1ff;
+    border-radius: var(--radius-ctl);
+    border: 1px solid var(--field-border);
+    background: var(--panel-bg);
+    color: var(--ink-soft);
     font-size: 0.9rem;
 }
 
@@ -597,14 +717,14 @@ textarea:focus {
 
 .entity-related h2 {
     font-size: 0.95rem;
-    color: #ffe9a8;
+    color: var(--gold-2);
     margin: 0 0 8px;
 }
 
 .pdf-embed {
     width: 100%;
     height: 600px;
-    border: 1px solid rgba(255, 215, 130, 0.4);
+    border: 1px solid var(--field-border);
     border-radius: 10px;
     background: #fff;
 }

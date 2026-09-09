@@ -166,6 +166,16 @@ def build_site_map():
         description = PAGE_DESCRIPTIONS.get(rule.endpoint, "(noch keine Beschreibung hinterlegt)")
         methods = ", ".join(sorted(rule.methods - {"HEAD", "OPTIONS"}))
         lines.append(f"- {rule.rule} [{methods}] -> {description}")
+    # Kein eigener Flask-Route-Eintrag (der Wechsel hängt nur ?classic=1/0 an die
+    # jeweils aktuelle Seite an), aber eine Funktion, die die KI kennen muss, sonst
+    # verneint sie fälschlich, dass es sie gibt.
+    lines.append(
+        "- (kein eigener Menüpunkt/Seite, sondern auf jeder Seite oben rechts in der Navigation, "
+        "direkt links neben dem Konto-Menü) [GET] -> Wechsel zwischen der neuen React-Oberfläche "
+        "(Standard, Link-Beschriftung 'Klassisch' führt zur alten Oberfläche) und der klassischen "
+        "Flask-Oberfläche (Link-Beschriftung 'Reaktiv' führt zur neuen Oberfläche); die Wahl bleibt "
+        "bis zum nächsten Browser-Neustart erhalten"
+    )
     return "\n".join(lines)
 
 

@@ -1,13 +1,22 @@
 <!doctype html>
-<html lang="de">
+<html lang="de" class="react-app">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Stellenmarkt-AI (React)</title>
     <!-- Wiederverwendung des bestehenden Flask-Stylesheets/Icons für optische
-         Parität, statt das Design für den React-PoC neu zu bauen. -->
+         Parität, statt das Design für den React-PoC neu zu bauen. Die Klasse
+         "react-app" auf <html> aktiviert in style.css die für React
+         abgenommenen, dezenteren Design-Tokens (siehe dortiger Kommentar). -->
     <link rel="stylesheet" href="%VITE_API_BASE_URL%/static/style.css" />
     <link rel="stylesheet" href="%VITE_API_BASE_URL%/static/fontawesome/css/all.min.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="icon" href="%VITE_API_BASE_URL%/static/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="%VITE_API_BASE_URL%/static/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="%VITE_API_BASE_URL%/static/favicon-16x16.png">
+    <link rel="su-frog-icon" sizes="180x180" href="%VITE_API_BASE_URL%/static/su-frog-icon.png">
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@700&display=swap" rel="stylesheet" />
     <script src="https://cdn.tailwindcss.com"></script>
   </head>
   <body>

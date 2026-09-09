@@ -5,6 +5,10 @@ import { API_BASE, apiGet, apiPost } from './api/client'
 export default function App() {
   // undefined = wird geladen, null = nicht eingeloggt, sonst {id, short_name, role, customer_id}
   const [user, setUser] = useState(undefined)
+  // Hamburger-Menü unterhalb des md-Breakpoints, analog zu #nav-toggle/#nav-links
+  // in templates/navigation.html - dort per Vanilla-JS/hidden-Klasse gelöst, hier
+  // per State, da React die Navigation clientseitig rendert.
+  const [navOpen, setNavOpen] = useState(false)
   const toolsMenuRef = useRef(null)
   const accountMenuRef = useRef(null)
   const location = useLocation()
@@ -20,6 +24,14 @@ export default function App() {
     refreshUser()
   }, [refreshUser])
 
+  // Klassisch löst das durch volle Seitenreloads bei jeder Navigation implizit -
+  // hier stattdessen explizit schließen, sonst bliebe das aufgeklappte
+  // Hamburger-Menü nach einem Klick auf einen Link (SPA-Navigation ohne Reload)
+  // stehen.
+  useEffect(() => {
+    setNavOpen(false)
+  }, [location.pathname])
+
   function navClass(active) {
     return active ? 'active' : undefined
   }
@@ -34,10 +46,25 @@ export default function App() {
   return (
     <>
       <nav
-        className="flex flex-wrap items-center gap-4"
-        style={{ padding: '1rem', background: '#241141', color: '#ffe9a8', position: 'relative', zIndex: 2 }}
+        className="flex flex-wrap items-center"
+        style={{ padding: '1rem', position: 'relative', zIndex: 2 }}
       >
-        <strong>Stellenmarkt-AI (React)</strong>
+        <button
+          type="button"
+          className="md:hidden"
+          aria-label="Menü öffnen"
+          aria-expanded={navOpen}
+          aria-controls="nav-links"
+          onClick={() => setNavOpen((open) => !open)}
+          style={{ background: 'none', border: 'none', color: 'var(--gold-2)', fontSize: '1.1rem', padding: '0.2rem', cursor: 'pointer' }}
+        >
+          <i className="fa-solid fa-bars" />
+        </button>
+        <div
+          id="nav-links"
+          className={`${navOpen ? 'flex' : 'hidden'} md:flex w-full md:flex-1 flex-col md:flex-row md:items-center gap-4 mt-3 md:mt-0`}
+        >
+        <strong style={{ fontFamily: 'var(--heading-font)', fontWeight: 'var(--heading-weight)' }}>Stellenmarkt-AI (React)</strong>
         <Link to="/" className={navClass(location.pathname === '/')}>
           <i className="fa-solid fa-home text-[#76A250]" /> Start
         </Link>
@@ -61,7 +88,7 @@ export default function App() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.4rem',
-                color: '#ffe9a8',
+                color: 'var(--gold-2)',
               }}
             >
               <i className="fa-solid fa-toolbox text-[#76A250]" /> Tools
@@ -75,9 +102,9 @@ export default function App() {
                 display: 'flex',
                 flexDirection: 'column',
                 minWidth: '13rem',
-                background: '#241141',
-                border: '1px solid rgba(255, 215, 130, 0.35)',
-                borderRadius: '8px',
+                background: 'var(--field-bg)',
+                border: '1px solid var(--card-border)',
+                borderRadius: 'var(--radius-ctl)',
                 overflow: 'hidden',
                 zIndex: 10,
               }}
@@ -118,7 +145,7 @@ export default function App() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.4rem',
-                color: '#ffe9a8',
+                color: 'var(--gold-2)',
               }}
             >
               <i className="fa-solid fa-user text-[#76A250]" /> {user ? user.short_name : 'Konto'}
@@ -132,9 +159,9 @@ export default function App() {
                 display: 'flex',
                 flexDirection: 'column',
                 minWidth: '12rem',
-                background: '#241141',
-                border: '1px solid rgba(255, 215, 130, 0.35)',
-                borderRadius: '8px',
+                background: 'var(--field-bg)',
+                border: '1px solid var(--card-border)',
+                borderRadius: 'var(--radius-ctl)',
                 overflow: 'hidden',
                 zIndex: 10,
               }}
@@ -153,7 +180,7 @@ export default function App() {
                       padding: '0.5rem 1rem',
                       background: 'none',
                       border: 'none',
-                      color: '#ffe9a8',
+                      color: 'var(--gold-2)',
                       font: 'inherit',
                       fontSize: '0.78rem',
                       textTransform: 'uppercase',
@@ -192,6 +219,7 @@ export default function App() {
             </div>
           </details>
         )}
+        </div>
       </nav>
       <main className="scroll full" style={{ padding: '1.5rem' }}>
         <Outlet context={{ user, refreshUser }} />
