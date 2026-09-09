@@ -1,5 +1,6 @@
 import json
 from datetime import datetime
+from urllib.parse import urlencode
 
 from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, jsonify
 from flask_cors import CORS
@@ -16,6 +17,7 @@ from document_extraction import extract_document_text, ALLOWED_DOCUMENT_UPLOAD_E
 from services import resume_service, joboffer_service
 from services.ai_clients import openai_client
 from services.assistant_service import AVAILABLE_MODELS, DEFAULT_MODEL, ask_assistant
+from services.auth_service import log_in_user
 from services.permissions import customer_management_permission, job_management_permission, own_customer_for_session
 from api.auth import auth_api
 from api.jobs import jobs_api
@@ -54,6 +56,60 @@ app.register_blueprint(tools_api)
 app.register_blueprint(resumes_api)
 db.init_db()
 
+# Endpoint -> Funktion, die aus request.view_args den passenden React-Pfad baut.
+# Nur Seiten mit echter React-Entsprechung landen hier - alles andere (Abmelden
+# [reiner Redirect ohne eigene Seite], Datei-Auslieferungsrouten, Lösch-Endpunkte,
+# /api/*, /static/*) bleibt bewusst außen vor und wird nie umgeleitet.
+_REACT_PAGE_ROUTES = {
+    "home": lambda args: "/",
+    "login": lambda args: "/login",
+    "register": lambda args: "/register",
+    "jobs": lambda args: "/jobs",
+    "edit_job": lambda args: f"/jobs/{args['job_id']}/edit",
+    "customers": lambda args: "/customers",
+    "edit_customer": lambda args: f"/customers/{args['customer_id']}/edit",
+    "users": lambda args: "/users",
+    "edit_user": lambda args: f"/users/{args['user_id']}/edit",
+    "generate_resume": lambda args: "/tools/resume",
+    "generate_joboffer": lambda args: "/tools/joboffer",
+    "my_resumes": lambda args: "/resumes",
+}
+
+
+@app.before_request
+def redirect_to_react_by_default():
+    """React ist die Standard-Oberfläche: GET-Aufrufe einer klassischen Seite mit
+    React-Entsprechung leiten dorthin um, sofern der/die Nutzer:in nicht bewusst im
+    klassischen UI bleiben möchte. "Klassisch"-Link in React hängt ?classic=1 an,
+    das merkt sich (Session-Cookie, endet mit dem Browser-Neustart) und hält
+    sämtliche Folgenavigation - inkl. Formular-POSTs und deren Redirects - auf der
+    klassischen Seite. ?classic=0 macht diese Wahl wieder rückgängig. POST/PUT/
+    DELETE werden nie umgeleitet, sonst würden Formularabsendungen ins Leere laufen."""
+    if request.method != "GET":
+        return None
+
+    classic_param = request.args.get("classic")
+    if classic_param == "1":
+        session["ui_pref"] = "classic"
+        return None
+    if classic_param == "0":
+        session.pop("ui_pref", None)
+    elif session.get("ui_pref") == "classic":
+        return None
+
+    build_react_path = _REACT_PAGE_ROUTES.get(request.endpoint)
+    if build_react_path is None:
+        return None
+
+    target = f"{_frontend_origin}{build_react_path(request.view_args or {})}"
+    # ?classic=... steuert nur diese Weiche und ist für React irrelevant - nicht durchreichen.
+    forwarded_args = request.args.to_dict(flat=False)
+    forwarded_args.pop("classic", None)
+    query_string = urlencode(forwarded_args, doseq=True)
+    if query_string:
+        target = f"{target}?{query_string}"
+    return redirect(target)
+
 
 @app.context_processor
 def inject_current_user():
@@ -75,11 +131,6 @@ def inject_frontend_url():
     return {"FRONTEND_URL": _frontend_origin}
 
 
-def _log_in_user(user):
-    session["user_id"] = user["id"]
-    session["user_short_name"] = user["short_name"]
-    session["user_role"] = user["role"]
-    session["user_customer_id"] = user.get("customer_id")
 
 # Kurzbeschreibung je Route für den KI-Assistenten. Die Website ist noch im
 # Aufbau, deshalb wird die eigentliche Seitenliste (URL + erlaubte Methoden)
@@ -140,7 +191,7 @@ def login():
         password = request.form.get("password", "")
         user = db.get_user_by_email(email)
         if user and check_password_hash(user["password_hash"], password):
-            _log_in_user(user)
+            log_in_user(user)
             return redirect(url_for('home'))
         error = "E-Mail oder Passwort ist falsch."
 
@@ -168,7 +219,7 @@ def register():
             error = "Diese E-Mail-Adresse ist bereits registriert."
         else:
             db.create_user(first_name, last_name, short_name, email, generate_password_hash(password), DEFAULT_ROLE, zip_code, city)
-            _log_in_user(db.get_user_by_email(email))
+            log_in_user(db.get_user_by_email(email))
             return redirect(url_for('home'))
 
     return render_template('index.html', content_template='register.html', error=error)

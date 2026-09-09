@@ -12,6 +12,8 @@ import UserEditPage from './pages/UserEditPage.jsx'
 import ToolResumePage from './pages/ToolResumePage.jsx'
 import ToolJobofferPage from './pages/ToolJobofferPage.jsx'
 import MyResumesPage from './pages/MyResumesPage.jsx'
+import LoginPage from './pages/LoginPage.jsx'
+import RegisterPage from './pages/RegisterPage.jsx'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
@@ -28,6 +30,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <Route path="tools/resume" element={<ToolResumePage />} />
           <Route path="tools/joboffer" element={<ToolJobofferPage />} />
           <Route path="resumes" element={<MyResumesPage />} />
+          <Route path="login" element={<LoginPage />} />
+          <Route path="register" element={<RegisterPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

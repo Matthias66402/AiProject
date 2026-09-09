@@ -9,7 +9,7 @@ Die Website ist noch im Aufbau, Struktur und Funktionsumfang können sich häufi
 - **KI-Assistent** (Startseite — klassisch unter `/`, ebenso im React-PoC unter `frontend/`): beantwortet Fragen zur Website über wählbare KI-Modelle. Der System-Prompt bekommt bei jeder Anfrage automatisch die aktuelle Seitenstruktur (aus den registrierten Flask-Routen erzeugt) mitgegeben, damit der Assistent nichts über nicht existierende Funktionen erfindet. Ohne explizite Auswahl (z.B. bei internen KI-Aufgaben wie dem Extrahieren einer hochgeladenen Stellenanzeige) wird immer `DEFAULT_MODEL` (`gpt-4.1-mini`, OpenAI) verwendet. Modell-Konfiguration und Anfrage-Logik liegen zentral in `services/assistant_service.py` (`ask_assistant()`), genutzt sowohl von der klassischen Route als auch vom JSON-Endpunkt `/api/assistant/ask` für React.
   - Modelle über [Groq](https://groq.com/) (`openai/gpt-oss-20b`, `openai/gpt-oss-120b`, `qwen/qwen3.6-27b`, `groq/compound-mini`) — **optional**: ohne (nicht-leeren) `GROQ_API_KEY` in `.env` werden diese Modelle automatisch aus der Auswahl entfernt und der Groq-Client gar nicht erst erzeugt (`services/assistant_service.py`, `groq_client`)
   - Modelle über [OpenAI](https://platform.openai.com/) (`gpt-5-mini`, `gpt-4o-mini`, `gpt-4.1-mini`) — `OPENAI_API_KEY` ist Pflicht, da auch die Embeddings darüber laufen
-- **Login/Registrierung**: Nutzer registrieren sich (immer mit Rolle `user`), melden sich an/ab; Passwörter werden gehasht (Werkzeug) gespeichert.
+- **Login/Registrierung** (`/login`, `/register` — klassisch, ebenso im React-PoC): Nutzer registrieren sich (immer mit Rolle `user`), melden sich an/ab; Passwörter werden gehasht (Werkzeug) gespeichert.
 - **Rollen**: `user` (Standard bei Registrierung), `customer`, `admin` — Liste zentral in `models/user.py` (`ROLES`). `admin` vergibt Rollen und hat vollen Schreibzugriff auf Nutzer-, Stellenanbieter- und Stellenverwaltung. `customer`-Nutzer sind über `users.customer_id` (nullable FK auf `customers`, Zuweisung durch einen Admin im Nutzerformular) genau einem Stellenanbieter zugeordnet und dürfen dadurch **nur ihre eigenen** Stellenangebote anlegen/bearbeiten/löschen sowie ihren eigenen Stellenanbieter-Datensatz bearbeiten (Anlegen/Löschen von Stellenanbietern bleibt `admin` vorbehalten).
 - **Nutzerverwaltung** (`/users` — klassisch, ebenso im React-PoC; nur `admin`): Nutzer anlegen, bearbeiten, Rolle zuweisen, optional PLZ/Stadt hinterlegen. Bei Rolle `customer` erscheint zusätzlich eine Selectbox zur Zuordnung eines Stellenanbieters. Zeigt außerdem alle für diesen Nutzer generierten/hochgeladenen Lebensläufe (Tabelle `resumes`, FK auf `users`), falls vorhanden. Kein Löschen (weder klassisch noch React) — dafür gibt es bislang keine Funktion.
 - **Eigener Lebenslauf** (`/resumes` — klassisch, ebenso im React-PoC; für jeden eingeloggten Nutzer mit Rolle `user`): zeigt den aktuellsten eigenen Lebenslauf (PDF eingebettet, andere Formate als Download-Link); eine Selectbox erlaubt den Zugriff auf ältere Versionen, ein Löschbutton entfernt den ausgewählten Lebenslauf inkl. Datei. Zwei Wege für einen neuen Lebenslauf:
@@ -76,7 +76,7 @@ docker compose exec app python backfill_embeddings.py
 ```
 app.py                     Flask-Routen (klassische Jinja-Seiten), registriert die api/-Blueprints
 api/                       JSON-API für das React-PoC-Frontend (frontend/), läuft parallel zu den klassischen Routen
-  auth.py                     GET /api/auth/me - Login-Status für React (liest dieselbe Flask-Session)
+  auth.py                     /api/auth/me + /api/auth/login + /api/auth/register + /api/auth/logout - JSON-Pendant zu den klassischen Login-/Registrierungs-/Abmelden-Routen, teilt sich die Session-Erzeugung mit app.py über services/auth_service.py (log_in_user())
   jobs.py                      /api/jobs-Endpunkte (Liste/Anlegen/Bearbeiten/Löschen), ersetzt für React die Jobs-Logik aus app.py
   customers.py                  /api/customers-Endpunkte (Liste/Anlegen/Bearbeiten/Löschen), ersetzt für React die Customers-Logik aus app.py
   users.py                      /api/users-Endpunkte (Liste/Anlegen/Bearbeiten, kein Löschen), ersetzt für React die Users-Logik aus app.py; entfernt password_hash aus jeder Antwort
@@ -96,13 +96,14 @@ models/                    SQLAlchemy-ORM-Modelle + CRUD-/Abfragefunktionen je T
 services/                  KI-/Datei-Erzeugungslogik der Tools-Seiten, aus app.py-Routen ausgelagert
   text_utils.py                Aufbereitung von KI-Antworten (`<think>`-Blöcke, Markdown-Codefences entfernen)
   assistant_service.py          KI-Assistent: Modell-Konfiguration + `ask_assistant()`, von app.py (`/`) und api/assistant.py (`/api/assistant/ask`) genutzt
+  auth_service.py               `log_in_user()` (Session befüllen), von app.py und api/auth.py genutzt
   pdf_service.py                HTML-zu-PDF-Rendering (WeasyPrint)
   resume_service.py             Lebenslauf generieren/aus Upload anlegen (`RESUME_DIR`, inkl. Embedding)
   joboffer_service.py           Stellenangebot generieren/aus Upload-Text extrahieren (`JOBOFFER_DIR`, inkl. Embedding)
   ai_clients.py                 Zentrale OpenAI-Client-Instanz (von app.py und api/jobs.py genutzt)
   permissions.py                Rollen-/Berechtigungslogik für Stellenangebote + Stellenanbieter (von app.py und api/jobs.py bzw. api/customers.py genutzt)
-frontend/                  React-PoC (Vite) - bislang umgezogene Seiten: Startseite (KI-Assistent), Stellenangebote, Stellenanbieter, Nutzer, die Admin-Tools und der eigene Lebenslauf - siehe "Frontend-Migration" unten
-  src/pages/                    HomePage.jsx, JobsPage.jsx, JobEditPage.jsx, CustomersPage.jsx, CustomerEditPage.jsx, UsersPage.jsx, UserEditPage.jsx, ToolResumePage.jsx, ToolJobofferPage.jsx, MyResumesPage.jsx - je eine Komponente pro migrierter Seite
+frontend/                  React-PoC (Vite) - inzwischen alle Seiten umgezogen (Startseite/KI-Assistent, Stellenangebote, Stellenanbieter, Nutzer, Admin-Tools, eigener Lebenslauf, Login/Registrieren) - siehe "Frontend-Migration" unten
+  src/pages/                    HomePage.jsx, JobsPage.jsx, JobEditPage.jsx, CustomersPage.jsx, CustomerEditPage.jsx, UsersPage.jsx, UserEditPage.jsx, ToolResumePage.jsx, ToolJobofferPage.jsx, MyResumesPage.jsx, LoginPage.jsx, RegisterPage.jsx - je eine Komponente pro migrierter Seite
   src/components/               JobForm.jsx, JobTable.jsx, JobUploadDropzone.jsx, CustomerForm.jsx, CustomerTable.jsx, UserForm.jsx, UserTable.jsx, Pager.jsx, RichTextEditor.jsx (Quill-Wrapper)
 embeddings.py              Embedding-Erzeugung (einzeln/batch), HTML-Stripping, Cosinus-Ähnlichkeit/Top-Matches
 document_extraction.py     Textextraktion aus hochgeladenen PDF/.docx/.odt-Dateien (Lebenslauf- und Stellenangebot-Upload)
@@ -149,6 +150,14 @@ python app.py
 
 Die App läuft danach auf `http://localhost:5003`.
 
+⚠️ Ohne separat laufenden React-Dev-Server (`frontend/`, Standard-Port 5173, siehe
+[Frontend-Migration](#frontend-migration-react-poc) unten) läuft dabei ins Leere: React
+ist seit dem in dieser Anleitung nicht enthaltenen `redirect_to_react_by_default()`-Hook
+(`app.py`) die Standard-Oberfläche, `http://localhost:5003/jobs` etc. leiten also auf das
+(hier nicht gestartete) `:5173` um. Entweder zusätzlich `npm install && npm run dev` in
+`frontend/` ausführen, oder dauerhaft bei der klassischen Ansicht bleiben:
+`http://localhost:5003/?classic=1` einmal aufrufen.
+
 #### WeasyPrint unter Windows
 
 `pip install weasyprint` reicht unter Windows **nicht** aus: Der Import schlägt mit `OSError: cannot load library ... libgobject-2.0-0.dll` fehl, weil WeasyPrint zur Laufzeit native GTK-Bibliotheken (Pango/Cairo/GObject) über `cffi` lädt, die kein reines Python-Package sind. Betroffen sind ausschließlich die beiden Tools-Seiten (`/tools/resume`, `/tools/joboffer`) — der Rest der App läuft davon unberührt, **außer** der komplette App-Import schlägt fehl, weil `from weasyprint import HTML` ganz oben in `app.py` steht.
@@ -162,7 +171,7 @@ cp .env.example .env   # Werte eintragen
 docker compose up --build
 ```
 
-Startet App und PostgreSQL zusammen; die DB-Daten liegen in einem benannten Volume (`aiproject_postgres_data`), generierte PDFs unter `./data` (Bind-Mount, direkt im Projektordner sichtbar).
+Startet App, PostgreSQL und den React-Dev-Server (`frontend`-Service, Port 5173) zusammen; die DB-Daten liegen in einem benannten Volume (`aiproject_postgres_data`), generierte PDFs unter `./data` (Bind-Mount, direkt im Projektordner sichtbar). `http://localhost:5003` leitet danach automatisch auf `http://localhost:5173` weiter (siehe [React als Standard-Oberfläche](#react-als-standard-oberfläche) weiter unten) — beide Adressen funktionieren.
 
 `docker-compose.yml` lädt `.env` per `env_file` **einmalig beim Erstellen des App-Containers** in dessen Umgebung — nicht laufend. Änderungen an `.env` (egal welche Variable) werden erst wirksam, wenn der Container neu erstellt wird:
 
@@ -221,31 +230,36 @@ Seite, nicht als Big-Bang-Rewrite. Bislang umgezogen:
   `my_resumes()`-Route auf und entfernt embedding/content aus jeder Antwort.
   Die PDF-Auslieferung bleibt die klassische, besitzerschaftsgeprüfte Route
   `/resumes/<id>/file`.
+- **Login/Registrieren** (`/login`, `/register`): eigene React-Formulare,
+  rufen `POST /api/auth/login` bzw. `POST /api/auth/register` auf und
+  aktualisieren danach den Login-Status (`App.jsx` gibt `refreshUser()` per
+  Outlet-Context an die Seiten weiter). `api/auth.py` teilt sich die
+  Session-Erzeugung (`services/auth_service.py`, `log_in_user()`) mit den
+  weiterhin bestehenden klassischen `/login`- und `/register`-Routen in
+  `app.py`. **Abmelden** läuft im React-Konto-Menü über `POST
+  /api/auth/logout` als Button (kein Seitenwechsel mehr nötig); die
+  klassische GET-Route `/logout` bleibt für die klassische Seite bestehen.
 
-Alle sieben Seiten laufen komplett innerhalb der React-SPA (client-seitiges
+Alle neun Seiten laufen komplett innerhalb der React-SPA (client-seitiges
 Routing via `react-router-dom`) — es wird an keiner Stelle automatisch zur
-klassischen Flask-Darstellung gesprungen; ein Link "Zur klassischen Seite"
-bleibt als bewusster, expliziter Ausstieg bestehen.
+klassischen Flask-Darstellung gesprungen; ein Link "Klassisch" bleibt als
+bewusster, expliziter Ausstieg bestehen (siehe "React als Standard-Oberfläche"
+unten für den Umkehr-Mechanismus).
 
 - **`api/`** stellt die dafür nötigen JSON-Endpunkte bereit (`/api/jobs/...`,
   `/api/customers/...`, `/api/users/...`, `/api/tools/...`, `/api/resumes/...`,
-  `/api/assistant(/ask)`, `/api/auth/me`), parallel zu den bestehenden
+  `/api/auth/...`, `/api/assistant(/ask)`), parallel zu den bestehenden
   Template-Routen in `app.py` — die klassischen Seiten funktionieren
   unverändert weiter, beide Varianten teilen sich die zugrundeliegende Logik
   in `services/` (z.B. `customer_management_permission()` für die
-  Bearbeiten-Rechte der Stellenanbieter, oder
-  `resume_service.py`/`joboffer_service.py` für Tools und eigenen Lebenslauf).
+  Bearbeiten-Rechte der Stellenanbieter, `resume_service.py`/
+  `joboffer_service.py` für Tools und eigenen Lebenslauf, oder
+  `auth_service.py` für die Login-Session).
 - **`frontend/`** ist ein eigenständiges Vite/React-Projekt, läuft als eigener
   `frontend`-Service in `docker-compose.yml` auf Port 5173 (`docker compose up -d
   frontend`, danach `http://localhost:5173`). Zusätzliche npm-Abhängigkeiten:
   `quill` (Rich-Text-Editor) und `dompurify` (HTML-Sanitisierung vor jeder Anzeige/
   Editor-Befüllung von gespeichertem Beschreibungs-HTML).
-- **Login/Registrierung/Abmelden** laufen weiterhin über die klassischen
-  Flask-Seiten (`http://localhost:5003/login` etc., verlinkt aus dem
-  React-Konto-Menü) — React liest den Login-Status nur aus (`/api/auth/me`)
-  und nutzt dieselbe Session-Cookie über CORS (`FRONTEND_ORIGIN` in
-  `docker-compose.yml`, `flask_cors` in `app.py`). Ein eigenes
-  Login-/Registrierungs-Formular in React gibt es noch nicht.
 - **Layout**: `App.jsx` bildet body-Navigation und Haupt-Container exakt wie im
   klassischen `body`-Flex-Layout nach (`#root { display: contents; }` in
   `static/style.css`, kein zusätzliches Wrapper-`<div>`) — Nav- und Content-Breite
@@ -255,8 +269,28 @@ bleibt als bewusster, expliziter Ausstieg bestehen.
   oder der Kunde-Link auf der Job-Bearbeiten-Seite → Stellenanbieter-Bearbeiten) konsequent
   intern über `react-router-dom`, nicht mehr auf die klassische Flask-Seite.
 
-Damit sind alle Hauptseiten umgezogen; nur Login/Registrierung/Abmelden bleiben
-bewusst klassisch (siehe "Login/Registrierung/Abmelden" oben).
+Damit sind alle Seiten der Anwendung nach React umgezogen; die klassischen
+Jinja-Templates bleiben als vollwertige, parallel funktionierende Alternative
+bestehen (siehe "React als Standard-Oberfläche" unten für den Umschalt-Mechanismus).
+
+### React als Standard-Oberfläche
+
+Ein `@app.before_request`-Hook in `app.py` (`redirect_to_react_by_default()`)
+leitet GET-Aufrufe einer klassischen Seite mit React-Entsprechung automatisch
+auf `FRONTEND_ORIGIN` um (`_REACT_PAGE_ROUTES` in `app.py` listet, welche
+Endpunkte betroffen sind, inzwischen inkl. `login`/`register` — bewusst nur
+Seiten mit echtem React-Pendant; Abmelden [reiner Redirect ohne eigene Seite],
+Datei-Auslieferungsrouten, Lösch-Endpunkte, `/api/*` und `/static/*` bleiben
+immer außen vor). POST/PUT/DELETE werden nie umgeleitet, sonst würden
+Formularabsendungen der klassischen Seiten ins Leere laufen.
+
+Der "Klassisch"-Link im React-Menü hängt `?classic=1` an und merkt sich das
+in der Flask-Session (`session["ui_pref"]`) — solange diese Session-Cookie
+lebt (endet mit dem Neustart des Browsers, oder explizit durch Abmelden, das
+`session.clear()` aufruft), bleibt auch sämtliche Folgenavigation inkl.
+Formular-POST-Redirects auf der klassischen Seite. `?classic=0` auf einer
+beliebigen klassischen Seite macht diese Wahl wieder rückgängig und leitet
+sofort auf React um.
 
 ### Von MySQL migrieren
 

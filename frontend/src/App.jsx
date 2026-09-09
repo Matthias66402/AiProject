@@ -1,21 +1,34 @@
-import { useEffect, useRef, useState } from 'react'
-import { Link, Outlet, useLocation } from 'react-router-dom'
-import { API_BASE, apiGet } from './api/client'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { API_BASE, apiGet, apiPost } from './api/client'
 
 export default function App() {
   // undefined = wird geladen, null = nicht eingeloggt, sonst {id, short_name, role, customer_id}
   const [user, setUser] = useState(undefined)
   const toolsMenuRef = useRef(null)
+  const accountMenuRef = useRef(null)
   const location = useLocation()
+  const navigate = useNavigate()
 
-  useEffect(() => {
-    apiGet('/api/auth/me')
+  const refreshUser = useCallback(() => {
+    return apiGet('/api/auth/me')
       .then((data) => setUser(data.user))
       .catch(() => setUser(null))
   }, [])
 
+  useEffect(() => {
+    refreshUser()
+  }, [refreshUser])
+
   function navClass(active) {
     return active ? 'active' : undefined
+  }
+
+  async function handleLogout() {
+    if (accountMenuRef.current) accountMenuRef.current.open = false
+    await apiPost('/api/auth/logout', {})
+    await refreshUser()
+    navigate('/')
   }
 
   return (
@@ -92,12 +105,12 @@ export default function App() {
             </div>
           </details>
         )}
-        <a href={API_BASE + '/'} style={{ marginLeft: 'auto' }}>
+        <a href={API_BASE + '/?classic=1'} style={{ marginLeft: 'auto' }}>
           <i className="fa-solid fa-landmark text-[#76A250]" /> Klassisch
         </a>
         {user === undefined && <span>Lade …</span>}
         {user !== undefined && (
-          <details style={{ position: 'relative' }}>
+          <details ref={accountMenuRef} style={{ position: 'relative' }}>
             <summary
               style={{
                 cursor: 'pointer',
@@ -133,18 +146,47 @@ export default function App() {
                       <i className="fa-solid fa-file-lines text-[#76A250]" /> Lebenslauf
                     </Link>
                   )}
-                  <a href={API_BASE + '/logout'} style={{ padding: '0.5rem 1rem' }}>
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      background: 'none',
+                      border: 'none',
+                      color: '#ffe9a8',
+                      font: 'inherit',
+                      fontSize: '0.78rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.4px',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                    }}
+                  >
                     <i className="fa-solid fa-right-from-bracket text-[#76A250]" /> Abmelden
-                  </a>
+                  </button>
                 </>
               ) : (
                 <>
-                  <a href={API_BASE + '/login'} style={{ padding: '0.5rem 1rem' }}>
+                  <Link
+                    to="/login"
+                    className={navClass(location.pathname === '/login')}
+                    style={{ padding: '0.5rem 1rem' }}
+                    onClick={() => {
+                      if (accountMenuRef.current) accountMenuRef.current.open = false
+                    }}
+                  >
                     <i className="fa-solid fa-right-to-bracket text-[#76A250]" /> Anmelden
-                  </a>
-                  <a href={API_BASE + '/register'} style={{ padding: '0.5rem 1rem' }}>
+                  </Link>
+                  <Link
+                    to="/register"
+                    className={navClass(location.pathname === '/register')}
+                    style={{ padding: '0.5rem 1rem' }}
+                    onClick={() => {
+                      if (accountMenuRef.current) accountMenuRef.current.open = false
+                    }}
+                  >
                     <i className="fa-solid fa-user-plus text-[#76A250]" /> Registrieren
-                  </a>
+                  </Link>
                 </>
               )}
             </div>
@@ -152,7 +194,7 @@ export default function App() {
         )}
       </nav>
       <main className="scroll full" style={{ padding: '1.5rem' }}>
-        <Outlet context={{ user }} />
+        <Outlet context={{ user, refreshUser }} />
       </main>
     </>
   )
