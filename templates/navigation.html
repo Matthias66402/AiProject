@@ -6,15 +6,15 @@
     </button>
 
     <div id="nav-links" class="hidden md:flex w-full md:flex-1 flex-col md:flex-row md:items-center gap-3 md:gap-5 mt-3 md:mt-0">
+        <strong>Stellenmarkt-AI (Flask)</strong>
         <a href="{{ url_for('home') }}" class="{{ 'active' if request.endpoint == 'home' else '' }}"><i class="fa-solid fa-home text-xl text-[#76A250]"></i> Start</a>
         <a href="{{ url_for('jobs') }}" class="{{ 'active' if request.endpoint in ('jobs', 'edit_job') else '' }}"><i class="fa-solid fa-briefcase text-xl text-[#76A250]"></i> Stellenangebote</a>
-        <a href="{{ FRONTEND_URL }}/jobs" title="Stellenangebote (React-Testversion)"><i class="fa-solid fa-flask text-xl text-[#76A250]"></i> SN</a>
+
         <a href="{{ url_for('customers') }}" class="{{ 'active' if request.endpoint in ('customers', 'edit_customer') else '' }}"><i class="fa-solid fa-building text-xl text-[#76A250]"></i> Stellenanbieter</a>
 
         {% if current_user and current_user.role == 'admin' %}
         <a href="{{ url_for('users') }}" class="{{ 'active' if request.endpoint in ('users', 'edit_user') else '' }}"><i class="fa-solid fa-users text-xl text-[#76A250]"></i> Nutzer</a>
         {% endif %}
-
         {% if current_user and current_user.role == 'admin' %}
         <details class="relative">
             <summary class="cursor-pointer flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[rgba(255,215,130,0.35)] bg-[rgba(0,0,0,0.2)] text-[#ffe9a8] text-sm select-none w-fit">
@@ -29,7 +29,9 @@
         </details>
         {% endif %}
 
-        <details class="relative md:ml-auto">
+        <a class="md:ml-auto" href="{{ FRONTEND_URL }}/" title="Stellenangebote (React-Testversion)"><i class="fa-solid fa-flask text-xl text-[#76A250]"></i> Reaktiv</a>
+
+        <details class="relative">
             <summary class="cursor-pointer flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[rgba(255,215,130,0.35)] bg-[rgba(0,0,0,0.2)] text-[#ffe9a8] text-sm select-none w-fit">
                 <i class="fa-solid fa-user text-[#76A250]"></i>
                 {{ current_user.short_name if current_user else 'Konto' }}

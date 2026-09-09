@@ -22,6 +22,8 @@ from api.jobs import jobs_api
 from api.assistant import assistant_api
 from api.customers import customers_api
 from api.users import users_api
+from api.tools import tools_api
+from api.resumes import resumes_api
 
 load_dotenv()
 
@@ -48,6 +50,8 @@ app.register_blueprint(jobs_api)
 app.register_blueprint(assistant_api)
 app.register_blueprint(customers_api)
 app.register_blueprint(users_api)
+app.register_blueprint(tools_api)
+app.register_blueprint(resumes_api)
 db.init_db()
 
 

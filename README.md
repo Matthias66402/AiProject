@@ -12,7 +12,7 @@ Die Website ist noch im Aufbau, Struktur und Funktionsumfang können sich häufi
 - **Login/Registrierung**: Nutzer registrieren sich (immer mit Rolle `user`), melden sich an/ab; Passwörter werden gehasht (Werkzeug) gespeichert.
 - **Rollen**: `user` (Standard bei Registrierung), `customer`, `admin` — Liste zentral in `models/user.py` (`ROLES`). `admin` vergibt Rollen und hat vollen Schreibzugriff auf Nutzer-, Stellenanbieter- und Stellenverwaltung. `customer`-Nutzer sind über `users.customer_id` (nullable FK auf `customers`, Zuweisung durch einen Admin im Nutzerformular) genau einem Stellenanbieter zugeordnet und dürfen dadurch **nur ihre eigenen** Stellenangebote anlegen/bearbeiten/löschen sowie ihren eigenen Stellenanbieter-Datensatz bearbeiten (Anlegen/Löschen von Stellenanbietern bleibt `admin` vorbehalten).
 - **Nutzerverwaltung** (`/users` — klassisch, ebenso im React-PoC; nur `admin`): Nutzer anlegen, bearbeiten, Rolle zuweisen, optional PLZ/Stadt hinterlegen. Bei Rolle `customer` erscheint zusätzlich eine Selectbox zur Zuordnung eines Stellenanbieters. Zeigt außerdem alle für diesen Nutzer generierten/hochgeladenen Lebensläufe (Tabelle `resumes`, FK auf `users`), falls vorhanden. Kein Löschen (weder klassisch noch React) — dafür gibt es bislang keine Funktion.
-- **Eigener Lebenslauf** (`/resumes`, für jeden eingeloggten Nutzer mit Rolle `user`): zeigt den aktuellsten eigenen Lebenslauf (PDF eingebettet, andere Formate als Download-Link); eine Selectbox erlaubt den Zugriff auf ältere Versionen, ein Löschbutton entfernt den ausgewählten Lebenslauf inkl. Datei. Zwei Wege für einen neuen Lebenslauf:
+- **Eigener Lebenslauf** (`/resumes` — klassisch, ebenso im React-PoC; für jeden eingeloggten Nutzer mit Rolle `user`): zeigt den aktuellsten eigenen Lebenslauf (PDF eingebettet, andere Formate als Download-Link); eine Selectbox erlaubt den Zugriff auf ältere Versionen, ein Löschbutton entfernt den ausgewählten Lebenslauf inkl. Datei. Zwei Wege für einen neuen Lebenslauf:
   - **Generieren** — dieselbe KI-Logik wie das Admin-Tool `/tools/resume`: verwendet immer den echten Namen des Nutzers, der Wohnort wird nur übernommen, wenn PLZ **und** Stadt hinterlegt sind (sonst frei erfunden).
   - **Hochladen** (Dropzone mit Drag & Drop) — eigene Datei als PDF/.docx/.odt hochladen; der Text wird ausgelesen (`document_extraction.py`) und wie bei der Generierung vektorisiert.
 
@@ -28,7 +28,7 @@ Die Website ist noch im Aufbau, Struktur und Funktionsumfang können sich häufi
   - Alle anderen: nur Liste + Lesemodus ("Ansehen"), kein Bearbeiten/Löschen.
   - Die Bearbeiten-Ansicht zeigt zusätzlich die zu diesem Stellenanbieter gehörenden Stellenangebote.
   - Anlegen von neuen Stellen per Dokumenten-Upload wird automatisch dem eingeloggten Stellenanbieter zugeordnet.
-- **Tools-Menü** (nur für Rolle `admin`): lässt die KI Inhalte als HTML formulieren und rendert sie per WeasyPrint zu PDF, mit dezentem Lade-Spinner während der Generierung und Link zum Öffnen der fertigen Datei in einem neuen Tab.
+- **Tools-Menü** (nur für Rolle `admin` — klassisch, ebenso im React-PoC): lässt die KI Inhalte als HTML formulieren und rendert sie per WeasyPrint zu PDF, mit dezentem Lade-Spinner während der Generierung und Link zum Öffnen der fertigen Datei in einem neuen Tab.
   - **Lebenslauf generieren** (`/tools/resume`): ein bestehender Nutzer wird per Selectbox ausgewählt. Sind bei ihm PLZ **und** Stadt hinterlegt, übernimmt die KI dessen echten Namen und Wohnort unverändert (Rest frei erfunden); ansonsten ein komplett fiktiver Dummy-Lebenslauf. Das PDF wird unter `data/resumes/` abgelegt und als neuer Eintrag in `resumes` (FK auf den Nutzer) gespeichert.
   - **Stellenangebot generieren** (`/tools/joboffer`): ein Stellenanbieter wird per Selectbox ausgewählt. Die KI liefert Position, PLZ, Stadt und den Stellentext strukturiert als JSON zurück; das PDF wird unter `data/joboffers/` abgelegt und automatisch ein passender Eintrag in `/jobs` angelegt (inkl. `document_link`, Gültigkeit heute bis +30 Tage).
   - ⚠️ Läuft nur, wo WeasyPrints native Abhängigkeiten (Pango/Cairo) vorhanden sind — siehe [WeasyPrint unter Windows](#weasyprint-unter-windows) weiter unten. Im Docker-Image ist das bereits eingerichtet.
@@ -80,6 +80,8 @@ api/                       JSON-API für das React-PoC-Frontend (frontend/), lä
   jobs.py                      /api/jobs-Endpunkte (Liste/Anlegen/Bearbeiten/Löschen), ersetzt für React die Jobs-Logik aus app.py
   customers.py                  /api/customers-Endpunkte (Liste/Anlegen/Bearbeiten/Löschen), ersetzt für React die Customers-Logik aus app.py
   users.py                      /api/users-Endpunkte (Liste/Anlegen/Bearbeiten, kein Löschen), ersetzt für React die Users-Logik aus app.py; entfernt password_hash aus jeder Antwort
+  tools.py                      /api/tools/resume + /api/tools/joboffer (KI-Generierung), ruft dieselben services/*_service.py-Funktionen wie /tools/resume + /tools/joboffer in app.py auf
+  resumes.py                     /api/resumes-Endpunkte (Liste/Anzeige/Generieren/Hochladen/Löschen), ersetzt für React die my_resumes()-Logik aus app.py
   assistant.py                  /api/assistant(/ask)-Endpunkte (Modellliste, Frage stellen) für die React-Startseite
 db/                        DB-Verbindung & Schema (siehe unten), von außen weiterhin per `import db` als Einheit genutzt
   __init__.py                Re-Export der öffentlichen Funktionen/Konstanten aus db_init.py und models/
@@ -99,8 +101,8 @@ services/                  KI-/Datei-Erzeugungslogik der Tools-Seiten, aus app.p
   joboffer_service.py           Stellenangebot generieren/aus Upload-Text extrahieren (`JOBOFFER_DIR`, inkl. Embedding)
   ai_clients.py                 Zentrale OpenAI-Client-Instanz (von app.py und api/jobs.py genutzt)
   permissions.py                Rollen-/Berechtigungslogik für Stellenangebote + Stellenanbieter (von app.py und api/jobs.py bzw. api/customers.py genutzt)
-frontend/                  React-PoC (Vite) - bislang umgezogene Seiten: Startseite (KI-Assistent), Stellenangebote, Stellenanbieter und Nutzer - siehe "Frontend-Migration" unten
-  src/pages/                    HomePage.jsx, JobsPage.jsx, JobEditPage.jsx, CustomersPage.jsx, CustomerEditPage.jsx, UsersPage.jsx, UserEditPage.jsx - je eine Komponente pro migrierter Seite
+frontend/                  React-PoC (Vite) - bislang umgezogene Seiten: Startseite (KI-Assistent), Stellenangebote, Stellenanbieter, Nutzer, die Admin-Tools und der eigene Lebenslauf - siehe "Frontend-Migration" unten
+  src/pages/                    HomePage.jsx, JobsPage.jsx, JobEditPage.jsx, CustomersPage.jsx, CustomerEditPage.jsx, UsersPage.jsx, UserEditPage.jsx, ToolResumePage.jsx, ToolJobofferPage.jsx, MyResumesPage.jsx - je eine Komponente pro migrierter Seite
   src/components/               JobForm.jsx, JobTable.jsx, JobUploadDropzone.jsx, CustomerForm.jsx, CustomerTable.jsx, UserForm.jsx, UserTable.jsx, Pager.jsx, RichTextEditor.jsx (Quill-Wrapper)
 embeddings.py              Embedding-Erzeugung (einzeln/batch), HTML-Stripping, Cosinus-Ähnlichkeit/Top-Matches
 document_extraction.py     Textextraktion aus hochgeladenen PDF/.docx/.odt-Dateien (Lebenslauf- und Stellenangebot-Upload)
@@ -202,37 +204,59 @@ Seite, nicht als Big-Bang-Rewrite. Bislang umgezogen:
   `customer`) und Anzeige der Lebensläufe des Nutzers. Der Passwort-Hash verlässt
   die API nie (`api/users.py` entfernt ihn aus jeder Antwort); Löschen gibt es wie
   in der klassischen Ansicht nicht.
+- **Admin-Tools** (`/tools/resume`, `/tools/joboffer`, nur `admin`): Lebenslauf
+  bzw. Stellenangebot per KI generieren, inkl. Lade-Spinner während der
+  WeasyPrint-PDF-Erzeugung und Link zum fertigen PDF (öffnet die weiterhin
+  klassische `/tools/resume/<datei>`-Auslieferungsroute in einem neuen Tab -
+  funktioniert dort per direkter Browser-Navigation auch ohne CORS auf dieser
+  Route). `api/tools.py` ruft dieselben `services/resume_service.py`- und
+  `services/joboffer_service.py`-Funktionen wie die klassischen Routen auf.
+- **Eigener Lebenslauf** (`/resumes`, für jeden eingeloggten Nutzer): Versions-
+  Selectbox, eingebettetes PDF (bzw. Download-Link für andere Formate),
+  Löschen, Generieren per KI und Hochladen (Dropzone mit Drag & Drop, inkl.
+  Übernahme der gedroppten Datei in den nativen `<input type="file">` fürs
+  Formular - sonst würde die HTML5-`required`-Prüfung beim Absenden
+  fehlschlagen) sowie die Liste passender Stellenangebote. `api/resumes.py`
+  ruft dieselben `resume_service.py`-Funktionen wie die klassische
+  `my_resumes()`-Route auf und entfernt embedding/content aus jeder Antwort.
+  Die PDF-Auslieferung bleibt die klassische, besitzerschaftsgeprüfte Route
+  `/resumes/<id>/file`.
 
-Alle vier Seiten laufen komplett innerhalb der React-SPA (client-seitiges Routing
-via `react-router-dom`) — es wird an keiner Stelle automatisch zur klassischen
-Flask-Darstellung gesprungen; ein Link "Zur klassischen Seite" bleibt als bewusster,
-expliziter Ausstieg bestehen.
+Alle sieben Seiten laufen komplett innerhalb der React-SPA (client-seitiges
+Routing via `react-router-dom`) — es wird an keiner Stelle automatisch zur
+klassischen Flask-Darstellung gesprungen; ein Link "Zur klassischen Seite"
+bleibt als bewusster, expliziter Ausstieg bestehen.
 
 - **`api/`** stellt die dafür nötigen JSON-Endpunkte bereit (`/api/jobs/...`,
-  `/api/customers/...`, `/api/users/...`, `/api/assistant(/ask)`, `/api/auth/me`),
-  parallel zu den bestehenden Template-Routen in `app.py` — die klassischen Seiten
-  funktionieren unverändert weiter, beide Varianten teilen sich die
-  zugrundeliegende Logik in `services/` (z.B. `customer_management_permission()`
-  für die Bearbeiten-Rechte der Stellenanbieter).
+  `/api/customers/...`, `/api/users/...`, `/api/tools/...`, `/api/resumes/...`,
+  `/api/assistant(/ask)`, `/api/auth/me`), parallel zu den bestehenden
+  Template-Routen in `app.py` — die klassischen Seiten funktionieren
+  unverändert weiter, beide Varianten teilen sich die zugrundeliegende Logik
+  in `services/` (z.B. `customer_management_permission()` für die
+  Bearbeiten-Rechte der Stellenanbieter, oder
+  `resume_service.py`/`joboffer_service.py` für Tools und eigenen Lebenslauf).
 - **`frontend/`** ist ein eigenständiges Vite/React-Projekt, läuft als eigener
   `frontend`-Service in `docker-compose.yml` auf Port 5173 (`docker compose up -d
   frontend`, danach `http://localhost:5173`). Zusätzliche npm-Abhängigkeiten:
   `quill` (Rich-Text-Editor) und `dompurify` (HTML-Sanitisierung vor jeder Anzeige/
   Editor-Befüllung von gespeichertem Beschreibungs-HTML).
-- **Login** läuft weiterhin über die klassische Flask-Seite (`http://localhost:5003/login`)
-  — React liest den Login-Status nur aus (`/api/auth/me`) und nutzt dieselbe
-  Session-Cookie über CORS (`FRONTEND_ORIGIN` in `docker-compose.yml`,
-  `flask_cors` in `app.py`). Ein eigenes Login-Formular in React gibt es noch nicht.
+- **Login/Registrierung/Abmelden** laufen weiterhin über die klassischen
+  Flask-Seiten (`http://localhost:5003/login` etc., verlinkt aus dem
+  React-Konto-Menü) — React liest den Login-Status nur aus (`/api/auth/me`)
+  und nutzt dieselbe Session-Cookie über CORS (`FRONTEND_ORIGIN` in
+  `docker-compose.yml`, `flask_cors` in `app.py`). Ein eigenes
+  Login-/Registrierungs-Formular in React gibt es noch nicht.
 - **Layout**: `App.jsx` bildet body-Navigation und Haupt-Container exakt wie im
   klassischen `body`-Flex-Layout nach (`#root { display: contents; }` in
   `static/style.css`, kein zusätzliches Wrapper-`<div>`) — Nav- und Content-Breite
   bleiben dadurch wie bei Flask konstant, unabhängig vom Tabelleninhalt.
-- Verlinkungen zu noch nicht umgezogenen Seiten (z.B. Nutzerbearbeitung aus der
-  Kandidaten-Matching-Liste) zeigen bewusst auf die klassische Flask-Seite.
+- Da inzwischen alle Hauptseiten umgezogen sind, verlinken auch bereichsübergreifende
+  Stellen (z.B. die Kandidaten-Matching-Liste auf der Job-Bearbeiten-Seite → Nutzerbearbeitung,
+  oder der Kunde-Link auf der Job-Bearbeiten-Seite → Stellenanbieter-Bearbeiten) konsequent
+  intern über `react-router-dom`, nicht mehr auf die klassische Flask-Seite.
 
-Nächster Kandidat für den Umzug wäre analog `/resumes` (eigener Lebenslauf) oder
-die Tools-Seiten (`/tools/resume`, `/tools/joboffer`). Login/Registrierung/Abmelden
-bleiben bewusst klassisch (siehe "Login" oben).
+Damit sind alle Hauptseiten umgezogen; nur Login/Registrierung/Abmelden bleiben
+bewusst klassisch (siehe "Login/Registrierung/Abmelden" oben).
 
 ### Von MySQL migrieren
 

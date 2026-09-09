@@ -179,9 +179,9 @@ export default function JobEditPage() {
             <ul>
               {job.matching_resumes.map((m) => (
                 <li key={m.id}>
-                  <a href={`${API_BASE}/users/${m.user_id}/edit`}>
+                  <Link to={`/users/${m.user_id}/edit`}>
                     {m.first_name} {m.last_name} ({m.short_name})
-                  </a>{' '}
+                  </Link>{' '}
                   · {(m.similarity * 100).toFixed(1)}% Übereinstimmung
                 </li>
               ))}

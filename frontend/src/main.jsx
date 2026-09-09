@@ -9,6 +9,9 @@ import CustomersPage from './pages/CustomersPage.jsx'
 import CustomerEditPage from './pages/CustomerEditPage.jsx'
 import UsersPage from './pages/UsersPage.jsx'
 import UserEditPage from './pages/UserEditPage.jsx'
+import ToolResumePage from './pages/ToolResumePage.jsx'
+import ToolJobofferPage from './pages/ToolJobofferPage.jsx'
+import MyResumesPage from './pages/MyResumesPage.jsx'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
@@ -22,6 +25,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <Route path="customers/:customerId/edit" element={<CustomerEditPage />} />
           <Route path="users" element={<UsersPage />} />
           <Route path="users/:userId/edit" element={<UserEditPage />} />
+          <Route path="tools/resume" element={<ToolResumePage />} />
+          <Route path="tools/joboffer" element={<ToolJobofferPage />} />
+          <Route path="resumes" element={<MyResumesPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
