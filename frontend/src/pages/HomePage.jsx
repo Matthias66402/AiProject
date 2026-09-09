@@ -22,6 +22,7 @@ export default function HomePage() {
     e.preventDefault()
     setAsking(true)
     setError('')
+    setAnswer('')
     try {
       const data = await apiPost('/api/assistant/ask', { question, model })
       setAnswer(data.answer)

@@ -93,17 +93,14 @@ export default function CustomerEditPage() {
         ) : (
           <div className="entity-view">
             <div>
-              <label>Firma</label>
-              <p>{customer.company_name}</p>
-              <p>
-                {customer.street} {customer.street_number}
-              </p>
-              <p>
-                {customer.zip} {customer.city}
-              </p>
+              <label>Unternehmen</label>
+              <em className="test">{customer.company_name}</em>
+              <em>
+                {customer.street} {customer.street_number}, {customer.zip} {customer.city}
+              </em>
             </div>
             <Link className="subtle-btn" to="/customers">
-              Schließen
+              Zurück
             </Link>
           </div>
         )}

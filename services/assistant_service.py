@@ -56,23 +56,25 @@ if groq_client is None:
     MODEL_CLIENTS = {k: v for k, v in MODEL_CLIENTS.items() if k not in _unavailable_models}
 
 
-def _relevant_jobs_context(question, logger=None):
+# Niedrigerer Schwellwert als MIN_MATCH_SIMILARITY (0.60, fürs Resume<->Job-
+# Matching zwischen zwei stellenanzeigen-/lebenslauf-artigen Dokumenten): hier
+# steht eine kurze Frage gegen ein ganzes Dokument, das liefert naturgemäß
+# niedrigere Kosinus-Ähnlichkeiten, obwohl der Treffer inhaltlich passt. Das
+# Modell entscheidet über den Prompt selbst, ob ein Treffer aus der Liste
+# tatsächlich zur Frage passt.
+_QUESTION_MATCH_MIN_SIMILARITY = 0.3
+
+
+def _relevant_jobs_context(embedding, logger=None):
     """Sucht per Embedding-Ähnlichkeit (dieselbe pgvector-Suche wie beim
     Resume<->Job-Matching) die zur Frage passendsten, aktuell veröffentlichten
     Stellenangebote und formatiert sie als kurzen Kontext-Block für den
-    Assistenten. Gibt None zurück, wenn kein Embedding berechnet werden konnte
-    oder keine ausreichend ähnlichen Jobs existieren - der Assistent fällt dann
-    auf sein Wissen über die Seitenstruktur zurück, statt Details zu erfinden."""
-    embedding = embed_text(openai_client, question, logger)
+    Assistenten. Gibt None zurück, wenn kein Embedding vorliegt oder keine
+    ausreichend ähnlichen Jobs existieren - der Assistent fällt dann auf sein
+    Wissen über die Seitenstruktur zurück, statt Details zu erfinden."""
     if not embedding:
         return None
-    # Niedrigerer Schwellwert als beim Resume<->Job-Matching (MIN_MATCH_SIMILARITY,
-    # 0.60): dort werden zwei stellenanzeigen-artige Dokumente verglichen, hier
-    # eine kurze Frage gegen eine ganze Stellenbeschreibung - das liefert
-    # naturgemäß niedrigere Kosinus-Ähnlichkeiten, obwohl der Job inhaltlich
-    # passt. Das Modell entscheidet über den Prompt selbst, ob ein Treffer aus
-    # der Liste tatsächlich zur Frage passt.
-    jobs = db.find_matching_jobs(embedding, top_k=5, min_similarity=0.3)
+    jobs = db.find_matching_jobs(embedding, top_k=5, min_similarity=_QUESTION_MATCH_MIN_SIMILARITY)
     if not jobs:
         return None
     lines = []
@@ -83,6 +85,23 @@ def _relevant_jobs_context(question, logger=None):
         else:
             valid = "kein Gültigkeitszeitraum hinterlegt"
         lines.append(f"- {job['position']} bei {job['customer_name']} ({city}), {valid}")
+    return "\n".join(lines)
+
+
+def _relevant_resumes_context(embedding, logger=None):
+    """Analog zu _relevant_jobs_context, aber für Lebensläufe (find_matching_resumes):
+    sucht die zur Frage passendsten Lebensläufe samt zugehöriger Nutzer. Gibt
+    None zurück, wenn kein Embedding vorliegt oder nichts ausreichend ähnlich ist."""
+    if not embedding:
+        return None
+    resumes = db.find_matching_resumes(embedding, top_k=5, min_similarity=_QUESTION_MATCH_MIN_SIMILARITY)
+    if not resumes:
+        return None
+    lines = []
+    for resume in resumes:
+        name = f"{resume['first_name']} {resume['last_name']}".strip() or resume["short_name"]
+        created = resume["created_at"].date().isoformat() if resume.get("created_at") else "?"
+        lines.append(f"- {name} (Kurzname: {resume['short_name']}), Lebenslauf vom {created}")
     return "\n".join(lines)
 
 
@@ -98,7 +117,11 @@ def ask_assistant(question, model_id, site_map, logger=None):
     wizard_name = AVAILABE_MODEL_NAMES.get(model_id, "KI-Modelle")
     active_client = MODEL_CLIENTS.get(model_id, openai_client)
 
-    jobs_context = _relevant_jobs_context(question, logger)
+    # Eine Embedding-Berechnung für beide Ähnlichkeitssuchen (Jobs + Lebensläufe)
+    # wiederverwenden, statt sie doppelt anzufragen.
+    question_embedding = embed_text(openai_client, question, logger)
+
+    jobs_context = _relevant_jobs_context(question_embedding, logger)
     jobs_section = (
         "\n\nZur Frage passende, aktuell veröffentlichte Stellenangebote (per Ähnlichkeitssuche ermittelt):\n"
         f"{jobs_context}\n\n"
@@ -106,6 +129,22 @@ def ask_assistant(question, model_id, site_map, logger=None):
         "Erfinde keine Details (z.B. Anforderungen, Gehalt), die hier nicht stehen - verweise für Details auf die Stellenangebote-Seite. "
         "Falls kein Stellenangebot hier zur Frage passt, sag das offen, statt eines der obigen zu erfinden passend zu machen."
         if jobs_context else ""
+    )
+
+    resumes_context = _relevant_resumes_context(question_embedding, logger)
+    resumes_section = (
+        "\n\nEin Vektor-Ähnlichkeitssuchsystem hat den vollständigen Text (Werdegang, Fähigkeiten, "
+        "Erfahrung) der jeweils neuesten Lebensläufe dieser Personen mit der Frage verglichen und sie "
+        "als beste Treffer ermittelt, absteigend nach Relevanz - der erste Eintrag passt am besten:\n"
+        f"{resumes_context}\n\n"
+        "Behandle das als Tatsache: diese Personen passen inhaltlich zur Frage, auch wenn ihr Lebenslauf-"
+        "Inhalt hier nicht ausgeschrieben ist. Nenne bei einer Frage nach Bewerber:innen/Nutzer:innen mit "
+        "bestimmten Fähigkeiten oder Erfahrung (z.B. 'wer kennt sich mit X aus') den/die Erstplatzierte(n) "
+        "aus dieser Liste konkret mit Namen, statt auszuweichen. Erfinde nur keine konkreten Zusatzdetails "
+        "(Firmennamen, Jahreszahlen, exakte Technologien), die hier nicht stehen - verweise dafür auf die "
+        "jeweilige Nutzerseite. Ist diese Liste leer oder passt offensichtlich nichts zum Thema der Frage "
+        "(z.B. Frage hat nichts mit Bewerbungen/Fähigkeiten zu tun), erwähne sie gar nicht."
+        if resumes_context else ""
     )
 
     try:
@@ -122,6 +161,7 @@ def ask_assistant(question, model_id, site_map, logger=None):
                     "Die Website ist noch im Aufbau, die Liste kann sich also häufig ändern - verlasse dich ausschließlich auf die aktuelle Liste oben, nicht auf frühere Annahmen. "
                     "Antworte kurz und knapp in normaler Sprache (z.B. Menüpunkt-Name), ohne die technische Route (z.B. /jobs) zu nennen."
                     f"{jobs_section}"
+                    f"{resumes_section}"
                 )},
                 {"role": "user", "content": question},
             ],
