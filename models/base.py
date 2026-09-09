@@ -46,6 +46,13 @@ def get_session():
         session.close()
 
 
+def escape_like(value):
+    """Escaped %/_ (ILIKE-Wildcards) in einem Suchbegriff, damit sie als Literal
+    statt als Wildcard behandelt werden, falls jemand sie in ein Suchfeld tippt.
+    Verwendung: column.ilike(f"%{escape_like(value)}%", escape="\\")."""
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 def to_dict(instance):
     """Wandelt eine ORM-Instanz in ein flaches dict aller Spalten um - Ersatz
     für die dict-artigen Zeilen, die app.py/Templates bisher von psycopg2s

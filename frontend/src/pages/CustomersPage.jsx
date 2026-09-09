@@ -12,15 +12,30 @@ export default function CustomersPage() {
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(10)
   const [error, setError] = useState('')
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
 
   const isAdmin = user?.role === 'admin'
   const isCustomerUser = Boolean(user?.role === 'customer' && user?.customer_id)
 
+  // Dynamisches Suchfeld (Firmierung, PLZ, Ort): kurz entprellen, statt bei
+  // jedem Tastendruck sofort neu zu laden, und dabei auf Seite 1
+  // zurückspringen, da das Suchergebnis eine andere Seitenzahl haben kann.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search.trim())
+      setPage(1)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [search])
+
   const load = useCallback(() => {
-    apiGet(`/api/customers?page=${page}&per_page=${perPage}`)
+    const params = new URLSearchParams({ page: String(page), per_page: String(perPage) })
+    if (debouncedSearch) params.set('search', debouncedSearch)
+    apiGet(`/api/customers?${params.toString()}`)
       .then(setData)
       .catch((err) => setError(err.message))
-  }, [page, perPage])
+  }, [page, perPage, debouncedSearch])
 
   useEffect(() => {
     if (user === undefined) return
@@ -59,6 +74,19 @@ export default function CustomersPage() {
           <CustomerForm onSubmit={handleCreate} submitLabel="Kunde anlegen" />
         </details>
       )}
+
+      <form onSubmit={(e) => e.preventDefault()} style={{ marginBottom: '16px' }}>
+        <div>
+          <label htmlFor="customer-search">Suche (Firmierung, PLZ, Ort)</label>
+          <input
+            id="customer-search"
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="z. B. Oldenburg"
+          />
+        </div>
+      </form>
 
       <CustomerTable
         customers={data.customers}

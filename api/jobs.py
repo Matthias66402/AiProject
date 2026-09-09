@@ -24,24 +24,26 @@ def _serialize_dates(row):
     return row
 
 
-def _paginate(customer_id=None):
+def _paginate(customer_id=None, search=None):
     per_page = request.args.get("per_page", type=int)
     if per_page not in JOBS_PER_PAGE_OPTIONS:
         per_page = JOBS_PER_PAGE_DEFAULT
-    total = db.count_jobs(customer_id)
+    total = db.count_jobs(customer_id, search=search)
     total_pages = max((total + per_page - 1) // per_page, 1)
     page = max(request.args.get("page", type=int) or 1, 1)
     page = min(page, total_pages)
-    jobs_list = db.list_jobs(customer_id, limit=per_page, offset=(page - 1) * per_page)
+    jobs_list = db.list_jobs(customer_id, limit=per_page, offset=(page - 1) * per_page, search=search)
     return jobs_list, page, per_page, total_pages
 
 
 @jobs_api.route("", methods=["GET"])
 def list_jobs():
     """Liste + Pagination - Pendant zu jobs()/GET (app.py). customer_id filtert wie
-    beim "von dieser Stelle aus zum Kunden zurück"-Flow der klassischen Seite."""
+    beim "von dieser Stelle aus zum Kunden zurück"-Flow der klassischen Seite. search
+    filtert (nur für die React-Liste, siehe JobsPage.jsx) auf die Position."""
     customer_id = request.args.get("customer_id", type=int)
-    jobs_list, page, per_page, total_pages = _paginate(customer_id)
+    search = (request.args.get("search") or "").strip()
+    jobs_list, page, per_page, total_pages = _paginate(customer_id, search)
     permission = job_management_permission()
     own_customer = own_customer_for_session()
     return jsonify(

@@ -1,6 +1,6 @@
-from sqlalchemy import Column, DateTime, Integer, String, delete, func, select
+from sqlalchemy import Column, DateTime, Integer, String, delete, func, or_, select
 
-from models.base import Base, get_session, to_dict
+from models.base import Base, escape_like, get_session, to_dict
 
 
 class Customer(Base):
@@ -16,17 +16,33 @@ class Customer(Base):
     updated_at = Column(DateTime, nullable=False, server_default=func.current_timestamp())
 
 
-def list_customers(limit=None, offset=None):
+def _search_filter(search):
+    """ILIKE-Filter fürs Suchfeld in der React-Kunden-Liste - sucht über
+    Firmierung, PLZ und Ort (jeweils ein Treffer reicht)."""
+    pattern = f"%{escape_like(search)}%"
+    return or_(
+        Customer.company_name.ilike(pattern, escape="\\"),
+        Customer.zip.ilike(pattern, escape="\\"),
+        Customer.city.ilike(pattern, escape="\\"),
+    )
+
+
+def list_customers(limit=None, offset=None, search=None):
     with get_session() as session:
         stmt = select(Customer).order_by(Customer.company_name)
+        if search:
+            stmt = stmt.where(_search_filter(search))
         if limit is not None:
             stmt = stmt.limit(limit).offset(offset or 0)
         return [to_dict(c) for c in session.scalars(stmt).all()]
 
 
-def count_customers():
+def count_customers(search=None):
     with get_session() as session:
-        return session.scalar(select(func.count()).select_from(Customer))
+        stmt = select(func.count()).select_from(Customer)
+        if search:
+            stmt = stmt.where(_search_filter(search))
+        return session.scalar(stmt)
 
 
 def get_customer(customer_id):

@@ -1,7 +1,7 @@
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, String, Text, delete, func, select
 
-from models.base import Base, MIN_MATCH_SIMILARITY, get_session, to_dict
+from models.base import Base, MIN_MATCH_SIMILARITY, escape_like, get_session, to_dict
 from models.customer import Customer
 
 
@@ -21,11 +21,19 @@ class Job(Base):
     embedding = Column(Vector(1536))
 
 
-def list_jobs(customer_id=None, limit=None, offset=None):
+def _position_search_filter(search):
+    """ILIKE-Filter fürs Suchfeld in der React-Stellenangebote-Liste - sucht
+    (noch) nur in der Position."""
+    return Job.position.ilike(f"%{escape_like(search)}%", escape="\\")
+
+
+def list_jobs(customer_id=None, limit=None, offset=None, search=None):
     with get_session() as session:
         stmt = select(Job, Customer.company_name.label("customer_name")).join(Customer, Customer.id == Job.customer_id)
         if customer_id:
             stmt = stmt.where(Job.customer_id == customer_id)
+        if search:
+            stmt = stmt.where(_position_search_filter(search))
         stmt = stmt.order_by(Job.created_at.desc())
         if limit is not None:
             stmt = stmt.limit(limit).offset(offset or 0)
@@ -37,11 +45,13 @@ def list_jobs(customer_id=None, limit=None, offset=None):
         return result
 
 
-def count_jobs(customer_id=None):
+def count_jobs(customer_id=None, search=None):
     with get_session() as session:
         stmt = select(func.count()).select_from(Job)
         if customer_id:
             stmt = stmt.where(Job.customer_id == customer_id)
+        if search:
+            stmt = stmt.where(_position_search_filter(search))
         return session.scalar(stmt)
 
 

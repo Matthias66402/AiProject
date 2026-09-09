@@ -19,15 +19,15 @@ def _serialize_dates(row):
     return row
 
 
-def _paginate():
+def _paginate(search=None):
     per_page = request.args.get("per_page", type=int)
     if per_page not in CUSTOMERS_PER_PAGE_OPTIONS:
         per_page = CUSTOMERS_PER_PAGE_DEFAULT
-    total = db.count_customers()
+    total = db.count_customers(search=search)
     total_pages = max((total + per_page - 1) // per_page, 1)
     page = max(request.args.get("page", type=int) or 1, 1)
     page = min(page, total_pages)
-    customers_list = db.list_customers(limit=per_page, offset=(page - 1) * per_page)
+    customers_list = db.list_customers(limit=per_page, offset=(page - 1) * per_page, search=search)
     return customers_list, page, per_page, total_pages
 
 
@@ -35,8 +35,10 @@ def _paginate():
 def list_customers():
     """Liste + Pagination - Pendant zu customers()/GET (app.py). Der Redirect für
     'customer'-Nutzer auf ihren eigenen Datensatz passiert im Frontend anhand von
-    /api/auth/me, nicht hier."""
-    customers_list, page, per_page, total_pages = _paginate()
+    /api/auth/me, nicht hier. search filtert (nur für die React-Liste, siehe
+    CustomersPage.jsx) auf Firmierung, PLZ und Ort."""
+    search = (request.args.get("search") or "").strip()
+    customers_list, page, per_page, total_pages = _paginate(search)
     return jsonify(
         customers=[_serialize_dates(dict(c)) for c in customers_list],
         page=page,
