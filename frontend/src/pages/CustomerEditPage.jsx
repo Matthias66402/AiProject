@@ -15,6 +15,7 @@ export default function CustomerEditPage() {
     const [page, setPage] = useState(1)
     const [perPage, setPerPage] = useState(10)
     const [error, setError] = useState('')
+    const [formOpen, setFormOpen] = useState(true)
 
     const isAdmin = user?.role === 'admin'
     const isCustomerUser = Boolean(
@@ -43,6 +44,10 @@ export default function CustomerEditPage() {
     }, [customerId])
 
     useEffect(() => {
+        setFormOpen(true)
+    }, [customerId])
+
+    useEffect(() => {
         if (user === undefined) return
         loadCustomer()
     }, [loadCustomer, user])
@@ -61,6 +66,7 @@ export default function CustomerEditPage() {
         await apiPut(`/api/customers/${customerId}`, values)
         loadCustomer()
         loadList()
+        setFormOpen(false)
     }
 
     async function handleDeleteRow(id) {
@@ -87,10 +93,14 @@ export default function CustomerEditPage() {
                 <p className="subtitle">Übersicht der registrierten Kunden</p>
             )}
 
-            <details className="entity-form" open>
-                <summary className="subtle-btn">
-                    {canManage ? 'Kunde bearbeiten' : 'Kundendaten'}
-                </summary>
+            <details
+                className="entity-form"
+                open={formOpen}
+                onToggle={(e) => setFormOpen(e.currentTarget.open)}
+            >
+                {/*<summary className="subtle-btn">*/}
+                {/*    {canManage ? 'Kunde bearbeitens' : 'Kundendaten'}*/}
+                {/*</summary>*/}
                 {canManage ? (
                     <>
                         <CustomerForm
@@ -118,52 +128,52 @@ export default function CustomerEditPage() {
                         </Link>
                     </div>
                 )}
-
-                <div className="entity-related">
-                    <h2>Stellenangebote von {customer.company_name}</h2>
-                    <table className="user-table">
-                        <thead>
-                            <tr>
-                                <th>Position</th>
-                                <th>Gültig von</th>
-                                <th>Gültig bis</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {jobs.length === 0 && (
-                                <tr>
-                                    <td colSpan={4}>
-                                        Noch keine Stellenangebote für diesen
-                                        Stellenanbieter.
-                                    </td>
-                                </tr>
-                            )}
-                            {jobs.map((job) => (
-                                <tr key={job.id}>
-                                    <td>{job.position}</td>
-                                    <td>{job.valid_from || '-'}</td>
-                                    <td>{job.valid_until || '-'}</td>
-                                    <td>
-                                        <div className="row-actions">
-                                            <Link
-                                                to={`/jobs/${job.id}/edit?from_customer=${customer.id}`}
-                                            >
-                                                <i
-                                                    className={`fa-solid ${canManage ? 'fa-pen' : 'fa-eye'}`}
-                                                />{' '}
-                                                {canManage
-                                                    ? 'Bearbeiten'
-                                                    : 'Ansehen'}
-                                            </Link>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
             </details>
+
+            <div className="entity-related">
+                <h2>Stellenangebote von {customer.company_name}</h2>
+                <table className="user-table">
+                    <thead>
+                        <tr>
+                            <th>Position</th>
+                            <th>Gültig von</th>
+                            <th>Gültig bis</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {jobs.length === 0 && (
+                            <tr>
+                                <td colSpan={4}>
+                                    Noch keine Stellenangebote für diesen
+                                    Stellenanbieter.
+                                </td>
+                            </tr>
+                        )}
+                        {jobs.map((job) => (
+                            <tr key={job.id}>
+                                <td>{job.position}</td>
+                                <td>{job.valid_from || '-'}</td>
+                                <td>{job.valid_until || '-'}</td>
+                                <td>
+                                    <div className="row-actions">
+                                        <Link
+                                            to={`/jobs/${job.id}/edit?from_customer=${customer.id}`}
+                                        >
+                                            <i
+                                                className={`fa-solid ${canManage ? 'fa-pen' : 'fa-eye'}`}
+                                            />{' '}
+                                            {canManage
+                                                ? 'Bearbeiten'
+                                                : 'Ansehen'}
+                                        </Link>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
 
             {!isCustomerUser && (
                 <>

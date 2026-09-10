@@ -47,6 +47,20 @@ export default function UsersPage() {
             <h1 id="greetings">Nutzer</h1>
             <p className="subtitle">Verwalte die registrierten Nutzer</p>
 
+            <details className="entity-form">
+                <summary className="subtle-btn">
+                    <span className="label-closed">+ Nutzer anlegen</span>
+                    <span className="label-open">- Abbrechen</span>
+                </summary>
+                <UserForm
+                    roles={data.roles}
+                    customers={data.customers}
+                    onSubmit={handleCreate}
+                    submitLabel="Nutzer anlegen"
+                />
+                <span className="label-open" class="subtle-btn cancel">Abbrechen</span>
+            </details>
+
             <form
                 onSubmit={(e) => e.preventDefault()}
                 style={{ marginBottom: '16px' }}
@@ -66,13 +80,6 @@ export default function UsersPage() {
             </form>
 
             <UserTable users={filteredUsers} />
-
-            <UserForm
-                roles={data.roles}
-                customers={data.customers}
-                onSubmit={handleCreate}
-                submitLabel="Nutzer anlegen"
-            />
         </div>
     )
 }

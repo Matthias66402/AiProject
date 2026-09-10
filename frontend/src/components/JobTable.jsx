@@ -30,7 +30,7 @@ export default function JobTable({
                         (isCustomerUser &&
                             job.customer_id === currentCustomerId)
                     return (
-                        <tr key={job.id}>
+                        <tr key={job.id} className="clickable-row">
                             <td>{job.position}</td>
                             <td>{job.customer_name}</td>
                             <td>{job.valid_from || '-'}</td>

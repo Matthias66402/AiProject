@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { apiGet, apiPut } from '../api/client'
 import UserForm from '../components/UserForm'
-import UserTable from '../components/UserTable'
 
 export default function UserEditPage() {
     const { userId } = useParams()
+    const navigate = useNavigate()
     const [listData, setListData] = useState(null)
     const [userDetail, setUserDetail] = useState(null)
     const [error, setError] = useState('')
@@ -32,8 +32,7 @@ export default function UserEditPage() {
 
     async function handleSave(values) {
         await apiPut(`/api/users/${userId}`, values)
-        loadList()
-        loadUser()
+        navigate('/users')
     }
 
     if (error) return <p className="form-error">{error}</p>
@@ -44,8 +43,6 @@ export default function UserEditPage() {
             <h1 id="greetings">Nutzer bearbeiten</h1>
             <p className="subtitle">Verwalte die registrierten Nutzer</p>
 
-            <UserTable users={listData.users} />
-
             <UserForm
                 key={userDetail.user.id}
                 roles={listData.roles}
@@ -54,10 +51,8 @@ export default function UserEditPage() {
                 resumes={userDetail.resumes}
                 onSubmit={handleSave}
                 submitLabel="Speichern"
+                cancelTo="/users"
             />
-            <p className="subtitle">
-                <Link to="/users">Abbrechen</Link>
-            </p>
         </div>
     )
 }

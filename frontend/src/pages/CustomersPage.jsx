@@ -69,16 +69,16 @@ export default function CustomersPage() {
     if (!data) return <p>Lade …</p>
 
     return (
-        <div className="scroll full">
-            <h1 id="greetings">Kunden</h1>
-            <p className="subtitle">Übersicht der registrierten Kunden</p>
+        <div className="scroll full" id="CustomerTable">
+            <h1 id="greetings">Stellenanbieter</h1>
+            <p className="subtitle">Übersicht der registrierten Stellenanbieter</p>
 
             {isAdmin && (
                 <details className="entity-form">
-                    <summary className="subtle-btn">+ Kunde anlegen</summary>
+                    <summary className="subtle-btn">+ Stellenanbieter anlegen</summary>
                     <CustomerForm
                         onSubmit={handleCreate}
-                        submitLabel="Kunde anlegen"
+                        submitLabel="Speichern"
                     />
                 </details>
             )}

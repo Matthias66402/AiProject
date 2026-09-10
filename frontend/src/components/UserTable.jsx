@@ -19,7 +19,7 @@ export default function UserTable({ users }) {
                     </tr>
                 )}
                 {users.map((user) => (
-                    <tr key={user.id}>
+                    <tr key={user.id} className="clickable-row">
                         <td>
                             {user.first_name} {user.last_name}
                         </td>
@@ -27,8 +27,11 @@ export default function UserTable({ users }) {
                         <td>{user.email}</td>
                         <td>{user.role}</td>
                         <td>
-                            <Link to={`/users/${user.id}/edit`}>
-                                Bearbeiten
+                            <Link
+                                className="row-link"
+                                to={`/users/${user.id}/edit`}
+                            >
+                                <i className="fa-solid fa-pen"></i> Bearbeiten
                             </Link>
                         </td>
                     </tr>

@@ -91,7 +91,7 @@ export default function JobEditPage() {
 
     return (
         <div className="scroll full">
-            <h1 id="greetings">Stellenangebote</h1>
+            <h1 id="greetings">Stellenangebot</h1>
             {fromCustomer ? (
                 <p className="subtitle">
                     Stellenangebote von {job.customer_name} ·{' '}

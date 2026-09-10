@@ -30,7 +30,7 @@ export default function CustomerTable({
                         isAdmin ||
                         (isCustomerUser && customer.id === currentCustomerId)
                     return (
-                        <tr key={customer.id}>
+                        <tr key={customer.id} className="clickable-row">
                             <td>{customer.company_name}</td>
                             <td>
                                 {customer.street} {customer.street_number}
@@ -44,7 +44,10 @@ export default function CustomerTable({
                             </td>
                             <td>
                                 <div className="row-actions">
-                                    <Link to={`/customers/${customer.id}/edit`}>
+                                    <Link
+                                        className="row-link"
+                                        to={`/customers/${customer.id}/edit`}
+                                    >
                                         <i
                                             className={`fa-solid ${rowCanManage ? 'fa-pen' : 'fa-eye'}`}
                                         />{' '}
