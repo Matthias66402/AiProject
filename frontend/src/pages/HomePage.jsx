@@ -69,7 +69,12 @@ export default function HomePage() {
           ✨ Anfrage
         </button>
       </form>
-      <p id="answer">{answer}</p>
+      <div className="answer-wrap">
+        <p id="answer">{answer}</p>
+        <div className={`generating-indicator${asking ? ' visible' : ''}`}>
+          <span className="spinner" />
+        </div>
+      </div>
     </div>
   )
 }

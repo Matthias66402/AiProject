@@ -669,7 +669,8 @@ textarea:focus {
     to { transform: rotate(360deg); }
 }
 
-.textarea-wrap {
+.textarea-wrap,
+.answer-wrap {
     position: relative;
 }
 
