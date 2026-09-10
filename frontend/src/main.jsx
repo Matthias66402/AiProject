@@ -16,24 +16,33 @@ import LoginPage from './pages/LoginPage.jsx'
 import RegisterPage from './pages/RegisterPage.jsx'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<App />}>
-          <Route index element={<HomePage />} />
-          <Route path="jobs" element={<JobsPage />} />
-          <Route path="jobs/:jobId/edit" element={<JobEditPage />} />
-          <Route path="customers" element={<CustomersPage />} />
-          <Route path="customers/:customerId/edit" element={<CustomerEditPage />} />
-          <Route path="users" element={<UsersPage />} />
-          <Route path="users/:userId/edit" element={<UserEditPage />} />
-          <Route path="tools/resume" element={<ToolResumePage />} />
-          <Route path="tools/joboffer" element={<ToolJobofferPage />} />
-          <Route path="resumes" element={<MyResumesPage />} />
-          <Route path="login" element={<LoginPage />} />
-          <Route path="register" element={<RegisterPage />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
-  </React.StrictMode>,
+    <React.StrictMode>
+        <BrowserRouter>
+            <Routes>
+                <Route path="/" element={<App />}>
+                    <Route index element={<HomePage />} />
+                    <Route path="jobs" element={<JobsPage />} />
+                    <Route path="jobs/:jobId/edit" element={<JobEditPage />} />
+                    <Route path="customers" element={<CustomersPage />} />
+                    <Route
+                        path="customers/:customerId/edit"
+                        element={<CustomerEditPage />}
+                    />
+                    <Route path="users" element={<UsersPage />} />
+                    <Route
+                        path="users/:userId/edit"
+                        element={<UserEditPage />}
+                    />
+                    <Route path="tools/resume" element={<ToolResumePage />} />
+                    <Route
+                        path="tools/joboffer"
+                        element={<ToolJobofferPage />}
+                    />
+                    <Route path="resumes" element={<MyResumesPage />} />
+                    <Route path="login" element={<LoginPage />} />
+                    <Route path="register" element={<RegisterPage />} />
+                </Route>
+            </Routes>
+        </BrowserRouter>
+    </React.StrictMode>,
 )
