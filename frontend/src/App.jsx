@@ -49,6 +49,12 @@ export default function App() {
                 className="flex flex-wrap items-center"
                 style={{ padding: '1rem', position: 'relative', zIndex: 2 }}
             >
+                <i class="fa-solid fa-frog text-2xl text-[#76A250]"></i>
+                <img
+                    src={`${API_BASE}/static/pics/umweltmarkt_logo.png`}
+                    alt="Stellenmarkt-Umweltschutz.de"
+                    style={{ height: '2.25rem', marginRight: '0.25rem', marginLeft: '-0.5rem' }}
+                />
                 <button
                     type="button"
                     className="md:hidden"
@@ -77,7 +83,7 @@ export default function App() {
                             fontWeight: 'var(--heading-weight)',
                         }}
                     >
-                        Stellenmarkt-AI (React)
+                        {/*Stellenmarkt-AI*/}
                     </strong>
                     <Link
                         to="/"
@@ -182,18 +188,13 @@ export default function App() {
                             </div>
                         </details>
                     )}
-                    <a
-                        href={API_BASE + '/?classic=1'}
-                        style={{ marginLeft: 'auto' }}
-                    >
-                        <i className="fa-solid fa-landmark text-[#76A250]" />{' '}
-                        Klassisch
-                    </a>
-                    {user === undefined && <span>Lade …</span>}
+                    {user === undefined && (
+                        <span style={{ marginLeft: 'auto' }}>Lade …</span>
+                    )}
                     {user !== undefined && (
                         <details
                             ref={accountMenuRef}
-                            style={{ position: 'relative' }}
+                            style={{ position: 'relative', marginLeft: 'auto' }}
                         >
                             <summary
                                 style={{

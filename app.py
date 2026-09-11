@@ -221,11 +221,11 @@ def build_site_map():
     # jeweils aktuelle Seite an), aber eine Funktion, die die KI kennen muss, sonst
     # verneint sie fälschlich, dass es sie gibt.
     lines.append(
-        "- (kein eigener Menüpunkt/Seite, sondern auf jeder Seite oben rechts in der Navigation, "
-        "direkt links neben dem Konto-Menü) [GET] -> Wechsel zwischen der neuen React-Oberfläche "
-        "(Standard, Link-Beschriftung 'Klassisch' führt zur alten Oberfläche) und der klassischen "
-        "Flask-Oberfläche (Link-Beschriftung 'Reaktiv' führt zur neuen Oberfläche); die Wahl bleibt "
-        "bis zum nächsten Browser-Neustart erhalten"
+        "- (kein eigener Menüpunkt/Seite, sondern auf jeder Seite oben rechts in der klassischen "
+        "Flask-Oberfläche, Link-Beschriftung 'Reaktiv') [GET] -> Wechsel von der klassischen "
+        "Flask-Oberfläche zur neuen React-Oberfläche (Standard); die Wahl bleibt bis zum nächsten "
+        "Browser-Neustart erhalten. Ein Link zurück von React zur klassischen Oberfläche existiert "
+        "nicht mehr (bewusst entfernter Umschalter)"
     )
     return "\n".join(lines)
 

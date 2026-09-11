@@ -39,11 +39,7 @@ export default function HomePage() {
 
     return (
         <div style={{ maxWidth: 560, margin: '0 auto' }}>
-            <div className="wand-row">
-                <span className="wand">🪄</span>
-                <i className="fa-solid fa-frog text-5xl text-[#76A250]" />
-            </div>
-            <h1 id="greetings">KI-Assistent</h1>
+            <h1 id="greetings"><span className="wand">🪄</span> KI-Assistent</h1>
             <p className="subtitle">Wie kann ich Dir helfen?</p>
             {error && <p className="form-error">{error}</p>}
             <form onSubmit={handleSubmit}>

@@ -173,6 +173,10 @@ nav {
     position: relative;
     z-index: 1;
     width: 100%;
+    /* Gleiche Obergrenze wie .scroll.full (React "main" nutzt sie immer),
+       damit die Navbar auf breiten Bildschirmen nicht breiter wird als der
+       darunterliegende Inhaltsbereich. */
+    max-width: 1600px;
     display: flex;
     gap: 14px;
     margin-bottom: 16px;
@@ -628,7 +632,7 @@ textarea:focus {
 }
 
 #answer::before {
-    content: "🔮 ";
+    content: "🦚 ";
 }
 
 .user-table {
