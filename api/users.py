@@ -3,6 +3,7 @@ from werkzeug.security import generate_password_hash
 
 import db
 from db import DEFAULT_ROLE, ROLES
+from services.permissions import user_read_permission
 
 users_api = Blueprint("users_api", __name__, url_prefix="/api/users")
 
@@ -31,8 +32,8 @@ def _is_admin():
 
 @users_api.route("", methods=["GET"])
 def list_users():
-    if not _is_admin():
-        return jsonify(error="Nicht berechtigt."), 403
+    if not user_read_permission():
+        return jsonify(error="Nicht berechtigt - Bitte kontaktieren Sie uns für weitere Informationen."), 403
     return jsonify(
         users=[_serialize_user(u) for u in db.list_users()],
         roles=ROLES,
@@ -43,7 +44,7 @@ def list_users():
 @users_api.route("", methods=["POST"])
 def create_user():
     if not _is_admin():
-        return jsonify(error="Nicht berechtigt."), 403
+        return jsonify(error="Nicht berechtigt - Bitte kontaktieren Sie uns für weitere Informationen."), 403
 
     data = request.get_json(silent=True) or {}
     first_name = (data.get("first_name") or "").strip()
@@ -69,8 +70,8 @@ def create_user():
 
 @users_api.route("/<int:user_id>", methods=["GET"])
 def get_user(user_id):
-    if not _is_admin():
-        return jsonify(error="Nicht berechtigt."), 403
+    if not user_read_permission():
+        return jsonify(error="Nicht berechtigt - Bitte kontaktieren Sie uns für weitere Informationen."), 403
 
     user = db.get_user(user_id)
     if not user:

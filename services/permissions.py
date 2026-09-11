@@ -24,6 +24,14 @@ def own_customer_for_session():
     return None
 
 
+def user_read_permission():
+    """True, wenn der eingeloggte Nutzer die User-Liste/-Profile (inkl. deren
+    Lebensläufe) lesen darf: Admins und Nutzer mit Rolle 'customer'.
+    Schreibender Zugriff (Anlegen/Bearbeiten) bleibt Admins vorbehalten, das
+    prüfen die aufrufenden Routen zusätzlich selbst."""
+    return session.get("user_role") in ("admin", "customer")
+
+
 def customer_management_permission(customer_id):
     """True, wenn der eingeloggte Nutzer diesen Stellenanbieter anlegen/bearbeiten/
     löschen darf: Admins immer, Nutzer mit Rolle 'customer' nur den ihnen

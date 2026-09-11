@@ -1,4 +1,5 @@
 <div class="scroll full">
+    {% set is_admin = current_user and current_user.role == 'admin' %}
     <h1 id="greetings">{{ "Nutzer bearbeiten" if editing_user else "Nutzer" }}</h1>
     <p class="subtitle">Verwalte die registrierten Nutzer</p>
 
@@ -19,7 +20,7 @@
                 <td>{{ user.short_name }}</td>
                 <td>{{ user.email }}</td>
                 <td>{{ user.role }}</td>
-                <td><a href="{{ url_for('edit_user', user_id=user.id) }}">Bearbeiten</a></td>
+                <td><a href="{{ url_for('edit_user', user_id=user.id) }}"><i class="fa-solid {{ 'fa-pen' if is_admin else 'fa-eye' }}"></i> {{ "Bearbeiten" if is_admin else "Ansehen" }}</a></td>
             </tr>
             {% else %}
             <tr>
@@ -29,66 +30,106 @@
         </tbody>
     </table>
 
-    <form action="{{ url_for('edit_user', user_id=editing_user.id) if editing_user else url_for('users') }}" method="POST">
-        <div>
-            <label for="first_name">Vorname</label>
-            <input id="first_name" name="first_name" type="text" value="{{ editing_user.first_name if editing_user else '' }}" required>
+    {% if is_admin or editing_user %}
+    <details class="entity-form" {% if editing_user %}open{% endif %}>
+        <summary class="subtle-btn">
+            {% if editing_user %}{{ "Nutzer bearbeiten" if is_admin else "Nutzerdaten" }}{% else %}+ Nutzer anlegen{% endif %}
+        </summary>
+
+        {% if editing_user and not is_admin %}
+        <div class="entity-view">
+            <div>
+                <label>Name</label>
+                <p>{{ editing_user.first_name }} {{ editing_user.last_name }} ({{ editing_user.short_name }})</p>
+            </div>
+            <div>
+                <label>E-Mail</label>
+                <p>{{ editing_user.email }}</p>
+            </div>
+            <div>
+                <label>Rolle</label>
+                <p>{{ editing_user.role }}</p>
+            </div>
+            <div>
+                <label>PLZ / Stadt</label>
+                <p>{{ editing_user.zip or '-' }} {{ editing_user.city or '' }}</p>
+            </div>
+            {% if resumes %}
+            <div>
+                <label>Lebensläufe</label>
+                <ul>
+                    {% for resume in resumes %}
+                    <li><a href="{{ resume.document_link }}" target="_blank" rel="noopener">Lebenslauf vom {{ resume.created_at }}</a></li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+            <a class="subtle-btn" href="{{ url_for('users') }}">Schließen</a>
         </div>
-        <div>
-            <label for="last_name">Nachname</label>
-            <input id="last_name" name="last_name" type="text" value="{{ editing_user.last_name if editing_user else '' }}" required>
-        </div>
-        <div>
-            <label for="short_name">Kurzname</label>
-            <input id="short_name" name="short_name" type="text" value="{{ editing_user.short_name if editing_user else '' }}" required>
-        </div>
-        <div>
-            <label for="email">E-Mail</label>
-            <input id="email" name="email" type="email" value="{{ editing_user.email if editing_user else '' }}" required>
-        </div>
-        <div>
-            <label for="zip">PLZ</label>
-            <input id="zip" name="zip" type="text" value="{{ editing_user.zip if editing_user else '' }}">
-        </div>
-        <div>
-            <label for="city">Stadt</label>
-            <input id="city" name="city" type="text" value="{{ editing_user.city if editing_user else '' }}">
-        </div>
-        <div>
-            <label for="role">Rolle</label>
-            <select id="role" name="role">
-                {% for role in roles %}
-                <option value="{{ role }}" {% if (editing_user.role if editing_user else 'user') == role %}selected{% endif %}>{{ role }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div id="customer-id-field" hidden>
-            <label for="customer_id">Stellenanbieter</label>
-            <select id="customer_id" name="customer_id">
-                <option value="">Kein Stellenanbieter zugeordnet</option>
-                {% for customer in customers %}
-                <option value="{{ customer.id }}" {% if editing_user and editing_user.customer_id == customer.id %}selected{% endif %}>{{ customer.company_name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        {% if editing_user and resumes %}
-        <div>
-            <label>Lebensläufe</label>
-            <ul>
-                {% for resume in resumes %}
-                <li><a href="{{ resume.document_link }}" target="_blank" rel="noopener">Lebenslauf vom {{ resume.created_at }}</a></li>
-                {% endfor %}
-            </ul>
-        </div>
+        {% else %}
+        <form action="{{ url_for('edit_user', user_id=editing_user.id) if editing_user else url_for('users') }}" method="POST">
+            <div>
+                <label for="first_name">Vorname</label>
+                <input id="first_name" name="first_name" type="text" value="{{ editing_user.first_name if editing_user else '' }}" required>
+            </div>
+            <div>
+                <label for="last_name">Nachname</label>
+                <input id="last_name" name="last_name" type="text" value="{{ editing_user.last_name if editing_user else '' }}" required>
+            </div>
+            <div>
+                <label for="short_name">Kurzname</label>
+                <input id="short_name" name="short_name" type="text" value="{{ editing_user.short_name if editing_user else '' }}" required>
+            </div>
+            <div>
+                <label for="email">E-Mail</label>
+                <input id="email" name="email" type="email" value="{{ editing_user.email if editing_user else '' }}" required>
+            </div>
+            <div>
+                <label for="zip">PLZ</label>
+                <input id="zip" name="zip" type="text" value="{{ editing_user.zip if editing_user else '' }}">
+            </div>
+            <div>
+                <label for="city">Stadt</label>
+                <input id="city" name="city" type="text" value="{{ editing_user.city if editing_user else '' }}">
+            </div>
+            <div>
+                <label for="role">Rolle</label>
+                <select id="role" name="role">
+                    {% for role in roles %}
+                    <option value="{{ role }}" {% if (editing_user.role if editing_user else 'user') == role %}selected{% endif %}>{{ role }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div id="customer-id-field" hidden>
+                <label for="customer_id">Stellenanbieter</label>
+                <select id="customer_id" name="customer_id">
+                    <option value="">Kein Stellenanbieter zugeordnet</option>
+                    {% for customer in customers %}
+                    <option value="{{ customer.id }}" {% if editing_user and editing_user.customer_id == customer.id %}selected{% endif %}>{{ customer.company_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% if editing_user and resumes %}
+            <div>
+                <label>Lebensläufe</label>
+                <ul>
+                    {% for resume in resumes %}
+                    <li><a href="{{ resume.document_link }}" target="_blank" rel="noopener">Lebenslauf vom {{ resume.created_at }}</a></li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+            <div>
+                <label for="password">{{ "Neues Passwort (optional)" if editing_user else "Passwort" }}</label>
+                <input id="password" name="password" type="password" {% if not editing_user %}required{% endif %}>
+            </div>
+            <button class="{{ 'subtle-btn' if editing_user else 'special-btn' }}" type="submit">{{ "Speichern" if editing_user else "Nutzer anlegen" }}</button>
+        </form>
+        {% if editing_user %}
+        <p class="subtitle"><a href="{{ url_for('users') }}">Abbrechen</a></p>
         {% endif %}
-        <div>
-            <label for="password">{{ "Neues Passwort (optional)" if editing_user else "Passwort" }}</label>
-            <input id="password" name="password" type="password" {% if not editing_user %}required{% endif %}>
-        </div>
-        <button class="{{ 'subtle-btn' if editing_user else 'special-btn' }}" type="submit">{{ "Speichern" if editing_user else "Nutzer anlegen" }}</button>
-    </form>
-    {% if editing_user %}
-    <p class="subtitle"><a href="{{ url_for('users') }}">Abbrechen</a></p>
+        {% endif %}
+    </details>
     {% endif %}
 </div>
 

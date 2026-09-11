@@ -239,6 +239,10 @@ export default function App() {
                                                 style={{
                                                     padding: '0.5rem 1rem',
                                                 }}
+                                                onClick={() => {
+                                                    if (accountMenuRef.current)
+                                                        accountMenuRef.current.open = false
+                                                }}
                                             >
                                                 <i className="fa-solid fa-file-lines text-[#76A250]" />{' '}
                                                 Lebenslauf

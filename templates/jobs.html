@@ -142,7 +142,7 @@
     </details>
     {% endif %}
 
-    {% if editing_job and is_admin %}
+    {% if editing_job and can_manage_job %}
     <div class="entity-view">
         <label>Passende Kandidaten</label>
         {% if matching_resumes %}

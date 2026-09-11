@@ -37,7 +37,10 @@ export default function JobTable({
                             <td>{job.valid_until || '-'}</td>
                             <td>
                                 <div className="row-actions">
-                                    <Link to={`/jobs/${job.id}/edit`}>
+                                    <Link
+                                        className="row-link"
+                                        to={`/jobs/${job.id}/edit`}
+                                    >
                                         <i
                                             className={`fa-solid ${rowCanManage ? 'fa-pen' : 'fa-eye'}`}
                                         />{' '}

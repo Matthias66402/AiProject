@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { API_BASE } from '../api/client'
 
 export default function UserForm({
     roles,
@@ -145,7 +146,7 @@ export default function UserForm({
                         {resumes.map((resume) => (
                             <li key={resume.id}>
                                 <a
-                                    href={resume.document_link}
+                                    href={API_BASE + resume.document_link}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                 >

@@ -31,6 +31,12 @@ export default function JobEditPage() {
     )
 
     const loadJob = useCallback(() => {
+        // Beim Wechsel der jobId sofort zuruecksetzen, damit waehrend des
+        // Nachladens die "Lade..."-Anzeige greift statt eines veralteten,
+        // aber weiterhin interaktiven Formulars fuer den vorherigen Job -
+        // sonst kann ein Speichern-Klick in diesem Fenster die Werte des
+        // alten Jobs (inkl. customer_id) auf die neue jobId schreiben.
+        setJob(null)
         apiGet(`/api/jobs/${jobId}`)
             .then((data) => setJob(data.job))
             .catch((err) => setError(err.message))
@@ -219,7 +225,7 @@ export default function JobEditPage() {
                 )}
             </details>
 
-            {isAdmin && (
+            {job.can_manage && (
                 <div className="entity-view">
                     <label>Passende Kandidaten</label>
                     {job.matching_resumes.length > 0 ? (

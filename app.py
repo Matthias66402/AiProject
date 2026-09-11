@@ -243,10 +243,13 @@ def logout():
 
 @app.route('/users', methods=["GET", "POST"])
 def users():
-    if session.get("user_role") != "admin":
+    if session.get("user_role") not in ("admin", "customer"):
         return redirect(url_for('home'))
 
     if request.method == "POST":
+        if session.get("user_role") != "admin":
+            return redirect(url_for('home'))
+
         first_name = request.form.get("first_name", "").strip()
         last_name = request.form.get("last_name", "").strip()
         short_name = request.form.get("short_name", "").strip()
@@ -271,10 +274,13 @@ def users():
 
 @app.route('/users/<int:user_id>/edit', methods=["GET", "POST"])
 def edit_user(user_id):
-    if session.get("user_role") != "admin":
+    if session.get("user_role") not in ("admin", "customer"):
         return redirect(url_for('home'))
 
     if request.method == "POST":
+        if session.get("user_role") != "admin":
+            return redirect(url_for('home'))
+
         first_name = request.form.get("first_name", "").strip()
         last_name = request.form.get("last_name", "").strip()
         short_name = request.form.get("short_name", "").strip()
@@ -488,7 +494,7 @@ def generate_resume():
 
 @app.route('/tools/resume/<path:filename>')
 def view_resume(filename):
-    if session.get("user_role") != "admin":
+    if session.get("user_role") not in ("admin", "customer"):
         return redirect(url_for('home'))
     return send_from_directory(RESUME_DIR, filename)
 

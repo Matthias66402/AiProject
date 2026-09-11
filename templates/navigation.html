@@ -12,7 +12,7 @@
 
         <a href="{{ url_for('customers') }}" class="{{ 'active' if request.endpoint in ('customers', 'edit_customer') else '' }}"><i class="fa-solid fa-building text-xl text-[#76A250]"></i> Stellenanbieter</a>
 
-        {% if current_user and current_user.role == 'admin' %}
+        {% if current_user and current_user.role in ('admin', 'customer') %}
         <a href="{{ url_for('users') }}" class="{{ 'active' if request.endpoint in ('users', 'edit_user') else '' }}"><i class="fa-solid fa-users text-xl text-[#76A250]"></i> Nutzer</a>
         {% endif %}
         {% if current_user and current_user.role == 'admin' %}

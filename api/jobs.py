@@ -1,4 +1,4 @@
-from flask import Blueprint, current_app, jsonify, request, session
+from flask import Blueprint, current_app, jsonify, request
 
 import db
 from embeddings import embed_text, strip_html_to_text
@@ -95,10 +95,10 @@ def get_job(job_id):
     result = _serialize_dates(dict(job))
     result.pop("embedding", None)
     result["can_manage"] = can_manage
-    # Passende Kandidaten nur für Admins berechnen/ausliefern - wie im Template
-    # ({% if editing_job and is_admin %}), damit die Daten Nicht-Admins nicht mal
-    # über die Netzwerk-Antwort erreichen.
-    if session.get("user_role") == "admin" and job.get("embedding"):
+    # Passende Kandidaten für Admins und für den Stellenanbieter der eigenen Stelle
+    # berechnen/ausliefern (can_manage deckt beides ab), damit die Daten sonst
+    # niemanden über die Netzwerk-Antwort erreichen.
+    if can_manage and job.get("embedding"):
         result["matching_resumes"] = [_serialize_dates(dict(m)) for m in db.find_matching_resumes(job["embedding"], top_k=5)]
     else:
         result["matching_resumes"] = []
