@@ -28,6 +28,20 @@ def _serialize_resume(row):
 
 @resumes_api.route("", methods=["GET"])
 def list_resumes():
+    """Eigene Lebensläufe des angemeldeten Nutzers auflisten.
+    ---
+    tags:
+      - Resumes
+    security:
+      - sessionAuth: []
+    responses:
+      200:
+        description: Liste der eigenen Lebensläufe.
+      401:
+        description: Nicht angemeldet.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+    """
     user_id = session.get("user_id")
     if not user_id:
         return jsonify(error="Nicht angemeldet."), 401
@@ -36,6 +50,29 @@ def list_resumes():
 
 @resumes_api.route("/<int:resume_id>", methods=["GET"])
 def get_resume(resume_id):
+    """Einen eigenen Lebenslauf ansehen, inkl. passender Stellenangebote (KI-Matching).
+    ---
+    tags:
+      - Resumes
+    security:
+      - sessionAuth: []
+    parameters:
+      - name: resume_id
+        in: path
+        type: integer
+        required: true
+    responses:
+      200:
+        description: Lebenslauf plus matching_jobs.
+      401:
+        description: Nicht angemeldet.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+      404:
+        description: Nicht gefunden oder gehört einem anderen Nutzer.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+    """
     user_id = session.get("user_id")
     if not user_id:
         return jsonify(error="Nicht angemeldet."), 401
@@ -50,6 +87,39 @@ def get_resume(resume_id):
 
 @resumes_api.route("", methods=["POST"])
 def generate_resume():
+    """Eigenen Lebenslauf per KI generieren lassen, anhand einer Freitext-Beschreibung.
+    ---
+    tags:
+      - Resumes
+    security:
+      - sessionAuth: []
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required: [spec]
+          properties:
+            spec:
+              type: string
+              description: Freitext, was der Lebenslauf enthalten soll.
+    responses:
+      201:
+        description: Lebenslauf wurde erstellt.
+      400:
+        description: spec fehlt.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+      401:
+        description: Nicht angemeldet.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+      502:
+        description: KI-Anfrage fehlgeschlagen, bitte später erneut versuchen.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+    """
     user_id = session.get("user_id")
     if not user_id:
         return jsonify(error="Nicht angemeldet."), 401
@@ -70,6 +140,31 @@ def generate_resume():
 
 @resumes_api.route("/upload", methods=["POST"])
 def upload_resume():
+    """Eigene Lebenslauf-Datei hochladen (PDF, .docx oder .odt).
+    ---
+    tags:
+      - Resumes
+    security:
+      - sessionAuth: []
+    consumes:
+      - multipart/form-data
+    parameters:
+      - name: resume_file
+        in: formData
+        type: file
+        required: true
+    responses:
+      201:
+        description: Lebenslauf wurde hochgeladen.
+      400:
+        description: Keine Datei, falsches Format oder kein auslesbarer Text.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+      401:
+        description: Nicht angemeldet.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+    """
     user_id = session.get("user_id")
     if not user_id:
         return jsonify(error="Nicht angemeldet."), 401
@@ -96,6 +191,31 @@ def upload_resume():
 
 @resumes_api.route("/<int:resume_id>", methods=["DELETE"])
 def delete_resume(resume_id):
+    """Eigenen Lebenslauf löschen (inkl. Datei).
+    ---
+    tags:
+      - Resumes
+    security:
+      - sessionAuth: []
+    parameters:
+      - name: resume_id
+        in: path
+        type: integer
+        required: true
+    responses:
+      200:
+        description: Lebenslauf wurde gelöscht.
+        schema:
+          $ref: '#/definitions/SuccessResponse'
+      401:
+        description: Nicht angemeldet.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+      404:
+        description: Nicht gefunden oder gehört einem anderen Nutzer.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+    """
     user_id = session.get("user_id")
     if not user_id:
         return jsonify(error="Nicht angemeldet."), 401

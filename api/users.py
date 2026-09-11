@@ -32,6 +32,20 @@ def _is_admin():
 
 @users_api.route("", methods=["GET"])
 def list_users():
+    """Alle Nutzer auflisten (Admins und 'customer'-Nutzer).
+    ---
+    tags:
+      - Users
+    security:
+      - sessionAuth: []
+    responses:
+      200:
+        description: Nutzerliste (ohne Passwort-Hash) plus verfügbare Rollen und Stellenanbieter.
+      403:
+        description: Nicht berechtigt.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+    """
     if not user_read_permission():
         return jsonify(error="Nicht berechtigt - Bitte kontaktieren Sie uns für weitere Informationen."), 403
     return jsonify(
@@ -43,6 +57,43 @@ def list_users():
 
 @users_api.route("", methods=["POST"])
 def create_user():
+    """Neuen Nutzer anlegen, inkl. Rollenvergabe (nur Admins).
+    ---
+    tags:
+      - Users
+    security:
+      - sessionAuth: []
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required: [first_name, last_name, short_name, email, password]
+          properties:
+            first_name: {type: string}
+            last_name: {type: string}
+            short_name: {type: string}
+            email: {type: string, format: email}
+            password: {type: string, format: password}
+            role: {type: string, description: "Eine der verfügbaren Rollen, siehe GET /api/users."}
+            zip: {type: string}
+            city: {type: string}
+            customer_id: {type: integer, description: "Nur bei role='customer' berücksichtigt."}
+    responses:
+      201:
+        description: Nutzer wurde angelegt.
+        schema:
+          $ref: '#/definitions/SuccessResponse'
+      400:
+        description: Pflichtfeld fehlt.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+      403:
+        description: Nicht berechtigt.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+    """
     if not _is_admin():
         return jsonify(error="Nicht berechtigt - Bitte kontaktieren Sie uns für weitere Informationen."), 403
 
@@ -70,6 +121,29 @@ def create_user():
 
 @users_api.route("/<int:user_id>", methods=["GET"])
 def get_user(user_id):
+    """Einen Nutzer ansehen, inkl. dessen Lebensläufen (Admins und 'customer'-Nutzer).
+    ---
+    tags:
+      - Users
+    security:
+      - sessionAuth: []
+    parameters:
+      - name: user_id
+        in: path
+        type: integer
+        required: true
+    responses:
+      200:
+        description: Nutzer (ohne Passwort-Hash) plus dessen Lebensläufe.
+      403:
+        description: Nicht berechtigt.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+      404:
+        description: Nicht gefunden.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+    """
     if not user_read_permission():
         return jsonify(error="Nicht berechtigt - Bitte kontaktieren Sie uns für weitere Informationen."), 403
 
@@ -85,6 +159,47 @@ def get_user(user_id):
 
 @users_api.route("/<int:user_id>", methods=["PUT"])
 def update_user(user_id):
+    """Nutzer bearbeiten, inkl. Rollenvergabe (nur Admins).
+    ---
+    tags:
+      - Users
+    security:
+      - sessionAuth: []
+    parameters:
+      - name: user_id
+        in: path
+        type: integer
+        required: true
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required: [first_name, last_name, short_name, email]
+          properties:
+            first_name: {type: string}
+            last_name: {type: string}
+            short_name: {type: string}
+            email: {type: string, format: email}
+            password: {type: string, format: password, description: "Optional - nur bei Änderung angeben."}
+            role: {type: string}
+            zip: {type: string}
+            city: {type: string}
+            customer_id: {type: integer, description: "Nur bei role='customer' berücksichtigt."}
+    responses:
+      200:
+        description: Nutzer wurde aktualisiert.
+        schema:
+          $ref: '#/definitions/SuccessResponse'
+      400:
+        description: Pflichtfeld fehlt.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+      403:
+        description: Nicht berechtigt.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+    """
     if not _is_admin():
         return jsonify(error="Nicht berechtigt."), 403
 

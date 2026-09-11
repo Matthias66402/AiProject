@@ -18,6 +18,45 @@ def _is_admin():
 
 @tools_api.route("/resume", methods=["POST"])
 def generate_resume():
+    """Lebenslauf für einen beliebigen, per user_id gewählten Nutzer generieren (nur Admins).
+    ---
+    tags:
+      - Tools
+    security:
+      - sessionAuth: []
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required: [spec, user_id]
+          properties:
+            spec:
+              type: string
+              description: Freitext, was der Lebenslauf enthalten soll.
+            user_id:
+              type: integer
+    responses:
+      200:
+        description: Lebenslauf wurde erstellt und dem Nutzer zugeordnet.
+        schema:
+          type: object
+          properties:
+            file_url: {type: string}
+      400:
+        description: spec oder user_id fehlt.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+      403:
+        description: Nicht berechtigt.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+      502:
+        description: KI-Anfrage fehlgeschlagen, bitte später erneut versuchen.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+    """
     if not _is_admin():
         return jsonify(error="Nicht berechtigt."), 403
 
@@ -38,6 +77,46 @@ def generate_resume():
 
 @tools_api.route("/joboffer", methods=["POST"])
 def generate_joboffer():
+    """Stellenangebot für einen per customer_id gewählten Stellenanbieter generieren
+    (legt dabei automatisch auch eine Stelle unter /api/jobs an). Nur Admins.
+    ---
+    tags:
+      - Tools
+    security:
+      - sessionAuth: []
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required: [spec, customer_id]
+          properties:
+            spec:
+              type: string
+              description: Freitext, was das Stellenangebot enthalten soll.
+            customer_id:
+              type: integer
+    responses:
+      200:
+        description: Stellenangebot wurde erstellt und als Stelle angelegt.
+        schema:
+          type: object
+          properties:
+            file_url: {type: string}
+      400:
+        description: spec oder customer_id fehlt.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+      403:
+        description: Nicht berechtigt.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+      502:
+        description: KI-Anfrage fehlgeschlagen, bitte später erneut versuchen.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+    """
     if not _is_admin():
         return jsonify(error="Nicht berechtigt."), 403
 

@@ -4,6 +4,7 @@ from urllib.parse import urlencode
 
 from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, jsonify
 from flask_cors import CORS
+from flasgger import Swagger
 from groq import APIStatusError as GroqAPIStatusError
 from openai import APIStatusError as OpenAIAPIStatusError
 from dotenv import load_dotenv
@@ -47,6 +48,56 @@ CORS(app, resources={
     r"/jobs/extract-upload": {"origins": _frontend_origin, "supports_credentials": True},
     r"/static/*": {"origins": "*"},
 })
+# Swagger/OpenAPI-Doku nur für die /api/*-Routen (die React-REST-API) - die
+# klassischen Jinja-Seiten (Formulare, Redirects) sind keine API und würden die
+# Spec nur unübersichtlich machen. Die eigentlichen Parameter/Response-Specs
+# stehen als YAML-Docstrings direkt bei den jeweiligen Routen in api/*.py.
+app.config["SWAGGER"] = {
+    "title": "Stellenmarkt-AI API",
+    "uiversion": 3,
+    "specs_route": "/apidocs/",
+}
+swagger = Swagger(app, config={
+    "headers": [],
+    "specs": [
+        {
+            "endpoint": "apispec",
+            "route": "/apispec.json",
+            "rule_filter": lambda rule: rule.rule.startswith("/api/"),
+            "model_filter": lambda tag: True,
+        }
+    ],
+    "static_url_path": "/flasgger_static",
+    "swagger_ui": True,
+    "specs_route": "/apidocs/",
+}, template={
+    "info": {
+        "title": "Stellenmarkt-AI API",
+        "description": "REST-API des React-Frontends (Stellenangebote, Stellenanbieter, "
+                        "Nutzer, Lebensläufe, KI-Tools). Auth läuft über das "
+                        "Flask-Session-Cookie, gesetzt von POST /api/auth/login.",
+        "version": "1.0.0",
+    },
+    "securityDefinitions": {
+        "sessionAuth": {
+            "type": "apiKey",
+            "in": "cookie",
+            "name": "session",
+            "description": "Flask-Session-Cookie, gesetzt durch POST /api/auth/login bzw. /api/auth/register.",
+        }
+    },
+    "definitions": {
+        "ErrorResponse": {
+            "type": "object",
+            "properties": {"error": {"type": "string"}},
+        },
+        "SuccessResponse": {
+            "type": "object",
+            "properties": {"success": {"type": "boolean"}},
+        },
+    },
+})
+
 app.register_blueprint(auth_api)
 app.register_blueprint(jobs_api)
 app.register_blueprint(assistant_api)

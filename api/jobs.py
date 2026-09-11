@@ -40,7 +40,30 @@ def _paginate(customer_id=None, search=None):
 def list_jobs():
     """Liste + Pagination - Pendant zu jobs()/GET (app.py). customer_id filtert wie
     beim "von dieser Stelle aus zum Kunden zurück"-Flow der klassischen Seite. search
-    filtert (nur für die React-Liste, siehe JobsPage.jsx) auf die Position."""
+    filtert (nur für die React-Liste, siehe JobsPage.jsx) auf die Position.
+    ---
+    tags:
+      - Jobs
+    parameters:
+      - name: page
+        in: query
+        type: integer
+      - name: per_page
+        in: query
+        type: integer
+        enum: [10, 25, 50, 100]
+      - name: customer_id
+        in: query
+        type: integer
+        description: Nur Stellen dieses Stellenanbieters.
+      - name: search
+        in: query
+        type: string
+        description: Freitextsuche auf die Position.
+    responses:
+      200:
+        description: Stellenangebote der aktuellen Seite plus Pagination-Metadaten.
+    """
     customer_id = request.args.get("customer_id", type=int)
     search = (request.args.get("search") or "").strip()
     jobs_list, page, per_page, total_pages = _paginate(customer_id, search)
@@ -60,6 +83,42 @@ def list_jobs():
 
 @jobs_api.route("", methods=["POST"])
 def create_job():
+    """Neues Stellenangebot anlegen (Admins für beliebigen Kunden, 'customer'-Nutzer nur für den eigenen).
+    ---
+    tags:
+      - Jobs
+    security:
+      - sessionAuth: []
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required: [position, content, customer_id]
+          properties:
+            position: {type: string}
+            content: {type: string, description: "HTML-Beschreibung."}
+            customer_id: {type: integer, description: "Nur für Admins relevant, für 'customer'-Nutzer wird der eigene Kunde erzwungen."}
+            valid_from: {type: string, format: date}
+            valid_until: {type: string, format: date}
+            zip: {type: string}
+            city: {type: string}
+            document_link: {type: string}
+    responses:
+      201:
+        description: Stelle wurde angelegt.
+        schema:
+          $ref: '#/definitions/SuccessResponse'
+      400:
+        description: Position, Beschreibung oder Kunde fehlt.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+      403:
+        description: Nicht berechtigt.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+    """
     permission = job_management_permission()
     if not permission:
         return jsonify(error="Nicht berechtigt."), 403
@@ -85,6 +144,23 @@ def create_job():
 
 @jobs_api.route("/<int:job_id>", methods=["GET"])
 def get_job(job_id):
+    """Ein Stellenangebot ansehen. matching_resumes (KI-Matching) nur, wenn can_manage true ist.
+    ---
+    tags:
+      - Jobs
+    parameters:
+      - name: job_id
+        in: path
+        type: integer
+        required: true
+    responses:
+      200:
+        description: Stellenangebot inkl. can_manage und ggf. matching_resumes.
+      404:
+        description: Nicht gefunden.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+    """
     job = db.get_job(job_id)
     if not job:
         return jsonify(error="Nicht gefunden."), 404
@@ -107,6 +183,45 @@ def get_job(job_id):
 
 @jobs_api.route("/<int:job_id>", methods=["PUT"])
 def update_job(job_id):
+    """Stellenangebot bearbeiten (Admins oder der zugehörige 'customer'-Nutzer).
+    ---
+    tags:
+      - Jobs
+    security:
+      - sessionAuth: []
+    parameters:
+      - name: job_id
+        in: path
+        type: integer
+        required: true
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required: [position, content, customer_id]
+          properties:
+            position: {type: string}
+            content: {type: string}
+            customer_id: {type: integer, description: "Nur für Admins änderbar."}
+            valid_from: {type: string, format: date}
+            valid_until: {type: string, format: date}
+            zip: {type: string}
+            city: {type: string}
+    responses:
+      200:
+        description: Stelle wurde aktualisiert.
+        schema:
+          $ref: '#/definitions/SuccessResponse'
+      400:
+        description: Position, Beschreibung oder Kunde fehlt.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+      403:
+        description: Nicht berechtigt.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+    """
     job = db.get_job(job_id)
     permission = job_management_permission()
     if not job or not (permission == "admin" or permission == job["customer_id"]):
@@ -132,6 +247,27 @@ def update_job(job_id):
 
 @jobs_api.route("/<int:job_id>", methods=["DELETE"])
 def delete_job(job_id):
+    """Stellenangebot löschen (Admins oder der zugehörige 'customer'-Nutzer).
+    ---
+    tags:
+      - Jobs
+    security:
+      - sessionAuth: []
+    parameters:
+      - name: job_id
+        in: path
+        type: integer
+        required: true
+    responses:
+      200:
+        description: Stelle wurde gelöscht.
+        schema:
+          $ref: '#/definitions/SuccessResponse'
+      403:
+        description: Nicht berechtigt.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+    """
     job = db.get_job(job_id)
     permission = job_management_permission()
     if not job or not (permission == "admin" or permission == job["customer_id"]):

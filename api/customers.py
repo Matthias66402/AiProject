@@ -36,7 +36,26 @@ def list_customers():
     """Liste + Pagination - Pendant zu customers()/GET (app.py). Der Redirect für
     'customer'-Nutzer auf ihren eigenen Datensatz passiert im Frontend anhand von
     /api/auth/me, nicht hier. search filtert (nur für die React-Liste, siehe
-    CustomersPage.jsx) auf Firmierung, PLZ und Ort."""
+    CustomersPage.jsx) auf Firmierung, PLZ und Ort.
+    ---
+    tags:
+      - Customers
+    parameters:
+      - name: page
+        in: query
+        type: integer
+      - name: per_page
+        in: query
+        type: integer
+        enum: [5, 10, 25, 50]
+      - name: search
+        in: query
+        type: string
+        description: Freitextsuche auf Firmierung, PLZ und Ort.
+    responses:
+      200:
+        description: Stellenanbieter der aktuellen Seite plus Pagination-Metadaten.
+    """
     search = (request.args.get("search") or "").strip()
     customers_list, page, per_page, total_pages = _paginate(search)
     return jsonify(
@@ -51,6 +70,39 @@ def list_customers():
 
 @customers_api.route("", methods=["POST"])
 def create_customer():
+    """Neuen Stellenanbieter anlegen (nur Admins).
+    ---
+    tags:
+      - Customers
+    security:
+      - sessionAuth: []
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required: [company_name, street, street_number, zip, city]
+          properties:
+            company_name: {type: string}
+            street: {type: string}
+            street_number: {type: string}
+            zip: {type: string}
+            city: {type: string}
+    responses:
+      201:
+        description: Stellenanbieter wurde angelegt.
+        schema:
+          $ref: '#/definitions/SuccessResponse'
+      400:
+        description: Pflichtfeld fehlt.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+      403:
+        description: Nicht berechtigt.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+    """
     if session.get("user_role") != "admin":
         return jsonify(error="Nicht berechtigt."), 403
 
@@ -70,6 +122,23 @@ def create_customer():
 
 @customers_api.route("/<int:customer_id>", methods=["GET"])
 def get_customer(customer_id):
+    """Einen Stellenanbieter ansehen.
+    ---
+    tags:
+      - Customers
+    parameters:
+      - name: customer_id
+        in: path
+        type: integer
+        required: true
+    responses:
+      200:
+        description: Stellenanbieter inkl. can_manage.
+      404:
+        description: Nicht gefunden.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+    """
     customer = db.get_customer(customer_id)
     if not customer:
         return jsonify(error="Nicht gefunden."), 404
@@ -81,6 +150,43 @@ def get_customer(customer_id):
 
 @customers_api.route("/<int:customer_id>", methods=["PUT"])
 def update_customer(customer_id):
+    """Stellenanbieter bearbeiten (Admins oder der zugehörige 'customer'-Nutzer).
+    ---
+    tags:
+      - Customers
+    security:
+      - sessionAuth: []
+    parameters:
+      - name: customer_id
+        in: path
+        type: integer
+        required: true
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required: [company_name, street, street_number, zip, city]
+          properties:
+            company_name: {type: string}
+            street: {type: string}
+            street_number: {type: string}
+            zip: {type: string}
+            city: {type: string}
+    responses:
+      200:
+        description: Stellenanbieter wurde aktualisiert.
+        schema:
+          $ref: '#/definitions/SuccessResponse'
+      400:
+        description: Pflichtfeld fehlt.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+      403:
+        description: Nicht berechtigt.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+    """
     if not customer_management_permission(customer_id):
         return jsonify(error="Nicht berechtigt."), 403
 
@@ -100,6 +206,27 @@ def update_customer(customer_id):
 
 @customers_api.route("/<int:customer_id>", methods=["DELETE"])
 def delete_customer(customer_id):
+    """Stellenanbieter löschen (nur Admins).
+    ---
+    tags:
+      - Customers
+    security:
+      - sessionAuth: []
+    parameters:
+      - name: customer_id
+        in: path
+        type: integer
+        required: true
+    responses:
+      200:
+        description: Stellenanbieter wurde gelöscht.
+        schema:
+          $ref: '#/definitions/SuccessResponse'
+      403:
+        description: Nicht berechtigt.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+    """
     if session.get("user_role") != "admin":
         return jsonify(error="Nicht berechtigt."), 403
     db.delete_customer(customer_id)

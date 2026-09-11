@@ -22,7 +22,27 @@ def me():
     """Aktueller Login-Status für React - Pendant zu inject_current_user() (app.py),
     das die klassischen Jinja-Templates versorgt. Liest dieselbe Flask-Session, damit
     ein über die bestehende /login-Seite angemeldeter Nutzer auch im React-Frontend
-    (anderer Port, gleiche Site) erkannt wird."""
+    (anderer Port, gleiche Site) erkannt wird.
+    ---
+    tags:
+      - Auth
+    security:
+      - sessionAuth: []
+    responses:
+      200:
+        description: Login-Status. user ist null, wenn niemand angemeldet ist.
+        schema:
+          type: object
+          properties:
+            user:
+              type: object
+              nullable: true
+              properties:
+                id: {type: integer}
+                short_name: {type: string}
+                role: {type: string}
+                customer_id: {type: integer, nullable: true}
+    """
     if not session.get("user_id"):
         return jsonify(user=None)
     return jsonify(user=_session_user())
@@ -30,6 +50,28 @@ def me():
 
 @auth_api.route("/login", methods=["POST"])
 def login():
+    """Mit E-Mail und Passwort anmelden.
+    ---
+    tags:
+      - Auth
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required: [email, password]
+          properties:
+            email: {type: string, format: email}
+            password: {type: string, format: password}
+    responses:
+      200:
+        description: Anmeldung erfolgreich, setzt das Session-Cookie.
+      401:
+        description: E-Mail oder Passwort ist falsch.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+    """
     data = request.get_json(silent=True) or {}
     email = (data.get("email") or "").strip()
     password = data.get("password") or ""
@@ -44,6 +86,34 @@ def login():
 
 @auth_api.route("/register", methods=["POST"])
 def register():
+    """Neuen Nutzer registrieren und direkt anmelden (immer Rolle 'user').
+    ---
+    tags:
+      - Auth
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required: [first_name, last_name, short_name, email, zip, city, password, password_confirm]
+          properties:
+            first_name: {type: string}
+            last_name: {type: string}
+            short_name: {type: string}
+            email: {type: string, format: email}
+            zip: {type: string}
+            city: {type: string}
+            password: {type: string, format: password}
+            password_confirm: {type: string, format: password}
+    responses:
+      201:
+        description: Registrierung erfolgreich, setzt das Session-Cookie.
+      400:
+        description: Pflichtfeld fehlt, Passwörter stimmen nicht überein oder E-Mail bereits vergeben.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+    """
     data = request.get_json(silent=True) or {}
     first_name = (data.get("first_name") or "").strip()
     last_name = (data.get("last_name") or "").strip()
@@ -68,5 +138,17 @@ def register():
 
 @auth_api.route("/logout", methods=["POST"])
 def logout():
+    """Abmelden (leert die Session).
+    ---
+    tags:
+      - Auth
+    security:
+      - sessionAuth: []
+    responses:
+      200:
+        description: Abmeldung erfolgreich.
+        schema:
+          $ref: '#/definitions/SuccessResponse'
+    """
     session.clear()
     return jsonify(success=True)
