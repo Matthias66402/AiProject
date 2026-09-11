@@ -77,6 +77,12 @@ export default function CustomerEditPage() {
         loadList()
     }
 
+    async function handleDeleteJob(jobId) {
+        if (!(await confirm('Stelle wirklich löschen?'))) return
+        await apiDelete(`/api/jobs/${jobId}`)
+        loadJobs()
+    }
+
     if (error) return <p className="form-error">{error}</p>
     if (!customer || !jobs || (!isCustomerUser && !listData))
         return <p>Lade …</p>
@@ -155,13 +161,14 @@ export default function CustomerEditPage() {
                             </tr>
                         )}
                         {jobs.map((job) => (
-                            <tr key={job.id}>
+                            <tr key={job.id} className="clickable-row">
                                 <td>{job.position}</td>
                                 <td>{job.valid_from || '-'}</td>
                                 <td>{job.valid_until || '-'}</td>
                                 <td>
                                     <div className="row-actions">
                                         <Link
+                                            className="row-link"
                                             to={`/jobs/${job.id}/edit?from_customer=${customer.id}`}
                                         >
                                             <i
@@ -171,6 +178,18 @@ export default function CustomerEditPage() {
                                                 ? 'Bearbeiten'
                                                 : 'Ansehen'}
                                         </Link>
+                                        {canManage && (
+                                            <button
+                                                type="button"
+                                                className="link-button"
+                                                onClick={() =>
+                                                    handleDeleteJob(job.id)
+                                                }
+                                            >
+                                                <i className="fa-solid fa-trash" />{' '}
+                                                Löschen
+                                            </button>
+                                        )}
                                     </div>
                                 </td>
                             </tr>
