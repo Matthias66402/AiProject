@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { API_BASE, apiDelete, apiGet, apiPost } from '../api/client'
+import { useConfirm } from '../components/ConfirmProvider'
 
 export default function MyResumesPage() {
+    const confirm = useConfirm()
     const fileInputRef = useRef(null)
     const [resumes, setResumes] = useState(null)
     const [selectedId, setSelectedId] = useState(null)
@@ -106,12 +108,7 @@ export default function MyResumesPage() {
 
     async function handleDelete() {
         if (!selectedResume) return
-        if (
-            !window.confirm(
-                'Diesen Lebenslauf wirklich löschen? Die zugehörige Datei wird dabei ebenfalls entfernt.',
-            )
-        )
-            return
+        if (!(await confirm('Diesen Lebenslauf wirklich löschen?'))) return
         await apiDelete(`/api/resumes/${selectedResume.id}`)
         setMessage('')
         loadList()

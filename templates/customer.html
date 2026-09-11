@@ -50,7 +50,7 @@
             <button class="subtle-btn" type="submit">{{ "Speichern" if editing_customer else "Kunde anlegen" }}</button>
         </form>
         {% if editing_customer %}
-        <p class="subtitles subtle-btn cancel"><a href="{{ url_for('customers') }}">Abbrechen</a></p>
+        <p class="subtitles subtle-btn cancel"><a class="cancel-link" href="{{ url_for('customers') }}"><i class="fa-solid fa-xmark"></i> Abbrechen</a></p>
         {% endif %}
         {% endif %}
 

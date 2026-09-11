@@ -1,5 +1,5 @@
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, String, Text, delete, func, select
+from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, String, Text, func, select
 
 from models.base import Base, MIN_MATCH_SIMILARITY, escape_like, get_session, to_dict
 from models.customer import Customer
@@ -19,6 +19,7 @@ class Job(Base):
     zip = Column(String(10))
     city = Column(String(100))
     embedding = Column(Vector(1536))
+    deleted = Column(Boolean, nullable=False, default=False, server_default="false")
 
 
 def _position_search_filter(search):
@@ -29,7 +30,11 @@ def _position_search_filter(search):
 
 def list_jobs(customer_id=None, limit=None, offset=None, search=None):
     with get_session() as session:
-        stmt = select(Job, Customer.company_name.label("customer_name")).join(Customer, Customer.id == Job.customer_id)
+        stmt = (
+            select(Job, Customer.company_name.label("customer_name"))
+            .join(Customer, Customer.id == Job.customer_id)
+            .where(Job.deleted.is_(False))
+        )
         if customer_id:
             stmt = stmt.where(Job.customer_id == customer_id)
         if search:
@@ -47,7 +52,7 @@ def list_jobs(customer_id=None, limit=None, offset=None, search=None):
 
 def count_jobs(customer_id=None, search=None):
     with get_session() as session:
-        stmt = select(func.count()).select_from(Job)
+        stmt = select(func.count()).select_from(Job).where(Job.deleted.is_(False))
         if customer_id:
             stmt = stmt.where(Job.customer_id == customer_id)
         if search:
@@ -57,7 +62,11 @@ def count_jobs(customer_id=None, search=None):
 
 def get_job(job_id):
     with get_session() as session:
-        stmt = select(Job, Customer.company_name.label("customer_name")).join(Customer, Customer.id == Job.customer_id).where(Job.id == job_id)
+        stmt = (
+            select(Job, Customer.company_name.label("customer_name"))
+            .join(Customer, Customer.id == Job.customer_id)
+            .where(Job.id == job_id, Job.deleted.is_(False))
+        )
         row = session.execute(stmt).first()
         if row is None:
             return None
@@ -101,6 +110,7 @@ def find_matching_jobs(embedding, top_k=5, min_similarity=MIN_MATCH_SIMILARITY):
             select(Job.id, Job.position, Job.city, Job.valid_from, Job.valid_until,
                    Customer.company_name.label("customer_name"), similarity)
             .join(Customer, Customer.id == Job.customer_id)
+            .where(Job.deleted.is_(False))
             .where(Job.embedding.isnot(None))
             .where(similarity >= min_similarity)
             .order_by(Job.embedding.cosine_distance(embedding))
@@ -110,5 +120,10 @@ def find_matching_jobs(embedding, top_k=5, min_similarity=MIN_MATCH_SIMILARITY):
 
 
 def delete_job(job_id):
+    """"Löschen" deaktiviert die Stelle nur noch (deleted=true) statt die Zeile
+    zu entfernen - list_jobs/get_job/find_matching_jobs blenden sie dadurch
+    überall aus, ohne dass z.B. bestehende Referenzen brechen."""
     with get_session() as session:
-        session.execute(delete(Job).where(Job.id == job_id))
+        job = session.get(Job, job_id)
+        if job is not None:
+            job.deleted = True

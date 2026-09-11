@@ -15,6 +15,10 @@ _CUSTOMER_COLUMNS = {
     "city": "VARCHAR(100) NOT NULL",
     "created_at": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP",
     "updated_at": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP",
+    # "Löschen" deaktiviert seitdem nur noch (siehe delete_customer in
+    # models/customer.py), statt die Zeile wirklich zu entfernen - u.a. damit
+    # bestehende jobs.customer_id-Referenzen gültig bleiben.
+    "deleted": "BOOLEAN NOT NULL DEFAULT FALSE",
 }
 
 _JOB_COLUMNS = {
@@ -22,6 +26,7 @@ _JOB_COLUMNS = {
     "zip": "VARCHAR(10)",
     "city": "VARCHAR(100)",
     "embedding": "vector(1536)",
+    "deleted": "BOOLEAN NOT NULL DEFAULT FALSE",
 }
 
 _USER_COLUMNS = {
@@ -31,6 +36,7 @@ _USER_COLUMNS = {
 
 _RESUME_COLUMNS = {
     "embedding": "vector(1536)",
+    "deleted": "BOOLEAN NOT NULL DEFAULT FALSE",
 }
 
 

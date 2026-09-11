@@ -181,8 +181,11 @@ export default function UserForm({
                     {submitLabel}
                 </button>
                 {cancelTo && (
-                    <Link className="subtle-btn cancel" to={cancelTo}>
-                        Abbrechen
+                    <Link
+                        className="subtle-btn cancel cancel-link"
+                        to={cancelTo}
+                    >
+                        <i className="fa-solid fa-xmark" /> Abbrechen
                     </Link>
                 )}
             </div>

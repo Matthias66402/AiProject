@@ -4,10 +4,12 @@ import { apiDelete, apiGet, apiPost } from '../api/client'
 import CustomerForm from '../components/CustomerForm'
 import CustomerTable from '../components/CustomerTable'
 import Pager from '../components/Pager'
+import { useConfirm } from '../components/ConfirmProvider'
 
 export default function CustomersPage() {
     const { user } = useOutletContext()
     const navigate = useNavigate()
+    const confirm = useConfirm()
     const [data, setData] = useState(null)
     const [page, setPage] = useState(1)
     const [perPage, setPerPage] = useState(10)
@@ -60,7 +62,7 @@ export default function CustomersPage() {
     }
 
     async function handleDelete(customerId) {
-        if (!window.confirm('Kunde wirklich löschen?')) return
+        if (!(await confirm('Kunde wirklich löschen?'))) return
         await apiDelete(`/api/customers/${customerId}`)
         load()
     }

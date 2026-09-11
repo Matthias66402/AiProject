@@ -4,10 +4,12 @@ import { apiDelete, apiGet, apiPut } from '../api/client'
 import CustomerForm from '../components/CustomerForm'
 import CustomerTable from '../components/CustomerTable'
 import Pager from '../components/Pager'
+import { useConfirm } from '../components/ConfirmProvider'
 
 export default function CustomerEditPage() {
     const { user } = useOutletContext()
     const { customerId } = useParams()
+    const confirm = useConfirm()
 
     const [customer, setCustomer] = useState(null)
     const [listData, setListData] = useState(null)
@@ -70,7 +72,7 @@ export default function CustomerEditPage() {
     }
 
     async function handleDeleteRow(id) {
-        if (!window.confirm('Kunde wirklich löschen?')) return
+        if (!(await confirm('Kunde wirklich löschen?'))) return
         await apiDelete(`/api/customers/${id}`)
         loadList()
     }
@@ -110,7 +112,9 @@ export default function CustomerEditPage() {
                             submitLabel="Speichern"
                         />
                         <p className="subtitle">
-                            <Link to="/customers">Abbrechen</Link>
+                            <Link className="cancel-link" to="/customers">
+                                <i className="fa-solid fa-xmark" /> Abbrechen
+                            </Link>
                         </p>
                     </>
                 ) : (

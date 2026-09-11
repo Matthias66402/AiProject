@@ -50,7 +50,9 @@ export default function UsersPage() {
             <details className="entity-form">
                 <summary className="subtle-btn">
                     <span className="label-closed">+ Nutzer anlegen</span>
-                    <span className="label-open">- Abbrechen</span>
+                    <span className="label-open cancel-link">
+                        <i className="fa-solid fa-xmark" /> Abbrechen
+                    </span>
                 </summary>
                 <UserForm
                     roles={data.roles}
@@ -58,7 +60,6 @@ export default function UsersPage() {
                     onSubmit={handleCreate}
                     submitLabel="Nutzer anlegen"
                 />
-                <span className="label-open" class="subtle-btn cancel">Abbrechen</span>
             </details>
 
             <form

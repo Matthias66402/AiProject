@@ -4,9 +4,11 @@ import { apiDelete, apiGet, apiPost } from '../api/client'
 import Pager from '../components/Pager'
 import JobTable from '../components/JobTable'
 import JobForm from '../components/JobForm'
+import { useConfirm } from '../components/ConfirmProvider'
 
 export default function JobsPage() {
     const { user } = useOutletContext()
+    const confirm = useConfirm()
     const [data, setData] = useState(null)
     const [page, setPage] = useState(1)
     const [perPage, setPerPage] = useState(10)
@@ -62,7 +64,7 @@ export default function JobsPage() {
     }
 
     async function handleDelete(jobId) {
-        if (!window.confirm('Stelle wirklich löschen?')) return
+        if (!(await confirm('Stelle wirklich löschen?'))) return
         await apiDelete(`/api/jobs/${jobId}`)
         load()
     }

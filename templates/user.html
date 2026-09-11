@@ -126,7 +126,7 @@
             <button class="{{ 'subtle-btn' if editing_user else 'special-btn' }}" type="submit">{{ "Speichern" if editing_user else "Nutzer anlegen" }}</button>
         </form>
         {% if editing_user %}
-        <p class="subtitle"><a href="{{ url_for('users') }}">Abbrechen</a></p>
+        <p class="subtitle"><a class="cancel-link" href="{{ url_for('users') }}"><i class="fa-solid fa-xmark"></i> Abbrechen</a></p>
         {% endif %}
         {% endif %}
     </details>

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, Integer, String, delete, func, or_, select
+from sqlalchemy import Boolean, Column, DateTime, Integer, String, func, or_, select
 
 from models.base import Base, escape_like, get_session, to_dict
 
@@ -14,6 +14,7 @@ class Customer(Base):
     city = Column(String(100), nullable=False)
     created_at = Column(DateTime, nullable=False, server_default=func.current_timestamp())
     updated_at = Column(DateTime, nullable=False, server_default=func.current_timestamp())
+    deleted = Column(Boolean, nullable=False, default=False, server_default="false")
 
 
 def _search_filter(search):
@@ -29,7 +30,7 @@ def _search_filter(search):
 
 def list_customers(limit=None, offset=None, search=None):
     with get_session() as session:
-        stmt = select(Customer).order_by(Customer.company_name)
+        stmt = select(Customer).where(Customer.deleted.is_(False)).order_by(Customer.company_name)
         if search:
             stmt = stmt.where(_search_filter(search))
         if limit is not None:
@@ -39,7 +40,7 @@ def list_customers(limit=None, offset=None, search=None):
 
 def count_customers(search=None):
     with get_session() as session:
-        stmt = select(func.count()).select_from(Customer)
+        stmt = select(func.count()).select_from(Customer).where(Customer.deleted.is_(False))
         if search:
             stmt = stmt.where(_search_filter(search))
         return session.scalar(stmt)
@@ -47,7 +48,8 @@ def count_customers(search=None):
 
 def get_customer(customer_id):
     with get_session() as session:
-        return to_dict(session.get(Customer, customer_id))
+        stmt = select(Customer).where(Customer.id == customer_id, Customer.deleted.is_(False))
+        return to_dict(session.scalars(stmt).first())
 
 
 def create_customer(company_name, street, street_number, zip_code, city):
@@ -68,5 +70,10 @@ def update_customer(customer_id, company_name, street, street_number, zip_code, 
 
 
 def delete_customer(customer_id):
+    """"Löschen" deaktiviert den Stellenanbieter nur noch (deleted=true) statt
+    die Zeile zu entfernen - list_customers/get_customer blenden ihn dadurch
+    überall aus, ohne dass bestehende jobs.customer_id-Referenzen brechen."""
     with get_session() as session:
-        session.execute(delete(Customer).where(Customer.id == customer_id))
+        customer = session.get(Customer, customer_id)
+        if customer is not None:
+            customer.deleted = True

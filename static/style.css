@@ -9,6 +9,13 @@
    Überschriften-Font). Alle Regeln im Rest der Datei lesen ausschließlich
    aus diesen Variablen, nie aus Literalen, damit beide Oberflächen aus
    derselben Quelle gespeist werden. */
+
+/* Different Background colors:
+    #f9fbee
+    #cfd4b5
+ */
+
+
 :root {
     --page-bg: #76a250;
     --ink: #f1e9ff;
@@ -368,6 +375,63 @@ nav summary::marker {
     text-decoration: underline;
 }
 
+/* Modal für Lösch-Bestätigungen (React, siehe ConfirmProvider.jsx) - Ersatz
+   für window.confirm(). */
+.confirm-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 4, 26, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 1000;
+}
+
+.confirm-dialog {
+    width: 100%;
+    max-width: 400px;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-card);
+    box-shadow: var(--card-shadow);
+    padding: 22px 26px;
+}
+
+.confirm-dialog p {
+    margin: 0 0 20px;
+    color: var(--ink);
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.confirm-danger-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--danger-bg);
+    border: 1px solid var(--danger-border);
+    border-radius: var(--radius-ctl);
+    color: var(--danger);
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    padding: 8px 18px;
+    cursor: pointer;
+    transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.confirm-danger-btn:hover {
+    transform: translateY(-1px);
+}
+
 .wand-row {
     display: flex;
     align-items: center;
@@ -612,6 +676,13 @@ textarea:focus {
     border-color: var(--gold);
 }
 
+/* "Abbrechen"-Links: gleiche Farbe wie "Ansehen" (.user-table a), plus
+   passendes Icon (fa-xmark) direkt im Markup - einheitlicher Cancel-Look
+   über alle Formulare hinweg. */
+.cancel-link {
+    color: var(--gold-2);
+}
+
 .form-actions {
     display: flex;
     flex-direction: row;
@@ -659,6 +730,14 @@ textarea:focus {
 
 .user-table a {
     color: var(--gold-2);
+}
+
+/* "Bearbeiten"-Links (fa-pen) grün statt Gold - "Ansehen" (fa-eye) bleibt
+   unverändert bei der Default-Farbe oben. Ein Selector statt einer eigenen
+   Klasse in jeder Tabellenkomponente/jedem Template, da fa-pen/fa-eye schon
+   überall konsequent zur Unterscheidung genutzt werden. */
+.user-table a:has(.fa-pen) {
+    color: #76A250;
 }
 
 .user-table tr.clickable-row {

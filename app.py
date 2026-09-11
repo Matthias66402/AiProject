@@ -680,10 +680,6 @@ def delete_resume(resume_id):
     resume = db.get_resume(resume_id)
     if not resume or resume["user_id"] != session.get("user_id"):
         return redirect(url_for('home'))
-    if resume["document_link"]:
-        file_path = os.path.join(RESUME_DIR, os.path.basename(resume["document_link"]))
-        if os.path.exists(file_path):
-            os.remove(file_path)
     db.delete_resume(resume_id)
     return redirect(url_for('my_resumes'))
 

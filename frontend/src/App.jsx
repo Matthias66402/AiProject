@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { API_BASE, apiGet, apiPost } from './api/client'
+import { ConfirmProvider } from './components/ConfirmProvider'
 
 export default function App() {
     // undefined = wird geladen, null = nicht eingeloggt, sonst {id, short_name, role, customer_id}
@@ -44,7 +45,7 @@ export default function App() {
     }
 
     return (
-        <>
+        <ConfirmProvider>
             <nav
                 className="flex flex-wrap items-center"
                 style={{ padding: '1rem', position: 'relative', zIndex: 2 }}
@@ -310,6 +311,6 @@ export default function App() {
             <main className="scroll full" style={{ padding: '1.5rem' }}>
                 <Outlet context={{ user, refreshUser }} />
             </main>
-        </>
+        </ConfirmProvider>
     )
 }

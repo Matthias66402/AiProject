@@ -11,12 +11,14 @@ import { API_BASE, apiDelete, apiGet, apiPut } from '../api/client'
 import JobForm from '../components/JobForm'
 import JobTable from '../components/JobTable'
 import Pager from '../components/Pager'
+import { useConfirm } from '../components/ConfirmProvider'
 
 export default function JobEditPage() {
     const { user } = useOutletContext()
     const { jobId } = useParams()
     const [searchParams] = useSearchParams()
     const navigate = useNavigate()
+    const confirm = useConfirm()
     const fromCustomer = searchParams.get('from_customer')
 
     const [job, setJob] = useState(null)
@@ -76,13 +78,13 @@ export default function JobEditPage() {
     }
 
     async function handleDeleteCurrent() {
-        if (!window.confirm('Stelle wirklich löschen?')) return
+        if (!(await confirm('Stelle wirklich löschen?'))) return
         await apiDelete(`/api/jobs/${jobId}`)
         navigate('/jobs')
     }
 
     async function handleDeleteRow(id) {
-        if (!window.confirm('Stelle wirklich löschen?')) return
+        if (!(await confirm('Stelle wirklich löschen?'))) return
         await apiDelete(`/api/jobs/${id}`)
         loadList()
     }
@@ -135,7 +137,10 @@ export default function JobEditPage() {
                                     ·{' '}
                                 </>
                             )}
-                            <Link to="/jobs">Abbrechen</Link> ·{' '}
+                            <Link className="cancel-link" to="/jobs">
+                                <i className="fa-solid fa-xmark" /> Abbrechen
+                            </Link>{' '}
+                            ·{' '}
                             <button
                                 type="button"
                                 className="link-button"

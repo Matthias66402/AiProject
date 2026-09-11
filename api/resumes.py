@@ -191,7 +191,7 @@ def upload_resume():
 
 @resumes_api.route("/<int:resume_id>", methods=["DELETE"])
 def delete_resume(resume_id):
-    """Eigenen Lebenslauf löschen (inkl. Datei).
+    """Eigenen Lebenslauf löschen (deaktiviert ihn nur noch, siehe delete_resume in models/resume.py - die Datei bleibt erhalten).
     ---
     tags:
       - Resumes
@@ -224,9 +224,5 @@ def delete_resume(resume_id):
     if not resume or resume["user_id"] != user_id:
         return jsonify(error="Nicht gefunden."), 404
 
-    if resume["document_link"]:
-        file_path = os.path.join(resume_service.RESUME_DIR, os.path.basename(resume["document_link"]))
-        if os.path.exists(file_path):
-            os.remove(file_path)
     db.delete_resume(resume_id)
     return jsonify(success=True)
