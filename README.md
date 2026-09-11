@@ -155,6 +155,19 @@ Startet App, PostgreSQL und den React-Dev-Server zusammen; DB-Daten in einem ben
 
 `.env` ist per `.gitignore` von Git ausgeschlossen — nur `.env.example` wird versioniert.
 
+### Ersten Admin-Nutzer anlegen
+
+Es gibt bewusst keinen automatischen Bootstrap-Admin: Jede Registrierung über `/register` legt den Nutzer immer mit Rolle `user` an (`DEFAULT_ROLE` in `models/user.py`), unabhängig davon, ob es der erste Nutzer ist. Um die Anwendung überhaupt administrieren zu können (Nutzer-/Rollenverwaltung, Stellenanbieter anlegen, Tools-Menü), nach der Installation also:
+
+1. Einmal ganz normal über `/register` registrieren.
+2. Diesem Nutzer danach **direkt in der Datenbank** die Rolle `admin` zuweisen, z.B. mit Docker Compose:
+
+   ```bash
+   docker compose exec postgres psql -U <DB_USER> -d <DB_NAME> -c "UPDATE users SET role = 'admin' WHERE email = '<E-Mail des Nutzers>';"
+   ```
+
+   `<DB_USER>`/`<DB_NAME>` wie in der eigenen `.env` (siehe Tabelle oben). Die Rolle landet beim Login einmalig in der Flask-Session (`log_in_user()` in `services/auth_service.py`) und wird danach nicht live nachgeladen — ein bereits eingeloggter Nutzer muss sich also nach dem Rollenwechsel einmal ab- und wieder anmelden, damit die neue Rolle (und damit Zugriff auf Nutzerverwaltung, Tools-Menü etc.) wirksam wird.
+
 ## Frontend (React)
 
 `frontend/` ist ein eigenständiges Vite-Projekt (Port 5173), das ausschließlich die JSON-API unter `api/` anspricht (CORS via `FRONTEND_ORIGIN`) und dieselbe Flask-Session/Business-Logik in `services/` nutzt.
