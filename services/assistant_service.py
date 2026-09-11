@@ -153,7 +153,7 @@ def ask_assistant(question, model_id, site_map, logger=None):
             messages=[
                 {"role": "system", "content": (
                     "Du bist ein Assistent, der bei allgemeinen Fragen zur Website, Stellenbewerbung und Stellenveröffentlichung hilft.\n\n"
-                    "Das ist die vollständige, aktuelle Seitenstruktur der Website (Route, erlaubte HTTP-Methoden, Zweck):\n"
+                    "Das ist die vollständige, aktuelle Seitenstruktur der Website (Pfad, Zweck):\n"
                     f"{site_map}\n\n"
                     "Diese Liste ist deine einzige Wissensquelle über den Aufbau der Website. "
                     "Wenn eine Seite, ein Menüpunkt oder eine Funktion hier nicht auftaucht, existiert sie nicht - "

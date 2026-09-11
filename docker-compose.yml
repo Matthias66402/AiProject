@@ -51,7 +51,6 @@ services:
       - ./document_extraction.py:/app/document_extraction.py
       - ./backfill_embeddings.py:/app/backfill_embeddings.py
       - ./migrate_mysql_to_postgres.py:/app/migrate_mysql_to_postgres.py
-      - ./templates:/app/templates
       - ./static:/app/static
     depends_on:
       postgres:
