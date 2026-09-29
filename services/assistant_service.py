@@ -13,8 +13,7 @@ from services.text_utils import strip_think_block
 AVAILABLE_MODELS = {
     "openai/gpt-oss-20b": "Groq - gpt-oss-20b (Standard, schnell)",
     "openai/gpt-oss-120b": "Groq - gpt-oss-120b (groß & mächtig)",
-    "qwen/qwen3.6-27b": "Qwen - qwen3.6-27b (kompakt & clever)",
-    "groq/compound-mini": "Groq - compound-mini (agentisch, mit Websuche)",
+    "qwen/qwen3.8-27b": "Qwen - qwen3.8-27b (kompakt & clever)",
     "gpt-5-mini": "OpenAI - gpt-5-mini",
     "gpt-4o-mini": "OpenAI - gpt-4o-mini",
     "gpt-4.1-mini": "OpenAI - gpt-4.1-mini",
@@ -24,8 +23,7 @@ DEFAULT_MODEL = "gpt-4.1-mini"
 AVAILABE_MODEL_NAMES = {
     "openai/gpt-oss-20b": "Groq - Standard",
     "openai/gpt-oss-120b": "Groq - Mächtig",
-    "qwen/qwen3.6-27b": "Qwen - Kompakt",
-    "groq/compound-mini": "Groq - agentisch",
+    "qwen/qwen3.8-27b": "Qwen - Kompakt",
     "gpt-5-mini": "OpenAI - gpt-5-mini",
     "gpt-4o-mini": "OpenAI - gpt-4o-mini",
     "gpt-4.1-mini": "OpenAI - gpt-4.1-mini",
@@ -42,8 +40,7 @@ groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 MODEL_CLIENTS = {
     "openai/gpt-oss-20b": groq_client,
     "openai/gpt-oss-120b": groq_client,
-    "qwen/qwen3.6-27b": groq_client,
-    "groq/compound-mini": groq_client,
+    "qwen/qwen3.8-27b": groq_client,
     "gpt-5-mini": openai_client,
     "gpt-4o-mini": openai_client,
     "gpt-4.1-mini": openai_client,
