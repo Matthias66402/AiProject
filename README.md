@@ -152,6 +152,7 @@ Startet App, PostgreSQL und den React-Dev-Server zusammen; DB-Daten in einem ben
 | `OPENAI_API_KEY` | API-Key für OpenAI (Chat-Modelle + Embeddings). Pflicht |
 | `DB_HOST` / `DB_PORT` / `DB_NAME` / `DB_USER` / `DB_PASSWORD` | Verbindungsdaten zur PostgreSQL-Datenbank |
 | `SECRET_KEY` | Flask-Session-Secret |
+| `FLASK_DEBUG` | `1` aktiviert Flask-Debug-Modus (Auto-Reloader + Werkzeug-Debugger). Standard: aus. In `docker-compose.yml` für die Entwicklung gesetzt; **nie im öffentlichen Betrieb**, da der Debugger Codeausführung erlaubt |
 
 `.env` ist per `.gitignore` von Git ausgeschlossen — nur `.env.example` wird versioniert.
 

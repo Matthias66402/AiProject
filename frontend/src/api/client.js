@@ -1,4 +1,6 @@
-export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5003'
+// ?? statt ||: ein leerer Wert ("") bleibt erhalten und ergibt relative Pfade (gleiche
+// Origin, z.B. hinter einem Reverse-Proxy); nur ein fehlender Wert fällt auf localhost zurück.
+export const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5003'
 
 async function request(path, options = {}) {
   const isFormData = options.body instanceof FormData

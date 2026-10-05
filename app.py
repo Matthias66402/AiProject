@@ -219,4 +219,6 @@ def view_joboffer(filename):
     return send_from_directory(JOBOFFER_DIR, filename)
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5003)
+    # Debug-Modus (Reloader + Werkzeug-Debugger) nur per FLASK_DEBUG=1 - der Debugger
+    # erlaubt im Fehlerfall Codeausführung im Browser und darf nie öffentlich laufen.
+    app.run(debug=os.environ.get("FLASK_DEBUG", "0") == "1", host='0.0.0.0', port=5003)

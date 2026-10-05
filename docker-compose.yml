@@ -28,6 +28,8 @@ services:
       # den internen Port erreicht, nicht über den nach außen gemappten ${DB_PORT}.
       DB_HOST: postgres
       DB_PORT: 5432
+      # Dev-Setup: Flask-Reloader + Debugger an (app.py). Für den Betrieb weglassen.
+      FLASK_DEBUG: "1"
       # Origin des React-PoC-Frontends (frontend/) - für CORS auf den /api/*-Routen.
       FRONTEND_ORIGIN: http://localhost:5173
     ports:
