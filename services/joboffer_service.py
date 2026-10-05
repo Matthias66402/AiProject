@@ -6,8 +6,9 @@ from flask import url_for
 
 import db
 from embeddings import embed_text, strip_html_to_text
+from services.ai_usage import log_token_usage
 from services.pdf_service import write_html_as_pdf
-from services.text_utils import clean_ai_response
+from services.text_utils import SIMPLE_HTML_RULE, clean_ai_response, compact_whitespace
 
 JOBOFFER_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "joboffers")
 
@@ -22,19 +23,20 @@ def extract_joboffer_from_text(openai_client, model, document_text):
         response_format={"type": "json_object"},
         messages=[
             {"role": "system", "content": (
-                "Du bekommst den Text eines hochgeladenen Stellenangebot-Dokuments. Fasse die "
-                "Stellenbeschreibung sinnvoll zusammen und extrahiere, falls im Text eindeutig erkennbar, "
-                "weitere Angaben - erfinde nichts frei hinzu. "
-                "Antworte ausschließlich mit einem JSON-Objekt mit genau vier Feldern: "
-                "\"position\" (kurze Stellenbezeichnung als Klartext, leerer String falls nicht erkennbar), "
-                "\"zip\" (Postleitzahl des Arbeitsortes als Text, leerer String falls nicht erkennbar), "
-                "\"city\" (Stadt des Arbeitsortes als Text, leerer String falls nicht erkennbar) und "
-                "\"content\" (eine sinnvoll gekürzte Zusammenfassung der Stellenbeschreibung als formatiertes "
-                "HTML mit Überschriften/Aufzählungen), ohne zusätzliche Erklärungen außerhalb des JSON."
+                "Du erhältst den Text eines Stellenangebots.\n\n"
+                "Fasse die Stellenbeschreibung sinnvoll zusammen.\n"
+                "Extrahiere, falls im Text eindeutig erkennbar: Position, PLZ, Stadt. Erfinde nichts hinzu.\n"
+                "Antworte nur mit einem JSON-Objekt mit genau diesen Feldern:\n"
+                "\"position\": kurze Stellenbezeichnung als Text, sonst \"\"\n"
+                "\"zip\": Postleitzahl des Arbeitsortes als Text, sonst \"\"\n"
+                "\"city\": Stadt des Arbeitsortes als Text, sonst \"\"\n"
+                f"\"content\": gekürzte Zusammenfassung als HTML mit Überschriften/Aufzählungen ({SIMPLE_HTML_RULE}).\n"
+                "Keine zusätzliche Ausgabe außerhalb dieses JSON."
             )},
-            {"role": "user", "content": document_text},
+            {"role": "user", "content": compact_whitespace(document_text)},
         ],
     )
+    log_token_usage("joboffer_extract", model, response)
     raw = clean_ai_response(response.choices[0].message.content)
     return json.loads(raw)
 
@@ -61,7 +63,7 @@ def generate_joboffer(openai_client, model, customer_id, spec, logger=None):
             "Antworte ausschließlich mit einem JSON-Objekt mit genau zwei Feldern: "
             "\"position\" (kurze Stellenbezeichnung als Klartext, z.B. \"Softwareentwickler (m/w/d)\") und "
             "\"content\" (das vollständige Stellenangebot als formatiertes HTML mit Überschriften, "
-            "Aufzählungen etc., inklusive der vorgegebenen Kontaktdaten), "
+            f"Aufzählungen etc., inklusive der vorgegebenen Kontaktdaten; {SIMPLE_HTML_RULE}), "
             "ohne zusätzliche Erklärungen außerhalb des JSON."
         )
         user_content = f"Unternehmen:\n{company_block}\n\n{spec}"
@@ -73,7 +75,7 @@ def generate_joboffer(openai_client, model, customer_id, spec, logger=None):
             "\"position\" (kurze Stellenbezeichnung als Klartext, z.B. \"Softwareentwickler (m/w/d)\"), "
             "\"zip\" (Postleitzahl des Arbeitsortes als Text), "
             "\"city\" (Stadt des Arbeitsortes als Text) und "
-            "\"content\" (das vollständige Stellenangebot als formatiertes HTML mit Überschriften, Aufzählungen etc.), "
+            f"\"content\" (das vollständige Stellenangebot als formatiertes HTML mit Überschriften, Aufzählungen etc.; {SIMPLE_HTML_RULE}), "
             "ohne zusätzliche Erklärungen außerhalb des JSON."
         )
         user_content = spec
@@ -86,6 +88,7 @@ def generate_joboffer(openai_client, model, customer_id, spec, logger=None):
             {"role": "user", "content": user_content},
         ],
     )
+    log_token_usage("joboffer_generate", model, response)
     raw = clean_ai_response(response.choices[0].message.content)
     data = json.loads(raw)
     position = (data.get("position") or "").strip()

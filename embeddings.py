@@ -3,6 +3,8 @@ import re
 
 from openai import APIError as OpenAIAPIError
 
+from services.ai_usage import log_token_usage
+
 EMBEDDING_MODEL = "text-embedding-3-small"
 
 _STYLE_SCRIPT_RE = re.compile(r"<(style|script)\b[^>]*>.*?</\1>", re.IGNORECASE | re.DOTALL)
@@ -28,6 +30,7 @@ def embed_text(openai_client, text, logger=None):
     Feature gegenüber dem eigentlichen Job-/Resume-Anlegen."""
     try:
         response = openai_client.embeddings.create(model=EMBEDDING_MODEL, input=text)
+        log_token_usage("embedding", EMBEDDING_MODEL, response)
         return response.data[0].embedding
     except OpenAIAPIError as e:
         if logger:
@@ -43,6 +46,7 @@ def embed_texts(openai_client, texts, logger=None):
         return []
     try:
         response = openai_client.embeddings.create(model=EMBEDDING_MODEL, input=texts)
+        log_token_usage(f"embedding_batch({len(texts)})", EMBEDDING_MODEL, response)
         result = [None] * len(texts)
         for item in response.data:
             result[item.index] = item.embedding

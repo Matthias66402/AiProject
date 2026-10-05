@@ -6,6 +6,7 @@ from openai import APIStatusError as OpenAIAPIStatusError
 import db
 from embeddings import embed_text
 from services.ai_clients import openai_client
+from services.ai_usage import log_token_usage
 from services.text_utils import strip_think_block
 
 # Verfügbare Zauberer (KI-Modelle). Key = Modell-ID, Value = Anzeigename.
@@ -45,6 +46,9 @@ MODEL_CLIENTS = {
     "gpt-4o-mini": openai_client,
     "gpt-4.1-mini": openai_client,
 }
+
+# Modelle, die reasoning_effort unterstützen (siehe ask_assistant).
+REASONING_MODELS = {"openai/gpt-oss-20b", "openai/gpt-oss-120b", "gpt-5-mini"}
 
 if groq_client is None:
     _unavailable_models = {model_id for model_id, model_client in MODEL_CLIENTS.items() if model_client is None}
@@ -120,29 +124,28 @@ def ask_assistant(question, model_id, site_map, logger=None):
 
     jobs_context = _relevant_jobs_context(question_embedding, logger)
     jobs_section = (
-        "\n\nZur Frage passende, aktuell veröffentlichte Stellenangebote (per Ähnlichkeitssuche ermittelt):\n"
+        "\n\nZur Frage passende, veröffentlichte Stellenangebote (per Ähnlichkeitssuche):\n"
         f"{jobs_context}\n\n"
-        "Nutze diese Liste, um konkrete Stellenangebote zu nennen, wenn danach gefragt wird. "
-        "Erfinde keine Details (z.B. Anforderungen, Gehalt), die hier nicht stehen - verweise für Details auf die Stellenangebote-Seite. "
-        "Falls kein Stellenangebot hier zur Frage passt, sag das offen, statt eines der obigen zu erfinden passend zu machen."
+        "Nenne daraus konkrete Stellen, wenn danach gefragt wird. Erfinde keine Details (z.B. Anforderungen, "
+        "Gehalt) - verweise dafür auf die Stellenangebote-Seite. Passt keine davon zur Frage, sag das offen."
         if jobs_context else ""
     )
 
     resumes_context = _relevant_resumes_context(question_embedding, logger)
     resumes_section = (
-        "\n\nEin Vektor-Ähnlichkeitssuchsystem hat den vollständigen Text (Werdegang, Fähigkeiten, "
-        "Erfahrung) der jeweils neuesten Lebensläufe dieser Personen mit der Frage verglichen und sie "
-        "als beste Treffer ermittelt, absteigend nach Relevanz - der erste Eintrag passt am besten:\n"
+        "\n\nPer Vektor-Ähnlichkeitssuche über den vollständigen Lebenslauftext (Werdegang, Fähigkeiten, "
+        "Erfahrung) ermittelte, am besten zur Frage passende Personen, absteigend nach Relevanz:\n"
         f"{resumes_context}\n\n"
-        "Behandle das als Tatsache: diese Personen passen inhaltlich zur Frage, auch wenn ihr Lebenslauf-"
-        "Inhalt hier nicht ausgeschrieben ist. Nenne bei einer Frage nach Bewerber:innen/Nutzer:innen mit "
-        "bestimmten Fähigkeiten oder Erfahrung (z.B. 'wer kennt sich mit X aus') den/die Erstplatzierte(n) "
-        "aus dieser Liste konkret mit Namen, statt auszuweichen. Erfinde nur keine konkreten Zusatzdetails "
-        "(Firmennamen, Jahreszahlen, exakte Technologien), die hier nicht stehen - verweise dafür auf die "
-        "jeweilige Nutzerseite. Ist diese Liste leer oder passt offensichtlich nichts zum Thema der Frage "
-        "(z.B. Frage hat nichts mit Bewerbungen/Fähigkeiten zu tun), erwähne sie gar nicht."
+        "Das ist eine Tatsache, auch wenn der Lebenslauf-Inhalt hier fehlt. Fragt jemand nach Personen mit "
+        "bestimmten Fähigkeiten (z.B. 'wer kennt sich mit X aus'), nenne den/die Erstplatzierte(n) konkret mit "
+        "Namen, statt auszuweichen. Erfinde keine Zusatzdetails (Firmen, Jahreszahlen, Technologien) - verweise "
+        "dafür auf die Nutzerseite. Hat die Frage nichts mit Bewerbungen/Fähigkeiten zu tun, erwähne die Liste nicht."
         if resumes_context else ""
     )
+
+    # Denkmodelle rechnen ihre Denk-Tokens als Output ab; für kurze Assistenten-
+    # Antworten reicht niedriger Aufwand. Andere Modelle kennen den Parameter nicht.
+    extra_args = {"reasoning_effort": "low"} if model_id in REASONING_MODELS else {}
 
     try:
         response = active_client.chat.completions.create(
@@ -162,7 +165,9 @@ def ask_assistant(question, model_id, site_map, logger=None):
                 )},
                 {"role": "user", "content": question},
             ],
+            **extra_args,
         )
+        log_token_usage("assistant", model_id, response)
         return strip_think_block(response.choices[0].message.content), model_id
     except (GroqAPIStatusError, OpenAIAPIStatusError) as e:
         if e.status_code == 429:

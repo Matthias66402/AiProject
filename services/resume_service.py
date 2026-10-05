@@ -6,8 +6,9 @@ from flask import url_for
 import db
 from document_extraction import extract_document_text
 from embeddings import embed_text, strip_html_to_text
+from services.ai_usage import log_token_usage
 from services.pdf_service import write_html_as_pdf
-from services.text_utils import clean_ai_response
+from services.text_utils import DOCUMENT_HTML_RULE, clean_ai_response
 
 RESUME_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "resumes")
 
@@ -23,7 +24,7 @@ def generate_resume_document(openai_client, model, user_id, spec, logger=None):
             "Name und Wohnort sind vorgegeben und müssen unverändert übernommen werden, "
             "alle weiteren Angaben (Ausbildung, Erfahrung, Qualifikationen) darfst du frei "
             "und kreativ erfinden. "
-            "Antworte ausschließlich mit dem fertigen Lebenslauf im HTML-Format, "
+            f"Antworte ausschließlich mit dem fertigen Lebenslauf ({DOCUMENT_HTML_RULE}), "
             "ohne zusätzliche Erklärungen."
         )
         user_content = (
@@ -37,7 +38,7 @@ def generate_resume_document(openai_client, model, user_id, spec, logger=None):
             "Der Name ist vorgegeben und muss unverändert übernommen werden. Einen Wohnort hat "
             "der Nutzer nicht hinterlegt - den darfst du ebenso wie alle weiteren Angaben "
             "(Ausbildung, Erfahrung, Qualifikationen) frei und kreativ erfinden. "
-            "Antworte ausschließlich mit dem fertigen Lebenslauf im HTML-Format, "
+            f"Antworte ausschließlich mit dem fertigen Lebenslauf ({DOCUMENT_HTML_RULE}), "
             "ohne zusätzliche Erklärungen."
         )
         user_content = (
@@ -48,7 +49,7 @@ def generate_resume_document(openai_client, model, user_id, spec, logger=None):
         system_content = (
             "Du erstellst einen Dummy-Lebenslauf mit frei erfundenen, kreativen Personendaten  "
             "(keine echten Personen) auf Basis der Vorgaben des Nutzers. "
-            "Antworte ausschließlich mit dem fertigen Lebenslauf im HTML-Format, "
+            f"Antworte ausschließlich mit dem fertigen Lebenslauf ({DOCUMENT_HTML_RULE}), "
             "ohne zusätzliche Erklärungen."
         )
         user_content = spec
@@ -60,6 +61,7 @@ def generate_resume_document(openai_client, model, user_id, spec, logger=None):
             {"role": "user", "content": user_content},
         ],
     )
+    log_token_usage("resume_generate", model, response)
     resume_text = clean_ai_response(response.choices[0].message.content)
 
     os.makedirs(RESUME_DIR, exist_ok=True)
