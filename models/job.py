@@ -1,8 +1,9 @@
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, String, Text, func, select
+from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, String, Text, and_, func, or_, select, tuple_
 
 from models.base import Base, MIN_MATCH_SIMILARITY, escape_like, get_session, to_dict
 from models.customer import Customer
+from models.resume import Resume
 
 
 class Job(Base):
@@ -57,6 +58,45 @@ def count_jobs(customer_id=None, search=None):
             stmt = stmt.where(Job.customer_id == customer_id)
         if search:
             stmt = stmt.where(_position_search_filter(search))
+        return session.scalar(stmt)
+
+
+def _active_filter():
+    """Stelle ist heute gültig: kein Start in der Zukunft, kein Ende in der
+    Vergangenheit (fehlende Daten gelten als unbegrenzt)."""
+    today = func.current_date()
+    return and_(
+        or_(Job.valid_from.is_(None), Job.valid_from <= today),
+        or_(Job.valid_until.is_(None), Job.valid_until >= today),
+    )
+
+
+def count_active_jobs():
+    """Anzahl der heute gültigen, nicht gelöschten Stellen (Zahlenkachel auf /jobs)."""
+    with get_session() as session:
+        stmt = select(func.count()).select_from(Job).where(Job.deleted.is_(False), _active_filter())
+        return session.scalar(stmt)
+
+
+def count_active_matches(customer_id=None, min_similarity=MIN_MATCH_SIMILARITY):
+    """Anzahl der Paare (heute gültige Stelle, Person) mit Cosine Similarity
+    >= min_similarity für mindestens eine Lebenslauf-Version der Person - gleiche
+    Schwelle und gleiche "eine Person = ein Treffer"-Logik wie find_matching_resumes.
+    customer_id beschränkt auf die Stellen eines Stellenanbieters.
+    Läuft als Kreuzprodukt ohne Index-Nutzung; für die aktuelle Datenmenge
+    unkritisch, bei vielen tausend Einträgen besser zwischenspeichern."""
+    similarity = 1 - Job.embedding.cosine_distance(Resume.embedding)
+    with get_session() as session:
+        stmt = (
+            select(func.count(func.distinct(tuple_(Job.id, Resume.user_id))))
+            .select_from(Job)
+            .join(Resume, Resume.deleted.is_(False))
+            .where(Job.deleted.is_(False), _active_filter())
+            .where(Job.embedding.isnot(None), Resume.embedding.isnot(None))
+            .where(similarity >= min_similarity)
+        )
+        if customer_id:
+            stmt = stmt.where(Job.customer_id == customer_id)
         return session.scalar(stmt)
 
 

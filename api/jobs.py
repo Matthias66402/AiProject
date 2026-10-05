@@ -81,6 +81,43 @@ def list_jobs():
     )
 
 
+@jobs_api.route("/stats", methods=["GET"])
+def job_stats():
+    """Kennzahlen für die Zahlenkacheln der Stellenangebote-Liste - eigener Endpoint,
+    damit das Match-Zählen nicht bei jeder Suche/jedem Seitenwechsel mitläuft.
+    Matches nur für Admins (alle Stellen) und 'customer'-Nutzer (nur eigene Stellen),
+    analog zu den passenden Kandidaten auf der Stellen-Detailseite.
+    ---
+    tags:
+      - Jobs
+    responses:
+      200:
+        description: Kennzahlen.
+        schema:
+          type: object
+          properties:
+            active_jobs: {type: integer, description: "Heute gültige Stellen."}
+            customers: {type: integer, description: "Stellenanbieter."}
+            matches: {type: integer, x-nullable: true, description: "Paare aus gültiger Stelle und Person ab min_similarity; null ohne Berechtigung."}
+            matches_scope: {type: string, enum: [all, own], x-nullable: true}
+            min_similarity: {type: number}
+    """
+    permission = job_management_permission()
+    if permission == "admin":
+        matches, matches_scope = db.count_active_matches(), "all"
+    elif permission:
+        matches, matches_scope = db.count_active_matches(customer_id=permission), "own"
+    else:
+        matches, matches_scope = None, None
+    return jsonify(
+        active_jobs=db.count_active_jobs(),
+        customers=db.count_customers(),
+        matches=matches,
+        matches_scope=matches_scope,
+        min_similarity=db.MIN_MATCH_SIMILARITY,
+    )
+
+
 @jobs_api.route("", methods=["POST"])
 def create_job():
     """Neues Stellenangebot anlegen (Admins für beliebigen Kunden, 'customer'-Nutzer nur für den eigenen).

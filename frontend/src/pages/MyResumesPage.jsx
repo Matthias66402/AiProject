@@ -187,31 +187,60 @@ export default function MyResumesPage() {
                                 </p>
                             )}
 
-                            <div className="entity-view mt-5">
-                                <label>Passende Stellenangebote</label>
+                            <section className="match-panel">
+                                <div className="match-panel-head">
+                                    <span className="icon-circle">
+                                        <i className="fa-solid fa-diagram-project" />
+                                    </span>
+                                    <div>
+                                        <h2>Passende Stellenangebote</h2>
+                                        <div className="match-panel-hint">
+                                            Semantische Ähnlichkeit zu diesem
+                                            Lebenslauf
+                                        </div>
+                                    </div>
+                                </div>
                                 {matchingJobs.length > 0 ? (
-                                    <ul>
+                                    <ul className="match-list">
                                         {matchingJobs.map((m) => (
                                             <li key={m.id}>
-                                                <Link to={`/jobs/${m.id}/edit`}>
-                                                    {m.position} bei{' '}
-                                                    {m.customer_name}
+                                                <Link
+                                                    className="match-item"
+                                                    to={`/jobs/${m.id}/edit`}
+                                                >
+                                                    <span className="match-item-top">
+                                                        <span>{m.position}</span>
+                                                        <span className="match-pct">
+                                                            {(
+                                                                m.similarity * 100
+                                                            ).toFixed(1)}{' '}
+                                                            %
+                                                        </span>
+                                                    </span>
+                                                    <span className="match-bar">
+                                                        <span
+                                                            style={{
+                                                                width: `${m.similarity * 100}%`,
+                                                            }}
+                                                        />
+                                                    </span>
+                                                    <span className="match-meta">
+                                                        {m.customer_name}
+                                                        {m.city
+                                                            ? ` · ${m.city}`
+                                                            : ''}
+                                                    </span>
                                                 </Link>
-                                                {m.city ? ` (${m.city})` : ''} ·{' '}
-                                                {(m.similarity * 100).toFixed(
-                                                    1,
-                                                )}
-                                                % Übereinstimmung
                                             </li>
                                         ))}
                                     </ul>
                                 ) : (
-                                    <p>
+                                    <p className="match-empty">
                                         Keine passenden Stellenangebote
                                         gefunden.
                                     </p>
                                 )}
-                            </div>
+                            </section>
                         </>
                     )}
                 </>

@@ -16,6 +16,8 @@ from models import (
     delete_customer,
     list_jobs,
     count_jobs,
+    count_active_jobs,
+    count_active_matches,
     get_job,
     create_job,
     update_job,

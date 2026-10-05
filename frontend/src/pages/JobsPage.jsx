@@ -15,6 +15,7 @@ export default function JobsPage() {
     const [error, setError] = useState('')
     const [search, setSearch] = useState('')
     const [debouncedSearch, setDebouncedSearch] = useState('')
+    const [stats, setStats] = useState(null)
 
     const isAdmin = user?.role === 'admin'
     const isCustomerUser = Boolean(
@@ -49,6 +50,22 @@ export default function JobsPage() {
         load()
     }, [load, user])
 
+    // Kennzahlen separat (und nicht bei jeder Suche) laden - das Zählen der
+    // Matches ist deutlich teurer als die Liste selbst. Fehler hier blenden
+    // nur die Kacheln aus, die Liste bleibt nutzbar.
+    const loadStats = useCallback(() => {
+        apiGet('/api/jobs/stats')
+            .then(setStats)
+            .catch(() => setStats(null))
+    }, [])
+
+    // Abhängig vom Nutzer neu laden: welche Matches gezählt werden (alle, nur
+    // eigene, keine) entscheidet der Server anhand der Session.
+    useEffect(() => {
+        if (user === undefined) return
+        loadStats()
+    }, [loadStats, user])
+
     async function handleCreate(values) {
         await apiPost('/api/jobs', {
             position: values.position,
@@ -61,12 +78,14 @@ export default function JobsPage() {
             document_link: values.document_link || null,
         })
         load()
+        loadStats()
     }
 
     async function handleDelete(jobId) {
         if (!(await confirm('Stelle wirklich löschen?'))) return
         await apiDelete(`/api/jobs/${jobId}`)
         load()
+        loadStats()
     }
 
     if (error) return <p className="form-error">{error}</p>
@@ -76,6 +95,48 @@ export default function JobsPage() {
         <div className="scroll full">
             <h1 id="greetings">Stellenangebote</h1>
             <p className="subtitle">Übersicht der Stellenangebote</p>
+
+            {stats && (
+                <div className="stat-grid">
+                    <div className="stat-tile">
+                        <span className="icon-circle">
+                            <i className="fa-solid fa-briefcase" />
+                        </span>
+                        <div>
+                            <div className="stat-value">{stats.active_jobs}</div>
+                            <div className="stat-label">
+                                aktive Stellenangebote
+                            </div>
+                        </div>
+                    </div>
+                    <div className="stat-tile">
+                        <span className="icon-circle">
+                            <i className="fa-solid fa-building" />
+                        </span>
+                        <div>
+                            <div className="stat-value">{stats.customers}</div>
+                            <div className="stat-label">Stellenanbieter</div>
+                        </div>
+                    </div>
+                    {stats.matches !== null && (
+                        <div className="stat-tile dark">
+                            <span className="icon-circle">
+                                <i className="fa-solid fa-diagram-project" />
+                            </span>
+                            <div>
+                                <div className="stat-value">{stats.matches}</div>
+                                <div className="stat-label">
+                                    Matches ab{' '}
+                                    {Math.round(stats.min_similarity * 100)} %
+                                    Ähnlichkeit
+                                    {stats.matches_scope === 'own' &&
+                                        ' (eigene Stellen)'}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
 
             {canManageJob && (
                 <details className="entity-form">

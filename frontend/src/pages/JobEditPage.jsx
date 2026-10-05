@@ -231,28 +231,60 @@ export default function JobEditPage() {
             </details>
 
             {job.can_manage && (
-                <div className="entity-view">
-                    <label>Passende Kandidaten</label>
+                <section
+                    className="match-panel"
+                    style={{ marginBottom: '24px' }}
+                >
+                    <div className="match-panel-head">
+                        <span className="icon-circle">
+                            <i className="fa-solid fa-diagram-project" />
+                        </span>
+                        <div>
+                            <h2>Passende Kandidat:innen</h2>
+                            <div className="match-panel-hint">
+                                Semantische Ähnlichkeit zu den hochgeladenen
+                                Lebensläufen
+                            </div>
+                        </div>
+                    </div>
                     {job.matching_resumes.length > 0 ? (
-                        <ul>
+                        <ul className="match-list">
                             {job.matching_resumes.map((m) => (
                                 <li key={m.id}>
-                                    <Link to={`/users/${m.user_id}/edit`}>
-                                        {m.first_name} {m.last_name} (
-                                        {m.short_name})
-                                    </Link>{' '}
-                                    · {(m.similarity * 100).toFixed(1)}%
-                                    Übereinstimmung
+                                    <Link
+                                        className="match-item"
+                                        to={`/users/${m.user_id}/edit`}
+                                    >
+                                        <span className="match-item-top">
+                                            <span>
+                                                {m.first_name} {m.last_name}
+                                            </span>
+                                            <span className="match-pct">
+                                                {(m.similarity * 100).toFixed(1)}{' '}
+                                                %
+                                            </span>
+                                        </span>
+                                        <span className="match-bar">
+                                            <span
+                                                style={{
+                                                    width: `${m.similarity * 100}%`,
+                                                }}
+                                            />
+                                        </span>
+                                        <span className="match-meta">
+                                            {m.short_name}
+                                        </span>
+                                    </Link>
                                 </li>
                             ))}
                         </ul>
                     ) : (
-                        <p>
+                        <p className="match-empty">
                             Keine Übereinstimmungen gefunden (evtl. noch kein
                             Embedding vorhanden).
                         </p>
                     )}
-                </div>
+                </section>
             )}
 
             <JobTable

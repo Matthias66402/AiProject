@@ -38,51 +38,55 @@ export default function HomePage() {
     }
 
     return (
-        <div style={{ maxWidth: 560, margin: '0 auto' }}>
+        <div className="scroll full">
             <h1 id="greetings"><span className="wand">🪄</span> KI-Assistent</h1>
             <p className="subtitle">Wie kann ich Dir helfen?</p>
-            {error && <p className="form-error">{error}</p>}
-            <form onSubmit={handleSubmit}>
-                <div>
-                    <label htmlFor="name-input">Deine Frage</label>
-                    <input
-                        id="name-input"
-                        type="text"
-                        value={question}
-                        onChange={(e) => setQuestion(e.target.value)}
-                        placeholder="Was möchtest du wissen?"
-                    />
-                </div>
-                <div>
-                    <label htmlFor="wizard-select">Welches KI-Modell?</label>
-                    <select
-                        id="wizard-select"
-                        value={model}
-                        onChange={(e) => setModel(e.target.value)}
-                        disabled={!models}
+            {/* Karte in voller Breite wie die übrigen Seiten, das Formular selbst
+                bleibt schmal - eine einzeilige Frage über 1200px liest sich schlecht. */}
+            <div style={{ maxWidth: 640 }}>
+                {error && <p className="form-error">{error}</p>}
+                <form onSubmit={handleSubmit}>
+                    <div>
+                        <label htmlFor="name-input">Deine Frage</label>
+                        <input
+                            id="name-input"
+                            type="text"
+                            value={question}
+                            onChange={(e) => setQuestion(e.target.value)}
+                            placeholder="Was möchtest du wissen?"
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="wizard-select">Welches KI-Modell?</label>
+                        <select
+                            id="wizard-select"
+                            value={model}
+                            onChange={(e) => setModel(e.target.value)}
+                            disabled={!models}
+                        >
+                            {models &&
+                                Object.entries(models).map(([modelId, label]) => (
+                                    <option key={modelId} value={modelId}>
+                                        {label}
+                                    </option>
+                                ))}
+                        </select>
+                    </div>
+                    <button
+                        id="special-btn"
+                        type="submit"
+                        disabled={asking || !question.trim()}
                     >
-                        {models &&
-                            Object.entries(models).map(([modelId, label]) => (
-                                <option key={modelId} value={modelId}>
-                                    {label}
-                                </option>
-                            ))}
-                    </select>
-                </div>
-                <button
-                    id="special-btn"
-                    type="submit"
-                    disabled={asking || !question.trim()}
-                >
-                    ✨ Anfrage
-                </button>
-            </form>
-            <div className="answer-wrap">
-                <p id="answer">{answer}</p>
-                <div
-                    className={`generating-indicator${asking ? ' visible' : ''}`}
-                >
-                    <span className="spinner" />
+                        ✨ Anfrage
+                    </button>
+                </form>
+                <div className="answer-wrap">
+                    <p id="answer">{answer}</p>
+                    <div
+                        className={`generating-indicator${asking ? ' visible' : ''}`}
+                    >
+                        <span className="spinner" />
+                    </div>
                 </div>
             </div>
         </div>

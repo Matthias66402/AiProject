@@ -71,57 +71,67 @@
 }
 
 html.react-app {
-    --page-bg: #ffffff;
-    --ink: #241a3d;
-    --ink-soft: #1f1638;
-    --ink-muted: #5c5380;
-    --ink-faint: #837ba3;
-    --label: #4a4270;
-    --label-track: 0.08em;
+    /* Markenfarben aus dem Logo: Navy als Leitfarbe, Grün als Akzent.
+       --green ist nur für Flächen/Icons gedacht (zu kontrastarm für Text auf
+       Weiß), für Links/Fokus --green-dark. */
+    --navy: #261b40;
+    --green: #7fae56;
+    --green-dark: #4f7f2e;
+    --tint: #f1f5ec;
 
-    --nav-bg: #eef4e6;
-    --nav-border: rgba(34, 26, 68, 0.4);
+    --page-bg: #f7f9f4;
+    --ink: #1e1a33;
+    --ink-soft: #1e1a33;
+    --ink-muted: #5b5675;
+    --ink-faint: #6e6987;
+    --label: #4a4566;
+    --label-track: 0;
+
+    --nav-bg: #ffffff;
+    --nav-border: #e3e8dc;
     --nav-glow: none;
-    --nav-shadow: 0 2px 10px rgba(34, 26, 68, 0.12);
+    --nav-shadow: none;
 
-    --card-bg: #eef4e6;
-    --card-border: rgba(34, 26, 68, 0.4);
-    --card-shadow: 0 4px 16px rgba(34, 26, 68, 0.14);
-    --radius-card: 10px;
-    --radius-ctl: 6px;
+    --card-bg: #ffffff;
+    --card-border: #e3e8dc;
+    --card-shadow: 0 1px 2px rgba(38, 27, 64, 0.04), 0 8px 24px rgba(38, 27, 64, 0.06);
+    --radius-card: 16px;
+    --radius-ctl: 10px;
 
-    --gold: #a9791f;
-    --gold-2: #a9791f;
+    /* "gold" ist historisch der Name der Signalfarbe (Fokus, aktiver Zustand,
+       Spinner) - im neuen Design das dunkle Grün. */
+    --gold: var(--green-dark);
+    --gold-2: var(--green-dark);
 
     --field-bg: #ffffff;
-    --field-border: rgba(34, 26, 68, 0.35);
-    --focus-ring: 0 0 0 3px rgba(169, 121, 31, 0.25);
-    --panel-bg: rgba(255, 255, 255, 0.55);
+    --field-border: #d5dccb;
+    --focus-ring: 0 0 0 3px rgba(127, 174, 86, 0.25);
+    --panel-bg: #f7f9f4;
     --picker-bg: #ffffff;
-    --line-soft: rgba(34, 26, 68, 0.18);
-    --spinner-track: rgba(34, 26, 68, 0.2);
+    --line-soft: #eef1ea;
+    --spinner-track: #e3e8dc;
 
-    --danger: #a83f3f;
-    --danger-bg: rgba(180, 40, 40, 0.12);
-    --danger-border: rgba(180, 40, 40, 0.35);
+    --danger: #a23a22;
+    --danger-bg: #fbeae6;
+    --danger-border: #e8c4ba;
 
-    --nav-active-color: var(--ink-soft);
+    --nav-active-color: var(--navy);
 
     --heading-font: 'Sora', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     --heading-weight: 700;
     --heading-shadow: none;
 
-    --btn-primary-bg: transparent;
-    --btn-primary-border: rgba(34, 26, 68, 0.7);
-    --btn-primary-color: var(--ink-soft);
+    --btn-primary-bg: var(--navy);
+    --btn-primary-border: var(--navy);
+    --btn-primary-color: #ffffff;
     --btn-primary-shadow: none;
-    --btn-primary-hover-shadow: none;
+    --btn-primary-hover-shadow: 0 6px 16px rgba(38, 27, 64, 0.18);
 
-    --btn-ghost-bg: transparent;
-    --btn-ghost-border: rgba(77, 107, 53, 0.6);
-    --btn-ghost-color: var(--ink-soft);
-    --btn-ghost-hover-bg: rgba(77, 107, 53, 0.12);
-    --btn-ghost-hover-border: rgba(77, 107, 53, 0.9);
+    --btn-ghost-bg: #ffffff;
+    --btn-ghost-border: #d5dccb;
+    --btn-ghost-color: var(--navy);
+    --btn-ghost-hover-bg: var(--tint);
+    --btn-ghost-hover-border: #b9c9a6;
 }
 
 /* React-PoC (frontend/): #root ist ein reines Mount-Element ohne eigene
@@ -878,4 +888,454 @@ textarea:focus {
     border: 1px solid var(--field-border);
     border-radius: 10px;
     background: #fff;
+}
+
+/* ------------------------------------------------------------------------
+   Modernes Layout (React): volle Breite für die Navigation, Inhalt in einer
+   zentrierten Spalte, weiße Karten auf leicht getöntem Grund, Navy als
+   Primärfarbe, Grün aus dem Logo als Akzent (Icons in Kreisen).
+   ------------------------------------------------------------------------ */
+
+html.react-app body {
+    padding: 0;
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+}
+
+html.react-app nav.app-nav {
+    max-width: none;
+    margin: 0 0 32px;
+    /* Inhalt auf die gleiche Spaltenbreite wie .app-main ausrichten, der
+       Hintergrund läuft trotzdem über die volle Breite. */
+    padding: 10px max(24px, calc((100% - 1240px) / 2 + 24px));
+    gap: 8px 6px;
+    border: 0;
+    border-bottom: 1px solid var(--nav-border);
+    border-radius: 0;
+}
+
+html.react-app nav a,
+html.react-app nav summary,
+html.react-app nav .nav-menu-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border: 0;
+    border-radius: var(--radius-ctl);
+    background: none;
+    color: var(--ink-muted);
+    font: inherit;
+    font-size: 0.93rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+html.react-app nav a:hover,
+html.react-app nav summary:hover,
+html.react-app nav .nav-menu-item:hover {
+    background: var(--tint);
+    color: var(--navy);
+    text-shadow: none;
+}
+
+html.react-app nav a.active {
+    background: var(--tint);
+    color: var(--nav-active-color);
+    font-weight: 700;
+    text-shadow: none;
+}
+
+html.react-app nav .fa-solid {
+    color: var(--green-dark);
+}
+
+.nav-toggle {
+    background: none;
+    border: 0;
+    color: var(--navy);
+    font-size: 1.2rem;
+    min-width: 44px;
+    min-height: 44px;
+    cursor: pointer;
+}
+
+.nav-dropdown {
+    position: absolute;
+    margin-top: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 13rem;
+    padding: 6px;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(38, 27, 64, 0.14);
+    z-index: 10;
+}
+
+html.react-app nav .nav-dropdown a,
+html.react-app nav .nav-dropdown .nav-menu-item {
+    width: 100%;
+    text-align: left;
+}
+
+html.react-app nav .nav-account > summary {
+    border: 1px solid var(--nav-border);
+    border-radius: 999px;
+}
+
+.app-main {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 1240px;
+    padding: 0 24px 56px;
+}
+
+html.react-app .scroll {
+    padding: 28px 32px;
+    backdrop-filter: none;
+}
+
+html.react-app h1#greetings {
+    text-align: left;
+    font-size: 1.9rem;
+    line-height: 1.2;
+    margin: 0 0 6px;
+    color: var(--navy);
+    letter-spacing: -0.02em;
+}
+
+html.react-app .subtitle {
+    text-align: left;
+    font-size: 0.95rem;
+    margin: 0 0 24px;
+}
+
+html.react-app .wand {
+    filter: none;
+    font-size: 1.6rem;
+}
+
+html.react-app label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-transform: none;
+}
+
+html.react-app input[type="text"],
+html.react-app input[type="email"],
+html.react-app input[type="password"],
+html.react-app input[type="date"],
+html.react-app select {
+    min-height: 44px;
+    padding: 0 14px;
+    font-size: 0.95rem;
+}
+
+html.react-app textarea {
+    padding: 12px 14px;
+    font-size: 0.95rem;
+    line-height: 1.6;
+}
+
+/* Buttons: einheitlich 44px hoch; Formular-Submits sind die Primäraktion
+   (Navy gefüllt), alle übrigen .subtle-btn sekundär (weiß mit Rand). */
+html.react-app #special-btn,
+html.react-app .special-btn,
+html.react-app .subtle-btn,
+html.react-app .confirm-danger-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 18px;
+    font-size: 0.92rem;
+    letter-spacing: 0;
+}
+
+html.react-app #special-btn:hover,
+html.react-app .special-btn:hover,
+html.react-app .subtle-btn:hover,
+html.react-app .confirm-danger-btn:hover {
+    transform: none;
+}
+
+html.react-app .subtle-btn[type="submit"] {
+    background: var(--btn-primary-bg);
+    border-color: var(--btn-primary-border);
+    color: var(--btn-primary-color);
+}
+
+html.react-app .subtle-btn[type="submit"]:hover {
+    background: var(--btn-primary-bg);
+    border-color: var(--btn-primary-border);
+    box-shadow: var(--btn-primary-hover-shadow);
+}
+
+html.react-app .subtle-btn[disabled],
+html.react-app #special-btn[disabled] {
+    opacity: 0.5;
+    cursor: default;
+    box-shadow: none;
+}
+
+html.react-app .subtle-btn.cancel {
+    border-color: var(--btn-ghost-border);
+}
+
+html.react-app .link-button {
+    letter-spacing: 0;
+}
+
+/* Tabellen: eigener Rahmen mit runden Ecken, ruhiger Kopf, großzügige Zeilen. */
+html.react-app .user-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    overflow: hidden;
+    font-size: 0.92rem;
+}
+
+html.react-app .user-table th {
+    padding: 12px 16px;
+    background: var(--panel-bg);
+    color: var(--ink-muted);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+}
+
+html.react-app .user-table td {
+    padding: 14px 16px;
+}
+
+/* Kurze Spalten (Ort, Datum, Aktionen) nicht umbrechen - der Platz geht an
+   die langen Texte (Position, Stellenanbieter). */
+html.react-app .user-table td:has(.row-actions),
+html.react-app .user-table td.nowrap {
+    white-space: nowrap;
+}
+
+html.react-app .user-table .row-actions {
+    flex-wrap: nowrap;
+}
+
+html.react-app .user-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+html.react-app .user-table a,
+html.react-app .user-table a:has(.fa-pen) {
+    color: var(--green-dark);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+html.react-app .user-table tr.clickable-row:hover {
+    background: var(--panel-bg);
+}
+
+.cell-strong {
+    color: var(--navy);
+    font-weight: 600;
+}
+
+html.react-app .pager {
+    margin-top: 0;
+}
+
+html.react-app .dropzone {
+    border-color: #b9c9a6;
+    border-radius: 12px;
+}
+
+html.react-app .dropzone:hover,
+html.react-app .dropzone.dragover {
+    background: var(--tint);
+}
+
+html.react-app .dropzone-icon {
+    color: var(--green-dark);
+}
+
+html.react-app #answer {
+    border-style: solid;
+    border-color: var(--card-border);
+    background: var(--panel-bg);
+}
+
+html.react-app .entity-view p {
+    background: var(--panel-bg);
+    border-color: var(--card-border);
+}
+
+html.react-app .confirm-overlay {
+    background: rgba(30, 26, 51, 0.45);
+}
+
+/* Status-Chips (Gültigkeit einer Stelle, siehe JobTable.jsx) */
+.status-chip {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.status-chip.active { background: #e5efda; color: #3f6a22; }
+.status-chip.expiring { background: #fbefd9; color: #7a4f08; }
+.status-chip.expired,
+.status-chip.planned { background: #eeedf2; color: #5b5675; }
+
+/* Zahlenkacheln (Stellenangebote-Liste) */
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.stat-tile {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px 20px;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+}
+
+.stat-tile.dark {
+    background: var(--navy);
+    border-color: var(--navy);
+}
+
+.icon-circle {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--green);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+}
+
+.stat-value {
+    font-family: var(--heading-font);
+    font-size: 1.6rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--navy);
+}
+
+.stat-label {
+    font-size: 0.82rem;
+    color: var(--ink-muted);
+}
+
+.stat-tile.dark .stat-value { color: #ffffff; }
+.stat-tile.dark .stat-label { color: #c9d9b8; }
+
+/* Matching-Ergebnisse: dunkle Fläche, damit das Kernfeature heraussticht. */
+.match-panel {
+    margin-top: 24px;
+    padding: 22px 24px;
+    border-radius: var(--radius-card);
+    background: var(--navy);
+    color: #ffffff;
+}
+
+.match-panel-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.match-panel h2 {
+    margin: 0;
+    font-family: var(--heading-font);
+    font-size: 1.1rem;
+}
+
+.match-panel-hint {
+    font-size: 0.82rem;
+    color: #c9d9b8;
+}
+
+.match-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.match-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    background: #322651;
+    border: 1px solid #43376a;
+    color: #ffffff;
+    text-decoration: none;
+    transition: border-color 0.15s ease;
+}
+
+.match-item:hover {
+    border-color: var(--green);
+}
+
+.match-item-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-weight: 600;
+}
+
+.match-pct {
+    font-family: var(--heading-font);
+    color: #a8d07f;
+    white-space: nowrap;
+}
+
+.match-bar {
+    height: 6px;
+    border-radius: 999px;
+    background: #43376a;
+    overflow: hidden;
+}
+
+.match-bar > span {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: var(--green);
+}
+
+.match-meta {
+    font-size: 0.78rem;
+    color: #c3bcd9;
+}
+
+.match-empty {
+    margin: 0;
+    color: #c3bcd9;
+    font-size: 0.9rem;
 }

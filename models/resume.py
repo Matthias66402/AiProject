@@ -53,17 +53,26 @@ def delete_resume(resume_id):
 
 def find_matching_resumes(embedding, top_k=5, min_similarity=MIN_MATCH_SIMILARITY):
     """Analog zu find_matching_jobs(), für resumes - inkl. Namen des
-    zugehörigen Nutzers für die Anzeige."""
-    similarity = (1 - Resume.embedding.cosine_distance(embedding)).label("similarity")
+    zugehörigen Nutzers für die Anzeige. Pro Nutzer zählt nur die ähnlichste
+    Lebenslauf-Version (DISTINCT ON user_id), sonst belegt eine Person mit
+    mehreren Versionen alle top_k-Plätze. Dadurch nutzt die Abfrage den
+    HNSW-Index nicht mehr - für die aktuelle Datenmenge unkritisch."""
+    distance = Resume.embedding.cosine_distance(embedding)
     with get_session() as session:
-        stmt = (
-            select(Resume.id, Resume.user_id, Resume.created_at,
-                   User.first_name, User.last_name, User.short_name, similarity)
-            .join(User, User.id == Resume.user_id)
+        best_per_user = (
+            select(Resume.id, Resume.user_id, Resume.created_at, (1 - distance).label("similarity"))
             .where(Resume.deleted.is_(False))
             .where(Resume.embedding.isnot(None))
-            .where(similarity >= min_similarity)
-            .order_by(Resume.embedding.cosine_distance(embedding))
+            .where(1 - distance >= min_similarity)
+            .distinct(Resume.user_id)
+            .order_by(Resume.user_id, distance)
+            .subquery()
+        )
+        stmt = (
+            select(best_per_user.c.id, best_per_user.c.user_id, best_per_user.c.created_at,
+                   User.first_name, User.last_name, User.short_name, best_per_user.c.similarity)
+            .join(User, User.id == best_per_user.c.user_id)
+            .order_by(best_per_user.c.similarity.desc())
             .limit(top_k)
         )
         return [dict(row) for row in session.execute(stmt).mappings().all()]

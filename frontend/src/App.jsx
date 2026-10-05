@@ -47,36 +47,28 @@ export default function App() {
     return (
         <ConfirmProvider>
             <nav
-                className="flex flex-wrap items-center"
-                style={{ padding: '1rem', position: 'relative', zIndex: 2 }}
+                className="app-nav flex flex-wrap items-center"
+                style={{ position: 'relative', zIndex: 2 }}
             >
-                <i class="fa-solid fa-frog text-2xl text-[#76A250]"></i>
+                <i className="fa-solid fa-frog text-2xl text-[#76A250]"></i>
                 <img
                     src={`${API_BASE}/static/pics/umweltmarkt_logo.png`}
                     alt="Stellenmarkt-Umweltschutz.de"
-                    style={{ height: '2.25rem', marginRight: '0.25rem', marginLeft: '-0.5rem' }}
+                    style={{ height: '2.25rem', marginRight: '1rem', marginLeft: '-0.25rem' }}
                 />
                 <button
                     type="button"
-                    className="md:hidden"
+                    className="md:hidden nav-toggle"
                     aria-label="Menü öffnen"
                     aria-expanded={navOpen}
                     aria-controls="nav-links"
                     onClick={() => setNavOpen((open) => !open)}
-                    style={{
-                        background: 'none',
-                        border: 'none',
-                        color: 'var(--gold-2)',
-                        fontSize: '1.1rem',
-                        padding: '0.2rem',
-                        cursor: 'pointer',
-                    }}
                 >
                     <i className="fa-solid fa-bars" />
                 </button>
                 <div
                     id="nav-links"
-                    className={`${navOpen ? 'flex' : 'hidden'} md:flex w-full md:flex-1 flex-col md:flex-row md:items-center gap-4 mt-3 md:mt-0`}
+                    className={`${navOpen ? 'flex' : 'hidden'} md:flex w-full md:flex-1 flex-col md:flex-row md:items-center gap-1 mt-3 md:mt-0`}
                 >
                     <strong
                         style={{
@@ -126,16 +118,7 @@ export default function App() {
                             ref={toolsMenuRef}
                             style={{ position: 'relative' }}
                         >
-                            <summary
-                                style={{
-                                    cursor: 'pointer',
-                                    listStyle: 'none',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.4rem',
-                                    color: 'var(--gold-2)',
-                                }}
-                            >
+                            <summary>
                                 <i className="fa-solid fa-toolbox text-[#76A250]" />{' '}
                                 Tools
                                 <i
@@ -144,26 +127,14 @@ export default function App() {
                                 />
                             </summary>
                             <div
-                                style={{
-                                    position: 'absolute',
-                                    left: 0,
-                                    marginTop: '0.5rem',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    minWidth: '13rem',
-                                    background: 'var(--field-bg)',
-                                    border: '1px solid var(--card-border)',
-                                    borderRadius: 'var(--radius-ctl)',
-                                    overflow: 'hidden',
-                                    zIndex: 10,
-                                }}
+                                className="nav-dropdown"
+                                style={{ left: 0 }}
                             >
                                 <Link
                                     to="/tools/resume"
                                     className={navClass(
                                         location.pathname === '/tools/resume',
                                     )}
-                                    style={{ padding: '0.5rem 1rem' }}
                                     onClick={() => {
                                         if (toolsMenuRef.current)
                                             toolsMenuRef.current.open = false
@@ -177,7 +148,6 @@ export default function App() {
                                     className={navClass(
                                         location.pathname === '/tools/joboffer',
                                     )}
-                                    style={{ padding: '0.5rem 1rem' }}
                                     onClick={() => {
                                         if (toolsMenuRef.current)
                                             toolsMenuRef.current.open = false
@@ -195,18 +165,10 @@ export default function App() {
                     {user !== undefined && (
                         <details
                             ref={accountMenuRef}
+                            className="nav-account"
                             style={{ position: 'relative', marginLeft: 'auto' }}
                         >
-                            <summary
-                                style={{
-                                    cursor: 'pointer',
-                                    listStyle: 'none',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.4rem',
-                                    color: 'var(--gold-2)',
-                                }}
-                            >
+                            <summary>
                                 <i className="fa-solid fa-user text-[#76A250]" />{' '}
                                 {user ? user.short_name : 'Konto'}
                                 <i
@@ -215,19 +177,8 @@ export default function App() {
                                 />
                             </summary>
                             <div
-                                style={{
-                                    position: 'absolute',
-                                    right: 0,
-                                    marginTop: '0.5rem',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    minWidth: '12rem',
-                                    background: 'var(--field-bg)',
-                                    border: '1px solid var(--card-border)',
-                                    borderRadius: 'var(--radius-ctl)',
-                                    overflow: 'hidden',
-                                    zIndex: 10,
-                                }}
+                                className="nav-dropdown"
+                                style={{ right: 0 }}
                             >
                                 {user ? (
                                     <>
@@ -238,9 +189,6 @@ export default function App() {
                                                     location.pathname ===
                                                         '/resumes',
                                                 )}
-                                                style={{
-                                                    padding: '0.5rem 1rem',
-                                                }}
                                                 onClick={() => {
                                                     if (accountMenuRef.current)
                                                         accountMenuRef.current.open = false
@@ -252,19 +200,8 @@ export default function App() {
                                         )}
                                         <button
                                             type="button"
+                                            className="nav-menu-item"
                                             onClick={handleLogout}
-                                            style={{
-                                                padding: '0.5rem 1rem',
-                                                background: 'none',
-                                                border: 'none',
-                                                color: 'var(--gold-2)',
-                                                font: 'inherit',
-                                                fontSize: '0.78rem',
-                                                textTransform: 'uppercase',
-                                                letterSpacing: '0.4px',
-                                                textAlign: 'left',
-                                                cursor: 'pointer',
-                                            }}
                                         >
                                             <i className="fa-solid fa-right-from-bracket text-[#76A250]" />{' '}
                                             Abmelden
@@ -277,7 +214,6 @@ export default function App() {
                                             className={navClass(
                                                 location.pathname === '/login',
                                             )}
-                                            style={{ padding: '0.5rem 1rem' }}
                                             onClick={() => {
                                                 if (accountMenuRef.current)
                                                     accountMenuRef.current.open = false
@@ -292,7 +228,6 @@ export default function App() {
                                                 location.pathname ===
                                                     '/register',
                                             )}
-                                            style={{ padding: '0.5rem 1rem' }}
                                             onClick={() => {
                                                 if (accountMenuRef.current)
                                                     accountMenuRef.current.open = false
@@ -308,7 +243,7 @@ export default function App() {
                     )}
                 </div>
             </nav>
-            <main className="scroll full" style={{ padding: '1.5rem' }}>
+            <main className="app-main">
                 <Outlet context={{ user, refreshUser }} />
             </main>
         </ConfirmProvider>
