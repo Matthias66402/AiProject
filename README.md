@@ -18,7 +18,7 @@ Flask liefert **keine eigenen Seiten** mehr aus — nur noch JSON (`/api/*`) sow
   - Optionaler Dokumenten-Upload (PDF/.docx/.odt) beim Anlegen (`/jobs/extract-upload`): KI fasst Inhalt zusammen und befüllt Position/PLZ/Stadt.
 - **Stellenanbieter** (`/customers`): Kunden (Unternehmen) mit Adresse, paginierte Liste mit Suche, inkl. Liste der zugehörigen Stellenangebote in der Bearbeiten-Ansicht.
   - `admin`: anlegen/bearbeiten/löschen. `customer`-Nutzer: nur der eigene Datensatz bearbeiten. Alle anderen: nur Lesemodus.
-- **Tools-Menü** (nur `admin`): lässt die KI Inhalte als HTML formulieren und rendert sie per WeasyPrint zu PDF.
+- **Tools** (nur `admin`, im Konto-Menü oben rechts): lässt die KI Inhalte als HTML formulieren und rendert sie per WeasyPrint zu PDF.
   - **Lebenslauf generieren** (`/tools/resume`): Nutzer per Selectbox wählen, PDF wird unter `resumes` gespeichert.
   - **Stellenangebot generieren** (`/tools/joboffer`): Stellenanbieter per Selectbox wählen, legt automatisch einen passenden Eintrag unter `/jobs` an.
   - ⚠️ Läuft nur, wo WeasyPrints native Abhängigkeiten (Pango/Cairo) vorhanden sind — siehe [WeasyPrint unter Windows](#weasyprint-unter-windows). Im Docker-Image bereits eingerichtet.
@@ -158,7 +158,7 @@ Startet App, PostgreSQL und den React-Dev-Server zusammen; DB-Daten in einem ben
 
 ### Ersten Admin-Nutzer anlegen
 
-Es gibt bewusst keinen automatischen Bootstrap-Admin: Jede Registrierung über `/register` legt den Nutzer immer mit Rolle `user` an (`DEFAULT_ROLE` in `models/user.py`), unabhängig davon, ob es der erste Nutzer ist. Um die Anwendung überhaupt administrieren zu können (Nutzer-/Rollenverwaltung, Stellenanbieter anlegen, Tools-Menü), nach der Installation also:
+Es gibt bewusst keinen automatischen Bootstrap-Admin: Jede Registrierung über `/register` legt den Nutzer immer mit Rolle `user` an (`DEFAULT_ROLE` in `models/user.py`), unabhängig davon, ob es der erste Nutzer ist. Um die Anwendung überhaupt administrieren zu können (Nutzer-/Rollenverwaltung, Stellenanbieter anlegen, Tools), nach der Installation also:
 
 1. Einmal ganz normal über `/register` registrieren.
 2. Diesem Nutzer danach **direkt in der Datenbank** die Rolle `admin` zuweisen, z.B. mit Docker Compose:
@@ -167,7 +167,7 @@ Es gibt bewusst keinen automatischen Bootstrap-Admin: Jede Registrierung über `
    docker compose exec postgres psql -U <DB_USER> -d <DB_NAME> -c "UPDATE users SET role = 'admin' WHERE email = '<E-Mail des Nutzers>';"
    ```
 
-   `<DB_USER>`/`<DB_NAME>` wie in der eigenen `.env` (siehe Tabelle oben). Die Rolle landet beim Login einmalig in der Flask-Session (`log_in_user()` in `services/auth_service.py`) und wird danach nicht live nachgeladen — ein bereits eingeloggter Nutzer muss sich also nach dem Rollenwechsel einmal ab- und wieder anmelden, damit die neue Rolle (und damit Zugriff auf Nutzerverwaltung, Tools-Menü etc.) wirksam wird.
+   `<DB_USER>`/`<DB_NAME>` wie in der eigenen `.env` (siehe Tabelle oben). Die Rolle landet beim Login einmalig in der Flask-Session (`log_in_user()` in `services/auth_service.py`) und wird danach nicht live nachgeladen — ein bereits eingeloggter Nutzer muss sich also nach dem Rollenwechsel einmal ab- und wieder anmelden, damit die neue Rolle (und damit Zugriff auf Nutzerverwaltung, Tools etc.) wirksam wird.
 
 ## Frontend (React)
 

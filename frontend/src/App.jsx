@@ -10,7 +10,6 @@ export default function App() {
     // in templates/navigation.html - dort per Vanilla-JS/hidden-Klasse gelöst, hier
     // per State, da React die Navigation clientseitig rendert.
     const [navOpen, setNavOpen] = useState(false)
-    const toolsMenuRef = useRef(null)
     const accountMenuRef = useRef(null)
     const location = useLocation()
     const navigate = useNavigate()
@@ -113,52 +112,6 @@ export default function App() {
                             Nutzer
                         </Link>
                     )}
-                    {user?.role === 'admin' && (
-                        <details
-                            ref={toolsMenuRef}
-                            style={{ position: 'relative' }}
-                        >
-                            <summary>
-                                <i className="fa-solid fa-toolbox text-[#76A250]" />{' '}
-                                Tools
-                                <i
-                                    className="fa-solid fa-chevron-down"
-                                    style={{ fontSize: '0.7em' }}
-                                />
-                            </summary>
-                            <div
-                                className="nav-dropdown"
-                                style={{ left: 0 }}
-                            >
-                                <Link
-                                    to="/tools/resume"
-                                    className={navClass(
-                                        location.pathname === '/tools/resume',
-                                    )}
-                                    onClick={() => {
-                                        if (toolsMenuRef.current)
-                                            toolsMenuRef.current.open = false
-                                    }}
-                                >
-                                    <i className="fa-solid fa-file-lines text-[#76A250]" />{' '}
-                                    Lebenslauf generieren
-                                </Link>
-                                <Link
-                                    to="/tools/joboffer"
-                                    className={navClass(
-                                        location.pathname === '/tools/joboffer',
-                                    )}
-                                    onClick={() => {
-                                        if (toolsMenuRef.current)
-                                            toolsMenuRef.current.open = false
-                                    }}
-                                >
-                                    <i className="fa-solid fa-file-lines text-[#76A250]" />{' '}
-                                    Stellenangebot generieren
-                                </Link>
-                            </div>
-                        </details>
-                    )}
                     {user === undefined && (
                         <span style={{ marginLeft: 'auto' }}>Lade …</span>
                     )}
@@ -197,6 +150,42 @@ export default function App() {
                                                 <i className="fa-solid fa-file-lines text-[#76A250]" />{' '}
                                                 Lebenslauf
                                             </Link>
+                                        )}
+                                        {/* Tools (nur Testdaten-Generierung) bewusst im
+                                            Konto-Menü statt als eigener Reiter - sie
+                                            gehören nicht zum eigentlichen Produkt. */}
+                                        {user.role === 'admin' && (
+                                            <>
+                                                <Link
+                                                    to="/tools/resume"
+                                                    className={navClass(
+                                                        location.pathname ===
+                                                            '/tools/resume',
+                                                    )}
+                                                    onClick={() => {
+                                                        if (accountMenuRef.current)
+                                                            accountMenuRef.current.open = false
+                                                    }}
+                                                >
+                                                    <i className="fa-solid fa-file-lines text-[#76A250]" />{' '}
+                                                    Lebenslauf generieren
+                                                </Link>
+                                                <Link
+                                                    to="/tools/joboffer"
+                                                    className={navClass(
+                                                        location.pathname ===
+                                                            '/tools/joboffer',
+                                                    )}
+                                                    onClick={() => {
+                                                        if (accountMenuRef.current)
+                                                            accountMenuRef.current.open = false
+                                                    }}
+                                                >
+                                                    <i className="fa-solid fa-briefcase text-[#76A250]" />{' '}
+                                                    Stellenangebot generieren
+                                                </Link>
+                                                <hr className="nav-dropdown-divider" />
+                                            </>
                                         )}
                                         <button
                                             type="button"

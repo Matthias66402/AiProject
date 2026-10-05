@@ -984,6 +984,13 @@ html.react-app nav .nav-dropdown a,
 html.react-app nav .nav-dropdown .nav-menu-item {
     width: 100%;
     text-align: left;
+    white-space: nowrap;
+}
+
+.nav-dropdown-divider {
+    margin: 4px 6px;
+    border: 0;
+    border-top: 1px solid var(--card-border);
 }
 
 html.react-app nav .nav-account > summary {
