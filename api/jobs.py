@@ -1,4 +1,4 @@
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, current_app, jsonify, request, session
 
 import db
 from embeddings import embed_text, strip_html_to_text
@@ -21,6 +21,14 @@ def _serialize_dates(row):
         value = row.get(field)
         if value is not None and hasattr(value, "isoformat"):
             row[field] = value.isoformat()
+    return row
+
+
+def _serialize_job(row):
+    """Wie _serialize_dates, entfernt zusätzlich das embedding (nur intern fürs
+    Matching relevant, 1536 Zahlen pro Stelle - bläht die Antwort sonst auf)."""
+    row = _serialize_dates(row)
+    row.pop("embedding", None)
     return row
 
 
@@ -64,15 +72,22 @@ def list_jobs():
         description: Freitextsuche auf die Position.
     responses:
       200:
-        description: Stellenangebote der aktuellen Seite plus Pagination-Metadaten.
+        description: Stellenangebote der aktuellen Seite plus Pagination-Metadaten; für Rolle user je Stelle my_match (beste Ähnlichkeit eines eigenen Lebenslaufs ab Schwellwert, sonst null).
     """
     customer_id = request.args.get("customer_id", type=int)
     search = (request.args.get("search") or "").strip()
     jobs_list, page, per_page, total_pages, total = _paginate(customer_id, search)
     permission = job_management_permission()
     own_customer = own_customer_for_session()
+    jobs_out = [_serialize_job(dict(job)) for job in jobs_list]
+    # Rolle 'user': Stellen markieren, zu denen ein eigener Lebenslauf passt
+    # (my_match = beste Ähnlichkeit, sonst None).
+    if session.get("user_role") == "user" and session.get("user_id"):
+        matches = db.user_match_similarities(session["user_id"], [job["id"] for job in jobs_out])
+        for job in jobs_out:
+            job["my_match"] = matches.get(job["id"])
     return jsonify(
-        jobs=[_serialize_dates(dict(job)) for job in jobs_list],
+        jobs=jobs_out,
         page=page,
         per_page=per_page,
         total_pages=total_pages,
@@ -208,8 +223,7 @@ def get_job(job_id):
     permission = job_management_permission()
     can_manage = permission == "admin" or permission == job["customer_id"]
 
-    result = _serialize_dates(dict(job))
-    result.pop("embedding", None)
+    result = _serialize_job(dict(job))
     result["can_manage"] = can_manage
     # Passende Kandidaten für Admins und für den Stellenanbieter der eigenen Stelle
     # berechnen/ausliefern (can_manage deckt beides ab), damit die Daten sonst

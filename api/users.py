@@ -18,6 +18,15 @@ def _serialize_dates(row):
     return row
 
 
+def _serialize_resume(row):
+    """Wie in api/resumes.py: embedding (nur fürs Matching) und content (voller
+    Text, die Anzeige läuft über die Datei) gehören nicht in die Antwort."""
+    row = _serialize_dates(dict(row))
+    row.pop("embedding", None)
+    row.pop("content", None)
+    return row
+
+
 def _serialize_user(row):
     """Wie _serialize_dates, entfernt zusätzlich den Passwort-Hash - der darf
     die API nie verlassen, auch nicht gehasht."""
@@ -153,7 +162,7 @@ def get_user(user_id):
 
     return jsonify(
         user=_serialize_user(user),
-        resumes=[_serialize_dates(dict(r)) for r in db.list_resumes_for_user(user_id)],
+        resumes=[_serialize_resume(r) for r in db.list_resumes_for_user(user_id)],
     )
 
 

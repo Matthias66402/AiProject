@@ -61,8 +61,24 @@ export default function JobTable({
                                 job.customer_id === currentCustomerId)
                         const status = jobStatus(job)
                         return (
-                            <tr key={job.id} className="clickable-row">
-                                <td className="cell-strong">{job.position}</td>
+                            <tr
+                                key={job.id}
+                                className={`clickable-row${job.my_match != null ? ' has-match' : ''}`}
+                            >
+                                <td className="cell-strong">
+                                    {job.position}
+                                    {/* Nur für Rolle 'user' gesetzt (api/jobs.py, list_jobs) */}
+                                    {job.my_match != null && (
+                                        <span
+                                            className="my-match-chip"
+                                            title="Mindestens einer deiner Lebensläufe passt zu dieser Stelle"
+                                        >
+                                            <i className="fa-solid fa-diagram-project" />{' '}
+                                            Passt zu dir ·{' '}
+                                            {(job.my_match * 100).toFixed(0)} %
+                                        </span>
+                                    )}
+                                </td>
                                 <td>{job.customer_name}</td>
                                 <td className="nowrap">
                                     {[job.zip, job.city]

@@ -24,6 +24,7 @@ from models import (
     delete_job,
     find_matching_jobs,
     job_similarity,
+    user_match_similarities,
     create_resume,
     get_resume,
     list_resumes_for_user,

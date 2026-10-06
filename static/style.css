@@ -1788,3 +1788,27 @@ html.react-app .side-panel .pager {
     white-space: nowrap;
     text-overflow: ellipsis;
 }
+
+/* Stellen-Liste, Rolle 'user': Stellen, zu denen ein eigener Lebenslauf passt. */
+html.react-app .user-table tr.has-match td {
+    background: var(--tint);
+}
+
+.my-match-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: fit-content;
+    margin-top: 6px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: var(--navy);
+    color: #ffffff;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.my-match-chip i {
+    color: #a8d07f;
+}
