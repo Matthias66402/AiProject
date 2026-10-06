@@ -181,6 +181,27 @@ def user_match_similarities(user_id, job_ids, min_similarity=MIN_MATCH_SIMILARIT
         return {row.id: float(row.similarity) for row in session.execute(stmt).all()}
 
 
+def job_match_counts(job_ids, min_similarity=MIN_MATCH_SIMILARITY):
+    """Für die Stellen-Liste der Rolle 'customer': Anzahl passender Personen je
+    Stelle aus job_ids (mind. eine Lebenslauf-Version ab min_similarity) - als
+    dict {job_id: count}, Stellen ohne Treffer fehlen. Gleiche Regeln wie
+    find_matching_resumes: eine Person zählt einmal, zugeschnittene Versionen
+    nur für ihre Zielstelle."""
+    if not job_ids:
+        return {}
+    similarity = 1 - Job.embedding.cosine_distance(Resume.embedding)
+    with get_session() as session:
+        stmt = (
+            select(Job.id, func.count(func.distinct(Resume.user_id)).label("matches"))
+            .join(Resume, and_(Resume.deleted.is_(False), Resume.embedding.isnot(None),
+                               or_(Resume.target_job_id.is_(None), Resume.target_job_id == Job.id)))
+            .where(Job.id.in_(job_ids), Job.embedding.isnot(None))
+            .where(similarity >= min_similarity)
+            .group_by(Job.id)
+        )
+        return {row.id: row.matches for row in session.execute(stmt).all()}
+
+
 def job_similarity(job_id, embedding):
     """Cosine Similarity zwischen genau einer Stelle und einem Embedding, ohne
     Schwellwert - für den Vorher/Nachher-Vergleich beim Zuschneiden eines

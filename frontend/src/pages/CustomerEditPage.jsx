@@ -179,7 +179,10 @@ export default function CustomerEditPage() {
                                 {jobs.map((job) => {
                                     const status = jobStatus(job)
                                     return (
-                                        <li key={job.id} className="side-item">
+                                        <li
+                                            key={job.id}
+                                            className={`side-item${job.match_count > 0 ? ' has-match' : ''}`}
+                                        >
                                             <div className="side-item-top">
                                                 <Link
                                                     className="side-item-title"
@@ -193,6 +196,19 @@ export default function CustomerEditPage() {
                                                     {status.label}
                                                 </span>
                                             </div>
+                                            {/* match_count: nur Rolle 'customer' bei eigenen Stellen (api/jobs.py) */}
+                                            {job.match_count > 0 && (
+                                                <Link
+                                                    className="my-match-chip"
+                                                    to={`/jobs/${job.id}/edit?from_customer=${customer.id}`}
+                                                    title="Stellensuchende, deren Lebenslauf zu dieser Stelle passt - Details auf der Stellenseite"
+                                                >
+                                                    <i className="fa-solid fa-diagram-project" />{' '}
+                                                    {job.match_count === 1
+                                                        ? '1 passende:r Kandidat:in'
+                                                        : `${job.match_count} passende Kandidat:innen`}
+                                                </Link>
+                                            )}
                                             <div className="side-item-meta">
                                                 <span>
                                                     Gültig bis{' '}

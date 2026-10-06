@@ -25,6 +25,7 @@ from models import (
     find_matching_jobs,
     job_similarity,
     user_match_similarities,
+    job_match_counts,
     create_resume,
     get_resume,
     list_resumes_for_user,

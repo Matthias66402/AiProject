@@ -60,10 +60,14 @@ export default function JobTable({
                             (isCustomerUser &&
                                 job.customer_id === currentCustomerId)
                         const status = jobStatus(job)
+                        // my_match: Rolle 'user', match_count: Rolle 'customer'
+                        // bei eigenen Stellen (beides aus api/jobs.py, list_jobs).
+                        const hasMatch =
+                            job.my_match != null || job.match_count > 0
                         return (
                             <tr
                                 key={job.id}
-                                className={`clickable-row${job.my_match != null ? ' has-match' : ''}`}
+                                className={`clickable-row${hasMatch ? ' has-match' : ''}`}
                             >
                                 <td className="cell-strong">
                                     {job.position}
@@ -77,6 +81,18 @@ export default function JobTable({
                                             Passt zu dir ·{' '}
                                             {(job.my_match * 100).toFixed(0)} %
                                         </span>
+                                    )}
+                                    {job.match_count > 0 && (
+                                        <Link
+                                            className="my-match-chip"
+                                            to={`/jobs/${job.id}/edit`}
+                                            title="Stellensuchende, deren Lebenslauf zu dieser Stelle passt - Details auf der Stellenseite"
+                                        >
+                                            <i className="fa-solid fa-diagram-project" />{' '}
+                                            {job.match_count === 1
+                                                ? '1 passende:r Kandidat:in'
+                                                : `${job.match_count} passende Kandidat:innen`}
+                                        </Link>
                                     )}
                                 </td>
                                 <td>{job.customer_name}</td>

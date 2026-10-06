@@ -72,7 +72,7 @@ def list_jobs():
         description: Freitextsuche auf die Position.
     responses:
       200:
-        description: Stellenangebote der aktuellen Seite plus Pagination-Metadaten; für Rolle user je Stelle my_match (beste Ähnlichkeit eines eigenen Lebenslaufs ab Schwellwert, sonst null).
+        description: Stellenangebote der aktuellen Seite plus Pagination-Metadaten; für Rolle user je Stelle my_match (beste Ähnlichkeit eines eigenen Lebenslaufs ab Schwellwert, sonst null), für Rolle customer bei eigenen Stellen match_count (Anzahl passender Stellensuchender).
     """
     customer_id = request.args.get("customer_id", type=int)
     search = (request.args.get("search") or "").strip()
@@ -86,6 +86,14 @@ def list_jobs():
         matches = db.user_match_similarities(session["user_id"], [job["id"] for job in jobs_out])
         for job in jobs_out:
             job["my_match"] = matches.get(job["id"])
+    # Rolle 'customer': bei den eigenen Stellen die Anzahl passender
+    # Stellensuchender (match_count, fremde Stellen bleiben ohne).
+    elif session.get("user_role") == "customer" and isinstance(permission, int):
+        own_ids = [job["id"] for job in jobs_out if job["customer_id"] == permission]
+        counts = db.job_match_counts(own_ids)
+        for job in jobs_out:
+            if job["id"] in own_ids:
+                job["match_count"] = counts.get(job["id"], 0)
     return jsonify(
         jobs=jobs_out,
         page=page,

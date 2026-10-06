@@ -1812,3 +1812,27 @@ html.react-app .user-table tr.has-match td {
 .my-match-chip i {
     color: #a8d07f;
 }
+
+html.react-app .user-table a.my-match-chip {
+    color: #ffffff;
+    font-weight: 600;
+}
+
+html.react-app .user-table a.my-match-chip:hover {
+    filter: brightness(1.2);
+}
+
+/* Seitenspalte "Stellenangebote" beim Stellenanbieter (Rolle 'customer') */
+.side-item.has-match {
+    background: var(--tint);
+}
+
+.side-item a.my-match-chip {
+    margin-top: 0;
+    color: #ffffff;
+    text-decoration: none;
+}
+
+.side-item a.my-match-chip:hover {
+    filter: brightness(1.2);
+}
