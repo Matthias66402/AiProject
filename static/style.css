@@ -1622,3 +1622,169 @@ html.react-app .side-panel .pager {
     width: 100%;
     justify-content: space-between;
 }
+
+/* Lebenslauf auf eine Stelle zuschneiden (JobEditPage, TailorResumePanel). */
+.detail-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.tailor-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.tailor-controls .special-btn {
+    margin-top: 6px;
+    width: 100%;
+}
+
+.spinner.spinner-small {
+    width: 16px;
+    height: 16px;
+    border-width: 2px;
+    border-color: rgba(255, 255, 255, 0.35);
+    border-top-color: #ffffff;
+}
+
+.tailor-compare {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 18px;
+}
+
+.tailor-compare-row {
+    display: grid;
+    grid-template-columns: 70px minmax(0, 1fr) 64px;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.88rem;
+}
+
+.tailor-compare-label {
+    color: var(--ink-muted);
+}
+
+.tailor-compare-pct {
+    font-family: var(--heading-font);
+    font-weight: 700;
+    color: var(--navy);
+    text-align: right;
+}
+
+.tailor-compare .match-bar {
+    background: var(--tint);
+}
+
+.tailor-warning,
+.tailor-ok {
+    margin: 0 0 18px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.tailor-warning {
+    background: #fbefd9;
+    border: 1px solid #ecd3a4;
+    color: #7a4f08;
+}
+
+.tailor-warning p {
+    margin: 0 0 6px;
+    font-weight: 600;
+}
+
+.tailor-warning ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.tailor-ok {
+    background: var(--tint);
+    color: var(--green-dark);
+}
+
+.tailor-preview {
+    max-height: 640px;
+    overflow-y: auto;
+    padding: 20px 24px;
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    background: var(--panel-bg);
+    color: var(--ink-soft);
+    font-size: 0.92rem;
+    line-height: 1.5;
+}
+
+.tailor-preview h1 {
+    margin: 0 0 4px;
+    font-size: 1.4rem;
+    color: var(--navy);
+}
+
+.tailor-preview h2 {
+    margin: 18px 0 6px;
+    padding-bottom: 3px;
+    font-size: 1.05rem;
+    color: var(--navy);
+    border-bottom: 1px solid var(--card-border);
+}
+
+.tailor-preview h3 {
+    margin: 12px 0 2px;
+    font-size: 0.95rem;
+    color: var(--navy);
+}
+
+.tailor-preview p,
+.tailor-preview ul {
+    margin: 0 0 6px;
+}
+
+.tailor-preview table {
+    border-collapse: collapse;
+}
+
+.tailor-preview th,
+.tailor-preview td {
+    padding: 3px 8px;
+    border: 1px solid var(--card-border);
+    text-align: left;
+}
+
+.tailor-actions {
+    margin-top: 18px;
+}
+
+.tailor-saved > i {
+    color: var(--green-dark);
+}
+
+/* Markierung zugeschnittener Versionen im Matching-Panel */
+.match-tag {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: #43376a;
+    color: #e3dcf5;
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+
+/* Auswahl nie breiter als die Seitenspalte: ohne min-width: 0 bestimmt die
+   längste Option die Mindestbreite; überlanger Text endet mit "…". */
+.tailor-controls select {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}

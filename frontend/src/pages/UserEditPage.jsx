@@ -153,6 +153,12 @@ export default function UserEditPage() {
                                             Lebenslauf vom{' '}
                                             {formatDate(resume.created_at)}
                                         </a>
+                                        {resume.target_job_position && (
+                                            <span className="side-item-meta">
+                                                Angepasst für{' '}
+                                                {resume.target_job_position}
+                                            </span>
+                                        )}
                                     </li>
                                 ))}
                             </ul>

@@ -152,6 +152,9 @@ export default function MyResumesPage() {
                                 <option key={resume.id} value={resume.id}>
                                     {resume.created_at}
                                     {index === 0 ? ' (neueste)' : ''}
+                                    {resume.target_job_position
+                                        ? ` · angepasst für ${resume.target_job_position}`
+                                        : ''}
                                 </option>
                             ))}
                         </select>
@@ -195,8 +198,9 @@ export default function MyResumesPage() {
                                     <div>
                                         <h2>Passende Stellenangebote</h2>
                                         <div className="match-panel-hint">
-                                            Semantische Ähnlichkeit zu diesem
-                                            Lebenslauf
+                                            {selectedResume.target_job_id
+                                                ? 'Diese angepasste Version zählt nur für ihre Zielstelle'
+                                                : 'Semantische Ähnlichkeit zu diesem Lebenslauf'}
                                         </div>
                                     </div>
                                 </div>

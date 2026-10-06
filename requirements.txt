@@ -7,7 +7,7 @@ python-dotenv
 psycopg2-binary
 SQLAlchemy
 pgvector
-weasyprint
+weasyprint~=70.0  # pdf_service nutzt URLFetcher(allowed_protocols=...), getestet mit 70.0
 pypdf
 python-docx
 odfpy

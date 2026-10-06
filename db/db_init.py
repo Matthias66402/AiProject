@@ -37,6 +37,9 @@ _USER_COLUMNS = {
 _RESUME_COLUMNS = {
     "embedding": "vector(1536)",
     "deleted": "BOOLEAN NOT NULL DEFAULT FALSE",
+    # Auf eine Stelle zugeschnittene Lebenslauf-Version (NULL = allgemeine Version),
+    # siehe services/resume_tailoring_service.py.
+    "target_job_id": "INT REFERENCES jobs(id)",
 }
 
 

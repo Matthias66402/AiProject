@@ -215,7 +215,7 @@ def get_job(job_id):
     # berechnen/ausliefern (can_manage deckt beides ab), damit die Daten sonst
     # niemanden über die Netzwerk-Antwort erreichen.
     if can_manage and job.get("embedding"):
-        result["matching_resumes"] = [_serialize_dates(dict(m)) for m in db.find_matching_resumes(job["embedding"], top_k=5)]
+        result["matching_resumes"] = [_serialize_dates(dict(m)) for m in db.find_matching_resumes(job["embedding"], top_k=5, job_id=job_id)]
     else:
         result["matching_resumes"] = []
     return jsonify(job=result)

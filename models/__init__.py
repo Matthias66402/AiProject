@@ -9,5 +9,5 @@ from models.customer import (
     update_customer,
     delete_customer,
 )
-from models.job import Job, list_jobs, count_jobs, count_active_jobs, count_active_matches, get_job, create_job, update_job, delete_job, find_matching_jobs
+from models.job import Job, list_jobs, count_jobs, count_active_jobs, count_active_matches, get_job, create_job, update_job, delete_job, find_matching_jobs, job_similarity
 from models.resume import Resume, create_resume, get_resume, list_resumes_for_user, delete_resume, find_matching_resumes

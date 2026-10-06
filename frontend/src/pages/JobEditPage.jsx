@@ -7,9 +7,10 @@ import {
     useSearchParams,
 } from 'react-router-dom'
 import DOMPurify from 'dompurify'
-import { API_BASE, apiDelete, apiGet, apiPut } from '../api/client'
+import { API_BASE, apiDelete, apiGet, apiPost, apiPut } from '../api/client'
 import DetailHeader from '../components/DetailHeader'
 import JobForm from '../components/JobForm'
+import TailorResumePanel from '../components/TailorResumePanel'
 import { formatDate, jobStatus } from '../components/JobTable'
 import { useConfirm } from '../components/ConfirmProvider'
 
@@ -24,8 +25,16 @@ export default function JobEditPage() {
     const [job, setJob] = useState(null)
     const [customers, setCustomers] = useState(null)
     const [error, setError] = useState('')
+    // Lebenslauf-Zuschnitt (Rolle 'user'): Entwurf aus der Vorschau, Status
+    // beim Übernehmen und Schlüssel zum Neuladen der Versionsliste im Panel.
+    const [draft, setDraft] = useState(null)
+    const [draftSaving, setDraftSaving] = useState(false)
+    const [draftError, setDraftError] = useState('')
+    const [savedResume, setSavedResume] = useState(null)
+    const [tailorReloadKey, setTailorReloadKey] = useState(0)
 
     const isAdmin = user?.role === 'admin'
+    const isUser = user?.role === 'user'
 
     const loadJob = useCallback(() => {
         // Beim Wechsel der jobId sofort zuruecksetzen, damit waehrend des
@@ -34,6 +43,8 @@ export default function JobEditPage() {
         // sonst kann ein Speichern-Klick in diesem Fenster die Werte des
         // alten Jobs (inkl. customer_id) auf die neue jobId schreiben.
         setJob(null)
+        setDraft(null)
+        setSavedResume(null)
         apiGet(`/api/jobs/${jobId}`)
             .then((data) => setJob(data.job))
             .catch((err) => setError(err.message))
@@ -69,6 +80,30 @@ export default function JobEditPage() {
             valid_until: values.valid_until || null,
         })
         loadJob()
+    }
+
+    function handleDraft(newDraft) {
+        setDraft(newDraft)
+        setDraftError('')
+        setSavedResume(null)
+    }
+
+    async function handleAcceptDraft() {
+        setDraftSaving(true)
+        setDraftError('')
+        try {
+            const data = await apiPost('/api/resumes/tailor', {
+                job_id: job.id,
+                content: draft.draft_html,
+            })
+            setSavedResume(data.resume)
+            setDraft(null)
+            setTailorReloadKey((k) => k + 1)
+        } catch (err) {
+            setDraftError(err.message)
+        } finally {
+            setDraftSaving(false)
+        }
     }
 
     async function handleDeleteCurrent() {
@@ -135,63 +170,102 @@ export default function JobEditPage() {
             />
 
             <div className="detail-layout">
-                <section className="detail-card detail-main">
-                    <h2>Stellendaten</h2>
-                    {canManage ? (
-                        <JobForm
-                            key={job.id}
-                            mode="edit"
-                            initial={job}
-                            isAdmin={isAdmin}
-                            customers={customers || []}
-                            ownCustomerName={job.customer_name}
-                            onSubmit={handleSave}
-                            submitLabel="Speichern"
-                        />
-                    ) : (
-                        <div className="entity-view">
-                            <div>
-                                <label>Beschreibung</label>
-                                {documentExt === 'pdf' ? (
-                                    <iframe
-                                        className="pdf-embed"
-                                        src={API_BASE + job.document_link}
-                                        title="Stellenangebot PDF"
-                                    />
-                                ) : (
-                                    <div
-                                        className="ql-editor job-content-view"
-                                        dangerouslySetInnerHTML={{
-                                            __html: DOMPurify.sanitize(
-                                                job.content,
-                                            ),
-                                        }}
-                                    />
-                                )}
-                                {job.document_link && documentExt !== 'pdf' && (
-                                    <p>
-                                        <a
-                                            href={API_BASE + job.document_link}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                        >
-                                            Original-Dokument herunterladen (
-                                            {documentExt.toUpperCase()})
-                                        </a>
-                                    </p>
-                                )}
+                <div className="detail-main detail-stack">
+                    <section className="detail-card">
+                        <h2>Stellendaten</h2>
+                        {canManage ? (
+                            <JobForm
+                                key={job.id}
+                                mode="edit"
+                                initial={job}
+                                isAdmin={isAdmin}
+                                customers={customers || []}
+                                ownCustomerName={job.customer_name}
+                                onSubmit={handleSave}
+                                submitLabel="Speichern"
+                            />
+                        ) : (
+                            <div className="entity-view">
+                                <div>
+                                    <label>Beschreibung</label>
+                                    {documentExt === 'pdf' ? (
+                                        <iframe
+                                            className="pdf-embed"
+                                            src={API_BASE + job.document_link}
+                                            title="Stellenangebot PDF"
+                                        />
+                                    ) : (
+                                        <div
+                                            className="ql-editor job-content-view"
+                                            dangerouslySetInnerHTML={{
+                                                __html: DOMPurify.sanitize(
+                                                    job.content,
+                                                ),
+                                            }}
+                                        />
+                                    )}
+                                    {job.document_link &&
+                                        documentExt !== 'pdf' && (
+                                            <p>
+                                                <a
+                                                    href={
+                                                        API_BASE +
+                                                        job.document_link
+                                                    }
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                >
+                                                    Original-Dokument
+                                                    herunterladen (
+                                                    {documentExt.toUpperCase()})
+                                                </a>
+                                            </p>
+                                        )}
+                                </div>
+                                <div>
+                                    <label>Gültig von</label>
+                                    <p>{formatDate(job.valid_from)}</p>
+                                </div>
+                                <div>
+                                    <label>Gültig bis</label>
+                                    <p>{formatDate(job.valid_until)}</p>
+                                </div>
                             </div>
-                            <div>
-                                <label>Gültig von</label>
-                                <p>{formatDate(job.valid_from)}</p>
-                            </div>
-                            <div>
-                                <label>Gültig bis</label>
-                                <p>{formatDate(job.valid_until)}</p>
-                            </div>
-                        </div>
+                        )}
+                    </section>
+
+                    {savedResume && (
+                        <section className="info-card tailor-saved">
+                            <i className="fa-solid fa-circle-check" />
+                            <p>
+                                Dein angepasster Lebenslauf wurde als neue
+                                Version gespeichert und zählt ab jetzt beim
+                                Matching für diese Stelle.{' '}
+                                <Link to="/resumes">Zu „Mein Lebenslauf“</Link>
+                            </p>
+                        </section>
                     )}
-                </section>
+
+                    {draft && (
+                        <TailorDraftCard
+                            draft={draft}
+                            saving={draftSaving}
+                            error={draftError}
+                            onAccept={handleAcceptDraft}
+                            onDiscard={() => setDraft(null)}
+                        />
+                    )}
+                </div>
+
+                {isUser && (
+                    <aside className="detail-aside">
+                        <TailorResumePanel
+                            jobId={job.id}
+                            reloadKey={tailorReloadKey}
+                            onDraft={handleDraft}
+                        />
+                    </aside>
+                )}
 
                 {canManage && (
                     <aside className="detail-aside">
@@ -237,6 +311,11 @@ export default function JobEditPage() {
                                                 </span>
                                                 <span className="match-meta">
                                                     {m.short_name}
+                                                    {m.target_job_id && (
+                                                        <span className="match-tag">
+                                                            angepasst
+                                                        </span>
+                                                    )}
                                                 </span>
                                             </Link>
                                         </li>
@@ -244,8 +323,8 @@ export default function JobEditPage() {
                                 </ul>
                             ) : (
                                 <p className="match-empty">
-                                    Keine Übereinstimmungen gefunden (evtl.
-                                    noch kein Embedding vorhanden).
+                                    Keine Übereinstimmungen gefunden (evtl. noch
+                                    kein Embedding vorhanden).
                                 </p>
                             )}
                         </section>
@@ -261,5 +340,87 @@ export default function JobEditPage() {
                 )}
             </div>
         </div>
+    )
+}
+
+function formatPct(value) {
+    return value == null ? '–' : `${(value * 100).toFixed(1)} %`
+}
+
+// Vorschau eines zugeschnittenen Lebenslaufs: Matching vorher/nachher, vom
+// Prüfschritt gemeldete unbelegte Angaben und der Entwurf selbst.
+function TailorDraftCard({ draft, saving, error, onAccept, onDiscard }) {
+    const bars = [
+        ['Vorher', draft.similarity_before],
+        ['Nachher', draft.similarity_after],
+    ]
+    return (
+        <section className="detail-card">
+            <h2>Entwurf: angepasster Lebenslauf</h2>
+
+            <div className="tailor-compare">
+                {bars.map(([label, value]) => (
+                    <div key={label} className="tailor-compare-row">
+                        <span className="tailor-compare-label">{label}</span>
+                        <span className="match-bar">
+                            <span style={{ width: `${(value || 0) * 100}%` }} />
+                        </span>
+                        <span className="tailor-compare-pct">
+                            {formatPct(value)}
+                        </span>
+                    </div>
+                ))}
+                <p className="side-panel-hint">
+                    Semantische Ähnlichkeit zu dieser Stelle
+                </p>
+            </div>
+
+            {draft.unsupported.length > 0 ? (
+                <div className="tailor-warning">
+                    <p>
+                        <i className="fa-solid fa-triangle-exclamation" /> Bitte
+                        prüfen - diese Angaben sind im Original nicht eindeutig
+                        belegt:
+                    </p>
+                    <ul>
+                        {draft.unsupported.map((item) => (
+                            <li key={item}>{item}</li>
+                        ))}
+                    </ul>
+                </div>
+            ) : (
+                <p className="tailor-ok">
+                    <i className="fa-solid fa-circle-check" /> Die Prüfung hat
+                    keine unbelegten Angaben gefunden.
+                </p>
+            )}
+
+            <div
+                className="tailor-preview"
+                dangerouslySetInnerHTML={{
+                    __html: DOMPurify.sanitize(draft.draft_html),
+                }}
+            />
+
+            {error && <p className="form-error">{error}</p>}
+            <div className="detail-actions tailor-actions">
+                <button
+                    type="button"
+                    className="special-btn"
+                    onClick={onAccept}
+                    disabled={saving}
+                >
+                    {saving ? 'Wird gespeichert …' : 'Übernehmen'}
+                </button>
+                <button
+                    type="button"
+                    className="subtle-btn cancel"
+                    onClick={onDiscard}
+                    disabled={saving}
+                >
+                    Verwerfen
+                </button>
+            </div>
+        </section>
     )
 }

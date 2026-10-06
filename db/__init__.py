@@ -23,6 +23,7 @@ from models import (
     update_job,
     delete_job,
     find_matching_jobs,
+    job_similarity,
     create_resume,
     get_resume,
     list_resumes_for_user,

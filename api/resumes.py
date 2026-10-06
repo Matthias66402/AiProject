@@ -6,7 +6,7 @@ from openai import APIStatusError as OpenAIAPIStatusError
 
 import db
 from document_extraction import ALLOWED_DOCUMENT_UPLOAD_EXTENSIONS
-from services import resume_service
+from services import resume_service, resume_tailoring_service
 from services.ai_clients import openai_client
 from services.assistant_service import DEFAULT_MODEL
 
@@ -81,7 +81,20 @@ def get_resume(resume_id):
     if not resume or resume["user_id"] != user_id:
         return jsonify(error="Nicht gefunden."), 404
 
-    matching_jobs = db.find_matching_jobs(resume["embedding"], top_k=5) if resume.get("embedding") else []
+    if resume.get("target_job_id"):
+        # Zugeschnittene Version: zählt nur für ihre Zielstelle, daher nur diese zeigen.
+        matching_jobs = []
+        target_job = db.get_job(resume["target_job_id"])
+        similarity = db.job_similarity(resume["target_job_id"], resume.get("embedding"))
+        if target_job and similarity is not None:
+            matching_jobs = [{
+                "id": target_job["id"], "position": target_job["position"], "city": target_job["city"],
+                "customer_name": target_job["customer_name"], "similarity": similarity,
+            }]
+    elif resume.get("embedding"):
+        matching_jobs = db.find_matching_jobs(resume["embedding"], top_k=5)
+    else:
+        matching_jobs = []
     return jsonify(resume=_serialize_resume(resume), matching_jobs=matching_jobs)
 
 
@@ -226,3 +239,135 @@ def delete_resume(resume_id):
 
     db.delete_resume(resume_id)
     return jsonify(success=True)
+
+
+def _tailoring_context():
+    """Gemeinsame Prüfungen der Zuschneide-Routen: angemeldet und Rolle 'user'.
+    Gibt (user_id, None) oder (None, Fehlerantwort) zurück."""
+    user_id = session.get("user_id")
+    if not user_id:
+        return None, (jsonify(error="Nicht angemeldet."), 401)
+    if session.get("user_role") != "user":
+        return None, (jsonify(error="Nur für Nutzer mit eigenem Lebenslauf verfügbar."), 403)
+    return user_id, None
+
+
+@resumes_api.route("/tailor/preview", methods=["POST"])
+def tailor_resume_preview():
+    """Entwurf eines auf ein Stellenangebot zugeschnittenen Lebenslaufs erzeugen (ohne zu speichern).
+    ---
+    tags:
+      - Resumes
+    security:
+      - sessionAuth: []
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required: [resume_id, job_id]
+          properties:
+            resume_id:
+              type: integer
+              description: Eigene Lebenslauf-Version als Ausgangsbasis.
+            job_id:
+              type: integer
+              description: Stellenangebot, auf das zugeschnitten wird.
+    responses:
+      200:
+        description: Entwurf (draft_html), unbelegte Angaben (unsupported) und Ähnlichkeit vorher/nachher.
+      401:
+        description: Nicht angemeldet.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+      403:
+        description: Nur für Rolle user.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+      404:
+        description: Lebenslauf oder Stelle nicht gefunden.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+      502:
+        description: KI-Anfrage fehlgeschlagen, bitte später erneut versuchen.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+    """
+    user_id, error = _tailoring_context()
+    if error:
+        return error
+
+    data = request.get_json(silent=True) or {}
+    resume = db.get_resume(data.get("resume_id")) if isinstance(data.get("resume_id"), int) else None
+    if not resume or resume["user_id"] != user_id:
+        return jsonify(error="Lebenslauf nicht gefunden."), 404
+    job = db.get_job(data.get("job_id")) if isinstance(data.get("job_id"), int) else None
+    if not job:
+        return jsonify(error="Stellenangebot nicht gefunden."), 404
+
+    try:
+        draft = resume_tailoring_service.draft_tailored_resume(openai_client, DEFAULT_MODEL, resume, job, current_app.logger)
+    except (GroqAPIStatusError, OpenAIAPIStatusError) as e:
+        current_app.logger.warning("API error %s: %s", e.status_code, e.body)
+        return jsonify(error="Der Entwurf konnte gerade nicht erstellt werden. Bitte später erneut versuchen."), 502
+
+    return jsonify(**draft)
+
+
+@resumes_api.route("/tailor", methods=["POST"])
+def tailor_resume_save():
+    """Einen in der Vorschau bestätigten, zugeschnittenen Lebenslauf als neue Version speichern.
+    ---
+    tags:
+      - Resumes
+    security:
+      - sessionAuth: []
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required: [job_id, content]
+          properties:
+            job_id:
+              type: integer
+              description: Zielstelle der Version.
+            content:
+              type: string
+              description: HTML des Entwurfs aus /api/resumes/tailor/preview.
+    responses:
+      201:
+        description: Version wurde gespeichert.
+      400:
+        description: content fehlt.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+      401:
+        description: Nicht angemeldet.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+      403:
+        description: Nur für Rolle user.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+      404:
+        description: Stelle nicht gefunden.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+    """
+    user_id, error = _tailoring_context()
+    if error:
+        return error
+
+    data = request.get_json(silent=True) or {}
+    job = db.get_job(data.get("job_id")) if isinstance(data.get("job_id"), int) else None
+    if not job:
+        return jsonify(error="Stellenangebot nicht gefunden."), 404
+    content = (data.get("content") or "").strip()
+    if not content:
+        return jsonify(error="Der Entwurf ist leer."), 400
+
+    resume_id = resume_tailoring_service.save_tailored_resume(openai_client, user_id, job["id"], content, current_app.logger)
+    return jsonify(resume=_serialize_resume(db.get_resume(resume_id))), 201

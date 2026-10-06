@@ -1,4 +1,5 @@
 from weasyprint import HTML
+from weasyprint.urls import URLFetcher
 
 # Festes Stylesheet für alle erzeugten PDFs (Lebensläufe, Stellenangebote): Die
 # KI liefert bewusst nur schlichtes, semantisches HTML ohne eigenes CSS (siehe
@@ -37,9 +38,18 @@ a { color: #1a3d5c; }
 """
 
 
+def _blocking_url_fetcher():
+    """URLFetcher für WeasyPrint ohne erlaubte Protokolle, d.h. jeder Abruf externer
+    Ressourcen (http, file, ...) wird verweigert: Die Dokumente brauchen keine, und
+    beim Zuschneiden eines Lebenslaufs kommt das HTML vom Client zurück - ohne
+    diese Sperre könnte ein <img src> den Server beliebige URLs oder lokale
+    Dateien abrufen lassen. WeasyPrint lässt die Ressource dann einfach weg."""
+    return URLFetcher(allowed_protocols=())
+
+
 def write_html_as_pdf(html_fragment, output_path):
     document = (
         f"<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>{_PDF_STYLESHEET}</style></head>"
         f"<body>{html_fragment}</body></html>"
     )
-    HTML(string=document).write_pdf(output_path)
+    HTML(string=document, url_fetcher=_blocking_url_fetcher()).write_pdf(output_path)

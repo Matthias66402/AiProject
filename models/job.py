@@ -90,7 +90,8 @@ def count_active_matches(customer_id=None, min_similarity=MIN_MATCH_SIMILARITY):
         stmt = (
             select(func.count(func.distinct(tuple_(Job.id, Resume.user_id))))
             .select_from(Job)
-            .join(Resume, Resume.deleted.is_(False))
+            .join(Resume, and_(Resume.deleted.is_(False),
+                               or_(Resume.target_job_id.is_(None), Resume.target_job_id == Job.id)))
             .where(Job.deleted.is_(False), _active_filter())
             .where(Job.embedding.isnot(None), Resume.embedding.isnot(None))
             .where(similarity >= min_similarity)
@@ -157,6 +158,22 @@ def find_matching_jobs(embedding, top_k=5, min_similarity=MIN_MATCH_SIMILARITY):
             .limit(top_k)
         )
         return [dict(row) for row in session.execute(stmt).mappings().all()]
+
+
+def job_similarity(job_id, embedding):
+    """Cosine Similarity zwischen genau einer Stelle und einem Embedding, ohne
+    Schwellwert - für den Vorher/Nachher-Vergleich beim Zuschneiden eines
+    Lebenslaufs und die Anzeige zugeschnittener Versionen. None, wenn die Stelle
+    fehlt, gelöscht ist oder kein Embedding hat."""
+    if embedding is None:
+        return None
+    with get_session() as session:
+        stmt = (
+            select((1 - Job.embedding.cosine_distance(embedding)).label("similarity"))
+            .where(Job.id == job_id, Job.deleted.is_(False), Job.embedding.isnot(None))
+        )
+        value = session.scalar(stmt)
+        return float(value) if value is not None else None
 
 
 def delete_job(job_id):
