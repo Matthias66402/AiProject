@@ -11,12 +11,15 @@ Flask liefert **keine eigenen Seiten** mehr aus — nur noch JSON (`/api/*`) sow
   - Modelle über [OpenAI](https://platform.openai.com/) — `OPENAI_API_KEY` ist Pflicht, da auch die Embeddings darüber laufen.
 - **Login/Registrierung** (`/login`, `/register`): Nutzer registrieren sich (immer mit Rolle `user`), melden sich an/ab; Passwörter gehasht (Werkzeug), Session-Cookie-Auth.
 - **Rollen**: `user` (Standard), `customer`, `admin` (`models/user.py`, `ROLES`). `admin` hat vollen Schreibzugriff. `customer`-Nutzer sind über `users.customer_id` genau einem Stellenanbieter zugeordnet und dürfen dadurch **nur ihre eigenen** Stellenangebote und ihren eigenen Stellenanbieter-Datensatz bearbeiten.
-- **Nutzerverwaltung** (`/users`, nur `admin`): anlegen, bearbeiten, Rolle zuweisen, Stellenanbieter-Zuordnung bei Rolle `customer`, Übersicht der Lebensläufe des Nutzers. Kein Löschen — dafür gibt es keine Funktion.
-- **Eigener Lebenslauf** (`/resumes`, jeder eingeloggte Nutzer): aktuellster Lebenslauf eingebettet (PDF) bzw. als Download; Selectbox für ältere Versionen; Löschen. Neuen Lebenslauf per KI **generieren** (echter Name, Wohnort nur bei hinterlegter PLZ+Stadt) oder eigene Datei **hochladen** (Dropzone, PDF/.docx/.odt, Text via `document_extraction.py` ausgelesen und vektorisiert).
-- **Stellenangebote** (`/jobs`): Stellenanzeigen mit Gültigkeitszeitraum, PLZ/Stadt, Stellenanbieter-Zuordnung; paginierte Liste mit Suche, Zeilenklick öffnet die Detailansicht.
+- **Nutzerverwaltung** (`/users`, nur `admin`, lesend auch `customer`): anlegen, bearbeiten, Rolle zuweisen, Stellenanbieter-Zuordnung bei Rolle `customer`. Die Detailseite zeigt links die Nutzerdaten, rechts die Lebensläufe (zugeschnittene Versionen mit „Angepasst für …“). Kein Löschen — dafür gibt es keine Funktion.
+- **Eigener Lebenslauf** (`/resumes`, Rolle `user`): aktuellster Lebenslauf eingebettet (PDF) bzw. als Download; Selectbox für ältere Versionen (zugeschnittene als „… · angepasst für {Position}“); Löschen; passende Stellenangebote zur gewählten Version. Neuen Lebenslauf per KI **generieren** (echter Name, Wohnort nur bei hinterlegter PLZ+Stadt) oder eigene Datei **hochladen** (Dropzone, PDF/.docx/.odt, Text via `document_extraction.py` ausgelesen und vektorisiert).
+- **Lebenslauf auf eine Stelle zuschneiden** (Rolle `user`, Stellen-Detailseite): siehe [eigener Abschnitt](#lebenslauf-auf-eine-stelle-zuschneiden).
+- **Stellenangebote** (`/jobs`): Stellenanzeigen mit Gültigkeitszeitraum, PLZ/Stadt, Stellenanbieter-Zuordnung; paginierte Liste mit Suche und Status-Chips (Aktiv, Läuft bald ab, Abgelaufen, Geplant).
   - `admin`: anlegen/bearbeiten/löschen für jeden Stellenanbieter. `customer`-Nutzer: nur für den eigenen (serverseitig erzwungen). Alle anderen: nur Lesemodus.
   - Optionaler Dokumenten-Upload (PDF/.docx/.odt) beim Anlegen (`/jobs/extract-upload`): KI fasst Inhalt zusammen und befüllt Position/PLZ/Stadt.
-- **Stellenanbieter** (`/customers`): Kunden (Unternehmen) mit Adresse, paginierte Liste mit Suche, inkl. Liste der zugehörigen Stellenangebote in der Bearbeiten-Ansicht.
+  - **Matching-Markierung in der Liste**: Für Rolle `user` sind Stellen hervorgehoben und mit „Passt zu dir · NN %“ markiert, wenn ein eigener Lebenslauf ab `MIN_MATCH_SIMILARITY` passt (`my_match` in `/api/jobs`, `db.user_match_similarities()`). Für Rolle `customer` zeigen die eigenen Stellen „N passende Kandidat:innen“ (`match_count`, `db.job_match_counts()`) — auch in der Stellenliste auf der eigenen Stellenanbieter-Seite.
+  - **Detailseite** (`/jobs/<id>/edit`): Kopf mit Position, Stellenanbieter, Ort, Status und Aktionen; links die Stellendaten (Formular oder Leseansicht), rechts „Passende Kandidat:innen“ (Admins und eigener Stellenanbieter, zugeschnittene Versionen mit Chip „angepasst“) bzw. für Rolle `user` das Feld „Lebenslauf anpassen“.
+- **Stellenanbieter** (`/customers`): Kunden (Unternehmen) mit Adresse, paginierte Liste mit Suche. Die Detailseite zeigt links die Unternehmensdaten und rechts alle Stellenangebote des Anbieters mit Suchfeld und Pager.
   - `admin`: anlegen/bearbeiten/löschen. `customer`-Nutzer: nur der eigene Datensatz bearbeiten. Alle anderen: nur Lesemodus.
 - **Tools** (nur `admin`, im Konto-Menü oben rechts): lässt die KI Inhalte als HTML formulieren und rendert sie per WeasyPrint zu PDF.
   - **Lebenslauf generieren** (`/tools/resume`): Nutzer per Selectbox wählen, PDF wird unter `resumes` gespeichert.
@@ -26,6 +29,36 @@ Flask liefert **keine eigenen Seiten** mehr aus — nur noch JSON (`/api/*`) sow
 ### Löschen = Deaktivieren
 
 „Löschen" bei Stellenangeboten, Stellenanbietern und Lebensläufen entfernt die Datenbankzeile **nicht** wirklich, sondern setzt nur ein `deleted`-Flag (`jobs`, `customers`, `resumes`, Migration in `db/db_init.py`). Alle Listen-/Detail-Abfragen (`models/job.py`, `models/customer.py`, `models/resume.py`) blenden `deleted = true`-Zeilen konsequent aus — für Nutzer:innen unterscheidet sich das nicht von einem echten Löschen, verhindert aber z.B. Fremdschlüssel-Probleme (ein Stellenanbieter mit bestehenden Stellenangeboten lässt sich so problemlos "löschen"). Es gibt aktuell **keine** Oberfläche zum Wiederherstellen — dafür müsste das Flag direkt in der Datenbank zurückgesetzt werden. Im React-Frontend fragt vor dem Löschen ein Modal-Dialog nach (`frontend/src/components/ConfirmProvider.jsx`) statt des Browser-`confirm()`.
+
+### Detailseiten-Layout
+
+Die Detailseiten von Stelle, Stellenanbieter und Nutzer folgen einem gemeinsamen Aufbau: Kopf mit Zurück-Link, Titel, Meta-Zeile und Aktionen (`frontend/src/components/DetailHeader.jsx`), darunter links eine Daten-Karte und rechts eine Seitenspalte (`.detail-layout`/`.detail-main`/`.detail-aside` in `static/style.css`). Unter ca. 940 px Breite rutscht die Seitenspalte unter die Daten. Listen unter den Detailansichten gibt es nicht mehr.
+
+### Einträge pro Seite
+
+Zentral in `frontend/src/config.js`:
+
+| Konstante | Wirkung |
+|---|---|
+| `DEFAULT_PER_PAGE` | Startwert der großen Listen (Stellenangebote, Stellenanbieter); dort per „Einträge pro Seite“ änderbar. Sollte eine der Backend-Optionen sein, sonst zeigt das Auswahlfeld keinen passenden Eintrag |
+| `SIDE_PANEL_PER_PAGE` | Einträge pro Seite in Seitenspalten (z.B. Stellen eines Stellenanbieters), ohne Auswahl |
+
+Das Backend akzeptiert `per_page` von 1 bis zur größten Option aus `JOBS_PER_PAGE_OPTIONS` (`api/jobs.py`, 100) bzw. `CUSTOMERS_PER_PAGE_OPTIONS` (`api/customers.py`, 50) und ersetzt alles andere durch seinen Standardwert. Die Optionslisten bestimmen nur noch die Auswahl im Pager. `/api/jobs` liefert zusätzlich `total` (Anzahl der Treffer).
+
+## Lebenslauf auf eine Stelle zuschneiden
+
+Nutzer mit Rolle `user` können auf der Stellen-Detailseite (rechte Spalte „Lebenslauf anpassen“) eine eigene Lebenslauf-Version per KI auf genau diese Stelle zuschneiden lassen — ohne etwas zu erfinden.
+
+1. **Vorschau** (`POST /api/resumes/tailor/preview`, `{resume_id, job_id}`): `services/resume_tailoring_service.py` (`draft_tailored_resume()`) lässt die KI den Lebenslauf umformulieren, umsortieren, gewichten und kürzen. Der Prompt verbietet neue Kenntnisse, Stationen, Abschlüsse, Zertifikate, Zahlen und Zeiträume.
+2. **Prüfschritt**: Ein zweiter KI-Aufruf (JSON-Antwort) vergleicht Entwurf und Original und listet Angaben ohne Beleg im Original. Sie erscheinen in der Vorschau als Warnung.
+3. **Vorher/Nachher**: Ähnlichkeit von Original und Entwurf zur Stelle (`db.job_similarity()`).
+4. **Übernehmen** (`POST /api/resumes/tailor`, `{job_id, content}`): speichert den Entwurf als neue Version (PDF + Embedding) mit `resumes.target_job_id`. Erst hier wird etwas gespeichert; „Verwerfen“ verwirft den Entwurf.
+
+Beide Endpunkte prüfen Anmeldung und Rolle `user`; die Vorschau zusätzlich, dass der Lebenslauf dem Nutzer gehört. Verbrauch je Entwurf ca. 3.000 Tokens (Zuschnitt + Prüfung mit `DEFAULT_MODEL`, aktuell `gpt-4.1-mini`) plus ein Embedding.
+
+**Matching-Regel:** Eine zugeschnittene Version (`target_job_id` gesetzt) zählt **nur für ihre Zielstelle**, damit sie das Matching anderer Stellen nicht verzerrt. Alle Matching-Abfragen beachten deshalb `target_job_id IS NULL OR target_job_id = <Stelle>` (`find_matching_resumes(job_id=…)`, `count_active_matches`, `user_match_similarities`, `job_match_counts`). Die Kandidatensuche des KI-Assistenten berücksichtigt zugeschnittene Versionen nicht. Auf `/resumes` zeigt eine zugeschnittene Version nur ihre Zielstelle als Treffer.
+
+**PDF-Sicherheit:** Das HTML zum Speichern kommt vom Client zurück. `write_html_as_pdf()` (`services/pdf_service.py`) rendert deshalb mit einem WeasyPrint-`URLFetcher` ohne erlaubte Protokolle, d.h. externe Ressourcen (`http`, `file:` …) werden nie abgerufen. Dafür ist WeasyPrint in `requirements.txt` auf `~=70.0` festgelegt.
 
 ## API-Dokumentation (Swagger / OpenAPI)
 
@@ -40,7 +73,7 @@ Auth läuft über das Flask-Session-Cookie: Endpoint `POST /api/auth/login` in S
 
 Jeder Job und jeder Lebenslauf bekommt beim Anlegen/Ändern automatisch ein OpenAI-Embedding (`text-embedding-3-small`) und wird als [pgvector](https://github.com/pgvector/pgvector) `vector(1536)` gespeichert. Die Ähnlichkeitssuche läuft nativ in SQL über Cosine-Distance, indiziert per HNSW-Index. Zuständig ist `embeddings.py` (`strip_html_to_text()`, `embed_text()`/`embed_texts()`, `to_vector_literal()`); API-Fehler werden abgefangen/geloggt statt das Anlegen zu blockieren.
 
-`db.find_matching_jobs()` / `db.find_matching_resumes()` liefern die ähnlichsten Einträge ab einer Mindest-Ähnlichkeit (`MIN_MATCH_SIMILARITY`, `models/base.py`) — Grundlage für das Matching zwischen Kandidat und Stellenangebot (angezeigt auf `/resumes` bzw. `/jobs/<id>/edit`). Deaktivierte (gelöschte) Jobs/Lebensläufe fließen dabei nicht mit ein.
+`db.find_matching_jobs()` / `db.find_matching_resumes()` liefern die ähnlichsten Einträge ab einer Mindest-Ähnlichkeit (`MIN_MATCH_SIMILARITY` = 0,60, `models/base.py`) — Grundlage für das Matching zwischen Kandidat und Stellenangebot (angezeigt auf `/resumes` bzw. `/jobs/<id>/edit`). Deaktivierte (gelöschte) Jobs/Lebensläufe fließen dabei nicht mit ein, pro Person zählt die ähnlichste Version. Weitere Matching-Funktionen in `models/job.py`: `count_active_matches()` (Zahlenkachel), `user_match_similarities()` (Markierung „Passt zu dir“), `job_match_counts()` (Kandidaten-Anzahl für Stellenanbieter), `job_similarity()` (eine Stelle gegen ein Embedding). Für zugeschnittene Lebensläufe gilt die [Matching-Regel](#lebenslauf-auf-eine-stelle-zuschneiden).
 
 `backfill_embeddings.py` berechnet einmalig fehlende Embeddings für Bestandsdaten nach:
 
@@ -75,7 +108,7 @@ api/                       JSON-API fürs React-Frontend, inkl. YAML-Docstrings 
   jobs.py                     /api/jobs-Endpunkte
   customers.py                /api/customers-Endpunkte
   users.py                    /api/users-Endpunkte (kein Löschen; entfernt password_hash aus jeder Antwort)
-  resumes.py                  /api/resumes-Endpunkte (Liste/Anzeige/Generieren/Hochladen/Löschen)
+  resumes.py                  /api/resumes-Endpunkte (Liste/Anzeige/Generieren/Hochladen/Löschen, Zuschneiden: /tailor/preview + /tailor)
   tools.py                    /api/tools/resume + /api/tools/joboffer (KI-Generierung)
   assistant.py                /api/assistant(/ask) für die Startseite
 db/                        DB-Verbindung & Schema, von außen per `import db` genutzt
@@ -85,11 +118,13 @@ services/                  Von app.py und api/ gemeinsam genutzte Logik
   auth_service.py              Login-Session befüllen (`log_in_user()`)
   permissions.py                Rollen-/Berechtigungslogik
   resume_service.py / joboffer_service.py   KI-Generierung + Uploads (inkl. Embedding)
-  pdf_service.py                HTML-zu-PDF (WeasyPrint)
+  resume_tailoring_service.py   Lebenslauf auf eine Stelle zuschneiden (Entwurf, Prüfschritt, Speichern)
+  pdf_service.py                HTML-zu-PDF (WeasyPrint, ohne Abruf externer Ressourcen)
   ai_clients.py / text_utils.py Client-Instanzen, KI-Antworten aufbereiten
 frontend/                  React-SPA (Vite) - einzige Oberfläche
   src/pages/                   je eine Komponente pro Seite (Home, Jobs, Customers, Users, Tools, Resumes, Login, Register)
-  src/components/              JobForm/-Table, CustomerForm/-Table, UserForm/-Table, JobUploadDropzone, Pager, RichTextEditor (Quill), ConfirmProvider (Lösch-Bestätigungsmodal)
+  src/components/              JobForm/-Table, CustomerForm/-Table, UserForm/-Table, JobUploadDropzone, Pager, RichTextEditor (Quill), ConfirmProvider (Lösch-Bestätigungsmodal), DetailHeader (Kopf der Detailseiten), TailorResumePanel (Lebenslauf zuschneiden)
+  src/config.js                Zentrale Einstellungen (Einträge pro Seite)
 embeddings.py              Embedding-Erzeugung, HTML-Stripping, Ähnlichkeits-Matching
 document_extraction.py     Textextraktion aus PDF/.docx/.odt-Uploads
 backfill_embeddings.py     Einmaliges Nachrechnen fehlender Embeddings
@@ -174,7 +209,8 @@ Es gibt bewusst keinen automatischen Bootstrap-Admin: Jede Registrierung über `
 `frontend/` ist ein eigenständiges Vite-Projekt (Port 5173), das ausschließlich die JSON-API unter `api/` anspricht (CORS via `FRONTEND_ORIGIN`) und dieselbe Flask-Session/Business-Logik in `services/` nutzt.
 
 Erwähnenswerte Details:
-- **`/api/users`** entfernt `password_hash` aus jeder Antwort.
+- **`/api/users`** entfernt `password_hash` aus jeder Antwort, bei den Lebensläufen im Nutzerprofil zusätzlich `embedding`/`content`.
+- **`/api/jobs`** entfernt `embedding` (Liste und Einzelansicht) — die Liste mit 10 Einträgen schrumpfte dadurch von ca. 341 KB auf ca. 10 KB.
 - **`/api/resumes`** entfernt `embedding`/`content`; die PDF-Auslieferung läuft über die eigene, besitzerschaftsgeprüfte Datei-Route `/resumes/<id>/file` (kein CORS nötig, da nur per `<iframe>`/`<a href>` eingebunden, nicht per `fetch()`).
 - **Login/Registrieren/Abmelden**: eigene React-Formulare rufen `/api/auth/login` bzw. `/register` auf; `App.jsx` reicht `refreshUser()` per Outlet-Context an die Seiten weiter. Abmelden läuft im Konto-Menü als Button (`POST /api/auth/logout`), ohne Seitenwechsel.
 - **Lösch-Bestätigung**: `ConfirmProvider`/`useConfirm()` (`src/components/ConfirmProvider.jsx`) ersetzt `window.confirm()` durch ein Modal im Look der restlichen Oberfläche; einmal in `App.jsx` um die ganze App gelegt.
@@ -192,4 +228,4 @@ docker compose exec app python migrate_mysql_to_postgres.py
 
 Neue Modelle in `services/assistant_service.py` ergänzen: Eintrag in `AVAILABLE_MODELS`, `AVAILABE_MODEL_NAMES` und `MODEL_CLIENTS`. Ohne `GROQ_API_KEY` werden neue Groq-Modelle automatisch ausgeblendet.
 
-Neue React-Seiten tauchen **nicht** automatisch im System-Prompt auf — dafür in `app.py` einen Eintrag in `REACT_PAGES` (Pfad + Kurzbeschreibung) ergänzen; `build_site_map()` baut daraus die Seitenliste, die der KI-Assistent bei jeder Anfrage als Systemkontext bekommt.
+Neue React-Seiten tauchen **nicht** automatisch im System-Prompt auf — dafür in `app.py` einen Eintrag in `REACT_PAGES` (Pfad + Kurzbeschreibung) ergänzen; `build_site_map()` baut daraus die Seitenliste, die der KI-Assistent bei jeder Anfrage als Systemkontext bekommt. Das gilt auch für neue Funktionen auf bestehenden Seiten (z.B. „Lebenslauf anpassen“ auf der Stellen-Detailseite oder die Matching-Markierungen in der Stellenliste): Der Assistent kennt nur, was in der Beschreibung der jeweiligen Seite steht, und verneint sonst, dass es die Funktion gibt.
