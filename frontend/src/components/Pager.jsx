@@ -39,20 +39,24 @@ export default function Pager({
                     </span>
                 )}
             </div>
-            <div className="pager-per-page">
-                <label htmlFor="per_page">Einträge pro Seite</label>
-                <select
-                    id="per_page"
-                    value={perPage}
-                    onChange={(e) => onPerPageChange(Number(e.target.value))}
-                >
-                    {perPageOptions.map((opt) => (
-                        <option key={opt} value={opt}>
-                            {opt}
-                        </option>
-                    ))}
-                </select>
-            </div>
+            {/* Ohne onPerPageChange (z. B. kompakter Pager in der Seitenspalte)
+                entfällt die Auswahl "Einträge pro Seite". */}
+            {onPerPageChange && (
+                <div className="pager-per-page">
+                    <label htmlFor="per_page">Einträge pro Seite</label>
+                    <select
+                        id="per_page"
+                        value={perPage}
+                        onChange={(e) => onPerPageChange(Number(e.target.value))}
+                    >
+                        {perPageOptions.map((opt) => (
+                            <option key={opt} value={opt}>
+                                {opt}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            )}
         </div>
     )
 }

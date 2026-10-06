@@ -5,6 +5,7 @@ import CustomerForm from '../components/CustomerForm'
 import CustomerTable from '../components/CustomerTable'
 import Pager from '../components/Pager'
 import { useConfirm } from '../components/ConfirmProvider'
+import { DEFAULT_PER_PAGE } from '../config'
 
 export default function CustomersPage() {
     const { user } = useOutletContext()
@@ -12,7 +13,7 @@ export default function CustomersPage() {
     const confirm = useConfirm()
     const [data, setData] = useState(null)
     const [page, setPage] = useState(1)
-    const [perPage, setPerPage] = useState(10)
+    const [perPage, setPerPage] = useState(DEFAULT_PER_PAGE)
     const [error, setError] = useState('')
     const [search, setSearch] = useState('')
     const [debouncedSearch, setDebouncedSearch] = useState('')

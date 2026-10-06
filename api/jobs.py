@@ -26,14 +26,16 @@ def _serialize_dates(row):
 
 def _paginate(customer_id=None, search=None):
     per_page = request.args.get("per_page", type=int)
-    if per_page not in JOBS_PER_PAGE_OPTIONS:
+    # Jeder Wert bis zur größten Option ist erlaubt (z. B. SIDE_PANEL_PER_PAGE aus
+    # frontend/src/config.js), die Optionen sind nur die Auswahl im Pager.
+    if per_page is None or not 1 <= per_page <= max(JOBS_PER_PAGE_OPTIONS):
         per_page = JOBS_PER_PAGE_DEFAULT
     total = db.count_jobs(customer_id, search=search)
     total_pages = max((total + per_page - 1) // per_page, 1)
     page = max(request.args.get("page", type=int) or 1, 1)
     page = min(page, total_pages)
     jobs_list = db.list_jobs(customer_id, limit=per_page, offset=(page - 1) * per_page, search=search)
-    return jobs_list, page, per_page, total_pages
+    return jobs_list, page, per_page, total_pages, total
 
 
 @jobs_api.route("", methods=["GET"])
@@ -66,7 +68,7 @@ def list_jobs():
     """
     customer_id = request.args.get("customer_id", type=int)
     search = (request.args.get("search") or "").strip()
-    jobs_list, page, per_page, total_pages = _paginate(customer_id, search)
+    jobs_list, page, per_page, total_pages, total = _paginate(customer_id, search)
     permission = job_management_permission()
     own_customer = own_customer_for_session()
     return jsonify(
@@ -74,6 +76,7 @@ def list_jobs():
         page=page,
         per_page=per_page,
         total_pages=total_pages,
+        total=total,
         per_page_options=JOBS_PER_PAGE_OPTIONS,
         customers=[_serialize_dates(dict(c)) for c in db.list_customers()],
         own_customer=_serialize_dates(dict(own_customer)) if own_customer else None,

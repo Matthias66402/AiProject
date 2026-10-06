@@ -21,7 +21,9 @@ def _serialize_dates(row):
 
 def _paginate(search=None):
     per_page = request.args.get("per_page", type=int)
-    if per_page not in CUSTOMERS_PER_PAGE_OPTIONS:
+    # Jeder Wert bis zur größten Option ist erlaubt (vgl. frontend/src/config.js),
+    # die Optionen sind nur die Auswahl im Pager.
+    if per_page is None or not 1 <= per_page <= max(CUSTOMERS_PER_PAGE_OPTIONS):
         per_page = CUSTOMERS_PER_PAGE_DEFAULT
     total = db.count_customers(search=search)
     total_pages = max((total + per_page - 1) // per_page, 1)

@@ -5,13 +5,14 @@ import Pager from '../components/Pager'
 import JobTable from '../components/JobTable'
 import JobForm from '../components/JobForm'
 import { useConfirm } from '../components/ConfirmProvider'
+import { DEFAULT_PER_PAGE } from '../config'
 
 export default function JobsPage() {
     const { user } = useOutletContext()
     const confirm = useConfirm()
     const [data, setData] = useState(null)
     const [page, setPage] = useState(1)
-    const [perPage, setPerPage] = useState(10)
+    const [perPage, setPerPage] = useState(DEFAULT_PER_PAGE)
     const [error, setError] = useState('')
     const [search, setSearch] = useState('')
     const [debouncedSearch, setDebouncedSearch] = useState('')

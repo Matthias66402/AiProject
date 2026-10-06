@@ -95,23 +95,25 @@ export default function JobForm({
                     <p>{ownCustomerName || '-'}</p>
                 )}
             </div>
-            <div>
-                <label htmlFor="zip">PLZ</label>
-                <input
-                    id="zip"
-                    type="text"
-                    value={values.zip}
-                    onChange={(e) => set('zip', e.target.value)}
-                />
-            </div>
-            <div>
-                <label htmlFor="city">Stadt</label>
-                <input
-                    id="city"
-                    type="text"
-                    value={values.city}
-                    onChange={(e) => set('city', e.target.value)}
-                />
+            <div className="form-grid">
+                <div>
+                    <label htmlFor="zip">PLZ</label>
+                    <input
+                        id="zip"
+                        type="text"
+                        value={values.zip}
+                        onChange={(e) => set('zip', e.target.value)}
+                    />
+                </div>
+                <div>
+                    <label htmlFor="city">Stadt</label>
+                    <input
+                        id="city"
+                        type="text"
+                        value={values.city}
+                        onChange={(e) => set('city', e.target.value)}
+                    />
+                </div>
             </div>
             {values.document_link && (
                 <div>
@@ -134,23 +136,25 @@ export default function JobForm({
                     onChange={(html) => set('content', html)}
                 />
             </div>
-            <div>
-                <label htmlFor="valid_from">Gültig von</label>
-                <input
-                    id="valid_from"
-                    type="date"
-                    value={values.valid_from || ''}
-                    onChange={(e) => set('valid_from', e.target.value)}
-                />
-            </div>
-            <div>
-                <label htmlFor="valid_until">Gültig bis</label>
-                <input
-                    id="valid_until"
-                    type="date"
-                    value={values.valid_until || ''}
-                    onChange={(e) => set('valid_until', e.target.value)}
-                />
+            <div className="form-grid">
+                <div>
+                    <label htmlFor="valid_from">Gültig von</label>
+                    <input
+                        id="valid_from"
+                        type="date"
+                        value={values.valid_from || ''}
+                        onChange={(e) => set('valid_from', e.target.value)}
+                    />
+                </div>
+                <div>
+                    <label htmlFor="valid_until">Gültig bis</label>
+                    <input
+                        id="valid_until"
+                        type="date"
+                        value={values.valid_until || ''}
+                        onChange={(e) => set('valid_until', e.target.value)}
+                    />
+                </div>
             </div>
             <button className="subtle-btn" type="submit" disabled={saving}>
                 {submitLabel}

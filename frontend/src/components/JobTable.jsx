@@ -11,12 +11,12 @@ function parseIsoDate(iso) {
     return new Date(y, m - 1, d)
 }
 
-function formatDate(iso) {
+export function formatDate(iso) {
     const date = parseIsoDate(iso)
     return date ? date.toLocaleDateString('de-DE') : '-'
 }
 
-function jobStatus(job) {
+export function jobStatus(job) {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const from = parseIsoDate(job.valid_from)
