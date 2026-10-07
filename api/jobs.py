@@ -81,17 +81,18 @@ def list_jobs():
         in: query
         type: integer
         enum: [0, 1]
-        description: Nur für Rolle customer - 1 = nur Stellen mit mindestens einem passenden Stellensuchenden (ab Schwellwert); zusammen mit customer_id für die eigenen Stellen.
+        description: Nur für Rollen admin und customer - 1 = nur Stellen mit mindestens einem passenden Stellensuchenden (ab Schwellwert); bei customer zusammen mit customer_id für die eigenen Stellen.
     responses:
       200:
-        description: Stellenangebote der aktuellen Seite plus Pagination-Metadaten; für Rolle user je Stelle my_match (beste Ähnlichkeit eines eigenen Lebenslaufs ab Schwellwert, sonst null), für Rolle customer bei eigenen Stellen match_count (Anzahl passender Stellensuchender).
+        description: Stellenangebote der aktuellen Seite plus Pagination-Metadaten; für Rolle user je Stelle my_match (beste Ähnlichkeit eines eigenen Lebenslaufs ab Schwellwert, sonst null), für Rolle customer bei eigenen Stellen und für Admins bei allen Stellen match_count (Anzahl passender Stellensuchender).
     """
     customer_id = request.args.get("customer_id", type=int)
     search = (request.args.get("search") or "").strip()
     matching_user_id = None
     if request.args.get("matching") == "1" and session.get("user_role") == "user":
         matching_user_id = session.get("user_id")
-    with_candidates = request.args.get("with_candidates") == "1" and session.get("user_role") == "customer"
+    with_candidates = (request.args.get("with_candidates") == "1"
+                       and session.get("user_role") in ("admin", "customer"))
     jobs_list, page, per_page, total_pages, total = _paginate(customer_id, search, matching_user_id, with_candidates)
     permission = job_management_permission()
     own_customer = own_customer_for_session()
@@ -103,12 +104,14 @@ def list_jobs():
         for job in jobs_out:
             job["my_match"] = matches.get(job["id"])
     # Rolle 'customer': bei den eigenen Stellen die Anzahl passender
-    # Stellensuchender (match_count, fremde Stellen bleiben ohne).
-    elif session.get("user_role") == "customer" and isinstance(permission, int):
-        own_ids = [job["id"] for job in jobs_out if job["customer_id"] == permission]
-        counts = db.job_match_counts(own_ids)
+    # Stellensuchender (match_count, fremde Stellen bleiben ohne); Admins bei
+    # allen Stellen.
+    elif (session.get("user_role") == "customer" and isinstance(permission, int)) or permission == "admin":
+        counted_ids = [job["id"] for job in jobs_out
+                       if permission == "admin" or job["customer_id"] == permission]
+        counts = db.job_match_counts(counted_ids)
         for job in jobs_out:
-            if job["id"] in own_ids:
+            if job["id"] in counted_ids:
                 job["match_count"] = counts.get(job["id"], 0)
     return jsonify(
         jobs=jobs_out,

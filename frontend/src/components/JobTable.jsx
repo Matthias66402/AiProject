@@ -61,7 +61,8 @@ export default function JobTable({
                                 job.customer_id === currentCustomerId)
                         const status = jobStatus(job)
                         // my_match: Rolle 'user', match_count: Rolle 'customer'
-                        // bei eigenen Stellen (beides aus api/jobs.py, list_jobs).
+                        // bei eigenen Stellen, Admins bei allen (beides aus
+                        // api/jobs.py, list_jobs).
                         const hasMatch =
                             job.my_match != null || job.match_count > 0
                         return (

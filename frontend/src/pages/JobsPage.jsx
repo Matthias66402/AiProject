@@ -26,9 +26,10 @@ export default function JobsPage() {
 
     // Filter 'Anzeigen' je Rolle: 'own' (customer) = nur Stellen des eigenen
     // Stellenanbieters, 'own_matching' (customer) = davon nur die mit mind.
-    // einer passenden Person, 'matching' (user) = nur Stellen, zu denen ein eigener
-    // Lebenslauf passt. Steht in der URL (?scope=...), damit z.B. der Eintrag
-    // 'Stellenangebote' im Konto-Menü direkt gefiltert öffnen kann, der
+    // einer passenden Person, 'with_candidates' (admin) = alle Stellen mit mind.
+    // einer passenden Person, 'matching' (user) = nur Stellen, zu denen ein
+    // eigener Lebenslauf passt. Steht in der URL (?scope=...), damit z.B. der
+    // Eintrag 'Stellenangebote' im Konto-Menü direkt gefiltert öffnen kann, der
     // Hauptmenü-Reiter dagegen alle.
     const scopeOptions = isCustomerUser
         ? [
@@ -38,9 +39,11 @@ export default function JobsPage() {
                   'Eigene Stellenangebote mit passenden Kandidaten',
               ],
           ]
-        : isJobSeeker
-          ? [['matching', 'Passende Stellenangebote']]
-          : []
+        : isAdmin
+          ? [['with_candidates', 'Stellenangebote mit passenden Kandidaten']]
+          : isJobSeeker
+            ? [['matching', 'Passende Stellenangebote']]
+            : []
     const [searchParams, setSearchParams] = useSearchParams()
     const requestedScope = searchParams.get('scope')
     const scope = scopeOptions.some(([value]) => value === requestedScope)
@@ -71,7 +74,8 @@ export default function JobsPage() {
         if (debouncedSearch) params.set('search', debouncedSearch)
         if (scope === 'own' || scope === 'own_matching')
             params.set('customer_id', String(user.customer_id))
-        if (scope === 'own_matching') params.set('with_candidates', '1')
+        if (scope === 'own_matching' || scope === 'with_candidates')
+            params.set('with_candidates', '1')
         if (scope === 'matching') params.set('matching', '1')
         apiGet(`/api/jobs?${params.toString()}`)
             .then(setData)
