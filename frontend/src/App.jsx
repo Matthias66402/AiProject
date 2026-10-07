@@ -136,21 +136,47 @@ export default function App() {
                                 {user ? (
                                     <>
                                         {user.role === 'user' && (
-                                            <Link
-                                                to="/resumes"
-                                                className={navClass(
-                                                    location.pathname ===
-                                                        '/resumes',
-                                                )}
-                                                onClick={() => {
-                                                    if (accountMenuRef.current)
-                                                        accountMenuRef.current.open = false
-                                                }}
-                                            >
-                                                <i className="fa-solid fa-file-lines text-[#76A250]" />{' '}
-                                                Lebenslauf
-                                            </Link>
+                                            <>
+                                                <Link
+                                                    to="/resumes"
+                                                    className={navClass(
+                                                        location.pathname ===
+                                                            '/resumes',
+                                                    )}
+                                                    onClick={() => {
+                                                        if (accountMenuRef.current)
+                                                            accountMenuRef.current.open = false
+                                                    }}
+                                                >
+                                                    <i className="fa-solid fa-file-lines text-[#76A250]" />{' '}
+                                                    Lebenslauf
+                                                </Link>
+                                                <hr className="nav-dropdown-divider" />
+                                            </>
                                         )}
+                                        {user.role === 'customer' &&
+                                            user.customer_id && (
+                                                <>
+                                                    <Link
+                                                        to="/jobs?scope=own"
+                                                        className={navClass(
+                                                            location.pathname ===
+                                                                '/jobs' &&
+                                                                location.search.includes(
+                                                                    'scope=own',
+                                                                ),
+                                                        )}
+                                                        onClick={() => {
+                                                            if (accountMenuRef.current)
+                                                                accountMenuRef.current.open = false
+                                                        }}
+                                                    >
+                                                        <i className="fa-solid fa-briefcase text-[#76A250]" />{' '}
+                                                        Stellenangebote
+                                                    </Link>
+                                                    <hr className="nav-dropdown-divider" />
+                                                </>
+                                            )}
                                         {/* Tools (nur Testdaten-Generierung) bewusst im
                                             Konto-Menü statt als eigener Reiter - sie
                                             gehören nicht zum eigentlichen Produkt. */}

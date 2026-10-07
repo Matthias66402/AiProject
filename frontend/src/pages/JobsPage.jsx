@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useOutletContext } from 'react-router-dom'
+import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { apiDelete, apiGet, apiPost } from '../api/client'
 import Pager from '../components/Pager'
 import JobTable from '../components/JobTable'
@@ -17,6 +17,11 @@ export default function JobsPage() {
     const [search, setSearch] = useState('')
     const [debouncedSearch, setDebouncedSearch] = useState('')
     const [stats, setStats] = useState(null)
+    // Nur Rolle 'customer': 'own' = nur Stellen des eigenen Stellenanbieters.
+    // Steht in der URL (?scope=own), damit der Eintrag 'Stellenangebote' im
+    // Konto-Menü direkt gefiltert öffnen kann, der Hauptmenü-Reiter dagegen alle.
+    const [searchParams, setSearchParams] = useSearchParams()
+    const scope = searchParams.get('scope') === 'own' ? 'own' : 'all'
 
     const isAdmin = user?.role === 'admin'
     const isCustomerUser = Boolean(
@@ -35,16 +40,23 @@ export default function JobsPage() {
         return () => clearTimeout(timer)
     }, [search])
 
+    // Filterwechsel (Auswahl oder Menü-Link) -> zurück auf Seite 1
+    useEffect(() => {
+        setPage(1)
+    }, [scope])
+
     const load = useCallback(() => {
         const params = new URLSearchParams({
             page: String(page),
             per_page: String(perPage),
         })
         if (debouncedSearch) params.set('search', debouncedSearch)
+        if (isCustomerUser && scope === 'own')
+            params.set('customer_id', String(user.customer_id))
         apiGet(`/api/jobs?${params.toString()}`)
             .then(setData)
             .catch((err) => setError(err.message))
-    }, [page, perPage, debouncedSearch])
+    }, [page, perPage, debouncedSearch, isCustomerUser, scope, user])
 
     useEffect(() => {
         if (user === undefined) return
@@ -156,6 +168,7 @@ export default function JobsPage() {
 
             <form
                 onSubmit={(e) => e.preventDefault()}
+                className={isCustomerUser ? 'form-grid' : undefined}
                 style={{ marginBottom: '16px' }}
             >
                 <div>
@@ -168,6 +181,25 @@ export default function JobsPage() {
                         placeholder="z. B. Entwickler"
                     />
                 </div>
+                {isCustomerUser && (
+                    <div>
+                        <label htmlFor="job-scope">Anzeigen</label>
+                        <select
+                            id="job-scope"
+                            value={scope}
+                            onChange={(e) => {
+                                setSearchParams(
+                                    e.target.value === 'own'
+                                        ? { scope: 'own' }
+                                        : {},
+                                )
+                            }}
+                        >
+                            <option value="all">Alle Stellenangebote</option>
+                            <option value="own">Eigene Stellenangebote</option>
+                        </select>
+                    </div>
+                )}
             </form>
 
             <JobTable
