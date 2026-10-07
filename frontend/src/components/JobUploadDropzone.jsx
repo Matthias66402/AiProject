@@ -76,8 +76,8 @@ export default function JobUploadDropzone({ onExtracted }) {
                         'Stellenangebot-Dokument hierher ziehen oder klicken zum Auswählen'}
                 </span>
                 <span className="dropzone-hint">
-                    PDF, .docx oder .odt · befüllt Position, PLZ, Stadt und
-                    Beschreibung automatisch
+                    PDF, .docx oder .odt · befüllt Position, PLZ, Stadt,
+                    Beschreibung und Gültigkeit automatisch
                 </span>
             </label>
             <div className={`generating-indicator${busy ? ' visible' : ''}`}>

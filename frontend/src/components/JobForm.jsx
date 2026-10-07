@@ -36,6 +36,8 @@ export default function JobForm({
             zip: data.zip || v.zip,
             city: data.city || v.city,
             content: data.content || v.content,
+            valid_from: data.valid_from || v.valid_from,
+            valid_until: data.valid_until || v.valid_until,
             document_link: data.document_link || v.document_link,
         }))
     }

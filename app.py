@@ -159,7 +159,7 @@ def view_resume(filename):
 @app.route('/jobs/extract-upload', methods=["POST"])
 def extract_job_upload():
     """Liest ein hochgeladenes Stellenangebot-Dokument (PDF/.docx/.odt) aus und lässt
-    per KI eine Zusammenfassung sowie ggf. Position/PLZ/Stadt daraus extrahieren, zur
+    per KI eine Zusammenfassung sowie ggf. Position/PLZ/Stadt und Gültig von/bis daraus extrahieren, zur
     Vorbefüllung des 'Stelle anlegen'-Formulars. Legt selbst noch keine Stelle an."""
     if not job_management_permission():
         return jsonify(error="Nicht berechtigt."), 403
@@ -200,6 +200,8 @@ def extract_job_upload():
         zip=(data.get("zip") or "").strip(),
         city=(data.get("city") or "").strip(),
         content=(data.get("content") or "").strip(),
+        valid_from=data["valid_from"],
+        valid_until=data["valid_until"],
         document_link=url_for('view_joboffer', filename=filename),
     )
 

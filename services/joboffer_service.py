@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from flask import url_for
 
@@ -15,8 +15,9 @@ JOBOFFER_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__fi
 
 def extract_joboffer_from_text(openai_client, model, document_text):
     """Lässt die KI den Text eines hochgeladenen Stellenangebot-Dokuments zusammenfassen
-    und, falls eindeutig erkennbar, Position/PLZ/Stadt extrahieren. Gibt das geparste
-    JSON-Dict zurück. Lässt GroqAPIStatusError/OpenAIAPIStatusError sowie
+    und, falls eindeutig erkennbar, Position/PLZ/Stadt sowie den Gültigkeitszeitraum
+    (valid_from/valid_until) extrahieren. Gibt das geparste JSON-Dict zurück, die
+    Datumsfelder bereits geprüft als YYYY-MM-DD oder "". Lässt GroqAPIStatusError/OpenAIAPIStatusError sowie
     json.JSONDecodeError/ValueError (bei unerwartetem Antwortformat) zum Aufrufer durch."""
     response = openai_client.chat.completions.create(
         model=model,
@@ -25,11 +26,16 @@ def extract_joboffer_from_text(openai_client, model, document_text):
             {"role": "system", "content": (
                 "Du erhältst den Text eines Stellenangebots.\n\n"
                 "Fasse die Stellenbeschreibung sinnvoll zusammen.\n"
-                "Extrahiere, falls im Text eindeutig erkennbar: Position, PLZ, Stadt. Erfinde nichts hinzu.\n"
+                "Extrahiere, falls im Text eindeutig erkennbar: Position, PLZ, Stadt sowie den "
+                "Gültigkeitszeitraum der Ausschreibung. Erfinde nichts hinzu.\n"
+                f"Heutiges Datum (für Angaben ohne Jahreszahl): {date.today().isoformat()}\n"
                 "Antworte nur mit einem JSON-Objekt mit genau diesen Feldern:\n"
                 "\"position\": kurze Stellenbezeichnung als Text, sonst \"\"\n"
                 "\"zip\": Postleitzahl des Arbeitsortes als Text, sonst \"\"\n"
                 "\"city\": Stadt des Arbeitsortes als Text, sonst \"\"\n"
+                "\"valid_from\": Veröffentlichungs-/Ausschreibungsdatum als YYYY-MM-DD, sonst \"\"\n"
+                "\"valid_until\": Bewerbungsfrist bzw. Ende der Ausschreibung als YYYY-MM-DD, sonst \"\" "
+                "(nicht das Ende einer Befristung des Arbeitsverhältnisses, nicht das Eintrittsdatum)\n"
                 f"\"content\": gekürzte Zusammenfassung als HTML mit Überschriften/Aufzählungen ({SIMPLE_HTML_RULE}).\n"
                 "Keine zusätzliche Ausgabe außerhalb dieses JSON."
             )},
@@ -38,7 +44,20 @@ def extract_joboffer_from_text(openai_client, model, document_text):
     )
     log_token_usage("joboffer_extract", model, response)
     raw = clean_ai_response(response.choices[0].message.content)
-    return json.loads(raw)
+    data = json.loads(raw)
+    for field in ("valid_from", "valid_until"):
+        data[field] = _iso_date_or_empty(data.get(field))
+    if data["valid_from"] and data["valid_until"] and data["valid_from"] > data["valid_until"]:
+        data["valid_from"] = ""
+    return data
+
+
+def _iso_date_or_empty(value):
+    """Datumsangabe der KI prüfen: gültiges YYYY-MM-DD bleibt, alles andere wird ""."""
+    try:
+        return date.fromisoformat(str(value or "").strip()).isoformat()
+    except ValueError:
+        return ""
 
 
 def generate_joboffer(openai_client, model, customer_id, spec, logger=None):
