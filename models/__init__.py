@@ -1,5 +1,5 @@
 from models.base import Base, MIN_MATCH_SIMILARITY
-from models.user import User, ROLES, DEFAULT_ROLE, list_users, get_user, get_user_by_email, create_user, update_user
+from models.user import User, ROLES, DEFAULT_ROLE, list_users, get_user, get_user_by_email, create_user, update_user, update_user_role
 from models.customer import (
     Customer,
     list_customers,

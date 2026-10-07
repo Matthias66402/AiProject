@@ -187,6 +187,19 @@ export default function App() {
                                                 <hr className="nav-dropdown-divider" />
                                             </>
                                         )}
+                                        <Link
+                                            to="/profile"
+                                            className={navClass(
+                                                location.pathname === '/profile',
+                                            )}
+                                            onClick={() => {
+                                                if (accountMenuRef.current)
+                                                    accountMenuRef.current.open = false
+                                            }}
+                                        >
+                                            <i className="fa-solid fa-user-pen text-[#76A250]" />{' '}
+                                            Einstellungen
+                                        </Link>
                                         <button
                                             type="button"
                                             className="nav-menu-item"

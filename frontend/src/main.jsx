@@ -39,6 +39,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                         element={<ToolJobofferPage />}
                     />
                     <Route path="resumes" element={<MyResumesPage />} />
+                    <Route path="profile" element={<UserEditPage />} />
                     <Route path="login" element={<LoginPage />} />
                     <Route path="register" element={<RegisterPage />} />
                 </Route>

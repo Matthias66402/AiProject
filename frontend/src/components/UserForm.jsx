@@ -10,6 +10,12 @@ export default function UserForm({
     onSubmit,
     submitLabel,
     cancelTo,
+    // Fremder Nutzer-Eintrag: nur Rolle (inkl. Stellenanbieter) änderbar,
+    // Stammdaten schreibgeschützt, kein Passwortfeld.
+    roleOnly = false,
+    // Eigenes Profil (Konto-Menü -> 'Bearbeiten'): Rolle und Stellenanbieter
+    // weder sichtbar noch änderbar, werden auch nicht mitgeschickt.
+    hideRole = false,
 }) {
     const isEdit = Boolean(initial)
     const [values, setValues] = useState({
@@ -35,7 +41,12 @@ export default function UserForm({
         setSaving(true)
         setError('')
         try {
-            await onSubmit(values)
+            if (hideRole) {
+                const { role, customer_id, ...rest } = values
+                await onSubmit(rest)
+            } else {
+                await onSubmit(values)
+            }
         } catch (err) {
             setError(err.message)
         } finally {
@@ -54,6 +65,7 @@ export default function UserForm({
                         type="text"
                         value={values.first_name}
                         onChange={(e) => set('first_name', e.target.value)}
+                        readOnly={roleOnly}
                         required
                     />
                 </div>
@@ -64,6 +76,7 @@ export default function UserForm({
                         type="text"
                         value={values.last_name}
                         onChange={(e) => set('last_name', e.target.value)}
+                        readOnly={roleOnly}
                         required
                     />
                 </div>
@@ -74,6 +87,7 @@ export default function UserForm({
                         type="text"
                         value={values.short_name}
                         onChange={(e) => set('short_name', e.target.value)}
+                        readOnly={roleOnly}
                         required
                     />
                 </div>
@@ -84,6 +98,7 @@ export default function UserForm({
                         type="email"
                         value={values.email}
                         onChange={(e) => set('email', e.target.value)}
+                        readOnly={roleOnly}
                         required
                     />
                 </div>
@@ -94,6 +109,7 @@ export default function UserForm({
                         type="text"
                         value={values.zip}
                         onChange={(e) => set('zip', e.target.value)}
+                        readOnly={roleOnly}
                     />
                 </div>
                 <div>
@@ -103,23 +119,26 @@ export default function UserForm({
                         type="text"
                         value={values.city}
                         onChange={(e) => set('city', e.target.value)}
+                        readOnly={roleOnly}
                     />
                 </div>
-                <div>
-                    <label htmlFor="role">Rolle</label>
-                    <select
-                        id="role"
-                        value={values.role}
-                        onChange={(e) => set('role', e.target.value)}
-                    >
-                        {roles.map((role) => (
-                            <option key={role} value={role}>
-                                {role}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-                {values.role === 'customer' && (
+                {!hideRole && (
+                    <div>
+                        <label htmlFor="role">Rolle</label>
+                        <select
+                            id="role"
+                            value={values.role}
+                            onChange={(e) => set('role', e.target.value)}
+                        >
+                            {roles.map((role) => (
+                                <option key={role} value={role}>
+                                    {role}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+                {!hideRole && values.role === 'customer' && (
                     <div>
                         <label htmlFor="customer_id">Stellenanbieter</label>
                         <select
@@ -160,18 +179,20 @@ export default function UserForm({
                     </ul>
                 </div>
             )}
-            <div>
-                <label htmlFor="password">
-                    {isEdit ? 'Neues Passwort (optional)' : 'Passwort'}
-                </label>
-                <input
-                    id="password"
-                    type="password"
-                    value={values.password}
-                    onChange={(e) => set('password', e.target.value)}
-                    required={!isEdit}
-                />
-            </div>
+            {!roleOnly && (
+                <div>
+                    <label htmlFor="password">
+                        {isEdit ? 'Neues Passwort (optional)' : 'Passwort'}
+                    </label>
+                    <input
+                        id="password"
+                        type="password"
+                        value={values.password}
+                        onChange={(e) => set('password', e.target.value)}
+                        required={!isEdit}
+                    />
+                </div>
+            )}
             <div className="form-actions">
                 <button
                     className={isEdit ? 'subtle-btn' : 'special-btn'}

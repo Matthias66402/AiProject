@@ -64,3 +64,14 @@ def update_user(user_id, first_name, last_name, short_name, email, role, passwor
         user.zip = zip_code
         user.city = city
         user.customer_id = customer_id
+
+
+def update_user_role(user_id, role, customer_id=None):
+    """Nur Rolle (und die daran hängende Stellenanbieter-Zuordnung) ändern - für
+    Admins, die fremde Nutzer bearbeiten; alle übrigen Felder bleiben unberührt."""
+    with get_session() as session:
+        user = session.get(User, user_id)
+        if user is None:
+            return
+        user.role = role
+        user.customer_id = customer_id

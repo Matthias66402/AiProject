@@ -39,6 +39,11 @@ def _is_admin():
     return session.get("user_role") == "admin"
 
 
+def _is_self(user_id):
+    """True, wenn user_id der eingeloggte Nutzer selbst ist (eigenes Profil)."""
+    return session.get("user_id") is not None and session.get("user_id") == user_id
+
+
 @users_api.route("", methods=["GET"])
 def list_users():
     """Alle Nutzer auflisten (Admins und 'customer'-Nutzer).
@@ -130,7 +135,8 @@ def create_user():
 
 @users_api.route("/<int:user_id>", methods=["GET"])
 def get_user(user_id):
-    """Einen Nutzer ansehen, inkl. dessen Lebensläufen (Admins und 'customer'-Nutzer).
+    """Einen Nutzer ansehen, inkl. dessen Lebensläufen (Admins und 'customer'-Nutzer,
+    außerdem jeder eingeloggte Nutzer sich selbst).
     ---
     tags:
       - Users
@@ -153,7 +159,7 @@ def get_user(user_id):
         schema:
           $ref: '#/definitions/ErrorResponse'
     """
-    if not user_read_permission():
+    if not (user_read_permission() or _is_self(user_id)):
         return jsonify(error="Nicht berechtigt - Bitte kontaktieren Sie uns für weitere Informationen."), 403
 
     user = db.get_user(user_id)
@@ -168,7 +174,12 @@ def get_user(user_id):
 
 @users_api.route("/<int:user_id>", methods=["PUT"])
 def update_user(user_id):
-    """Nutzer bearbeiten, inkl. Rollenvergabe (nur Admins).
+    """Nutzer bearbeiten: jeder eingeloggte Nutzer sich selbst, Admins zusätzlich
+    die Rolle fremder Nutzer.
+
+    Eigener Eintrag: alle Felder inkl. Passwort; role/customer_id aber nur bei
+    Admins und nur, wenn mitgeschickt (sonst bleiben sie unverändert). Fremde
+    Nutzer (nur Admins): nur role und customer_id, der Rest wird ignoriert.
     ---
     tags:
       - Users
@@ -208,28 +219,57 @@ def update_user(user_id):
         description: Nicht berechtigt.
         schema:
           $ref: '#/definitions/ErrorResponse'
+      404:
+        description: Nicht gefunden.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
     """
-    if not _is_admin():
+    is_self = _is_self(user_id)
+    if not (is_self or _is_admin()):
         return jsonify(error="Nicht berechtigt."), 403
 
+    current = db.get_user(user_id)
+    if not current:
+        return jsonify(error="Nicht gefunden."), 404
+
     data = request.get_json(silent=True) or {}
+    # Rolle nur durch Admins und nur, wenn mitgeschickt - das eigene Profil
+    # (Konto-Menü -> 'Bearbeiten') zeigt keine Rolle an und schickt keine.
+    if _is_admin() and "role" in data:
+        role = data.get("role") or DEFAULT_ROLE
+        if role not in ROLES:
+            role = DEFAULT_ROLE
+        customer_id = data.get("customer_id") or None
+        if role != "customer":
+            customer_id = None
+    else:
+        role = current["role"]
+        customer_id = current["customer_id"]
+
+    # Fremde Nutzer: Admins dürfen nur Rolle (inkl. Stellenanbieter-Zuordnung)
+    # ändern, Stammdaten und Passwort nur beim eigenen Eintrag.
+    if not is_self:
+        db.update_user_role(user_id, role, customer_id)
+        return jsonify(success=True)
+
     first_name = (data.get("first_name") or "").strip()
     last_name = (data.get("last_name") or "").strip()
     short_name = (data.get("short_name") or "").strip()
     email = (data.get("email") or "").strip()
     password = data.get("password") or ""
-    role = data.get("role") or DEFAULT_ROLE
-    if role not in ROLES:
-        role = DEFAULT_ROLE
     password_hash = generate_password_hash(password) if password else None
     zip_code = (data.get("zip") or "").strip() or None
     city = (data.get("city") or "").strip() or None
-    customer_id = data.get("customer_id") or None
-    if role != "customer":
-        customer_id = None
 
     if not (first_name and last_name and short_name and email):
         return jsonify(error="Bitte alle Pflichtfelder ausfüllen."), 400
+    existing = db.get_user_by_email(email)
+    if existing and existing["id"] != user_id:
+        return jsonify(error="Diese E-Mail-Adresse ist bereits registriert."), 400
 
     db.update_user(user_id, first_name, last_name, short_name, email, role, password_hash, zip_code, city, customer_id)
+    # Kurzname/Rolle stecken auch in der Session (Anzeige im Konto-Menü).
+    session["user_short_name"] = short_name
+    session["user_role"] = role
+    session["user_customer_id"] = customer_id
     return jsonify(success=True)

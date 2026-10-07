@@ -11,10 +11,15 @@ import { formatDate } from '../components/JobTable'
 import UserForm from '../components/UserForm'
 
 export default function UserEditPage() {
-    const { user } = useOutletContext()
-    const { userId } = useParams()
+    const { user, refreshUser } = useOutletContext()
+    const params = useParams()
     const navigate = useNavigate()
+    // Ohne :userId = eigenes Profil (/profile, Konto-Menü -> 'Bearbeiten'):
+    // für jeden eingeloggten Nutzer editierbar, Rolle nicht sichtbar.
+    const isProfile = !params.userId
+    const userId = params.userId ?? user?.id
     const isAdmin = user?.role === 'admin'
+    const needsList = isAdmin && !isProfile
 
     const [listData, setListData] = useState(null)
     const [userDetail, setUserDetail] = useState(null)
@@ -24,13 +29,14 @@ export default function UserEditPage() {
         // Nur Admins duerfen/brauchen die Liste (fuer Rollen-/Kunden-Dropdown
         // im Bearbeiten-Formular) - fuer die schreibgeschuetzte Kandidatenansicht
         // (z.B. ueber "Passende Kandidaten" erreicht) unnoetig.
-        if (!isAdmin) return
+        if (!needsList) return
         apiGet('/api/users')
             .then(setListData)
             .catch((err) => setError(err.message))
-    }, [isAdmin])
+    }, [needsList])
 
     const loadUser = useCallback(() => {
+        if (!userId) return
         setUserDetail(null)
         apiGet(`/api/users/${userId}`)
             .then(setUserDetail)
@@ -47,11 +53,16 @@ export default function UserEditPage() {
 
     async function handleSave(values) {
         await apiPut(`/api/users/${userId}`, values)
-        navigate('/users')
+        // Kurzname im Konto-Menü aktualisieren
+        if (Number(userId) === user.id) await refreshUser()
+        if (isProfile) navigate(-1)
+        else navigate('/users')
     }
 
+    if (user === null)
+        return <p className="form-error">Bitte melden Sie sich an.</p>
     if (error) return <p className="form-error">{error}</p>
-    if (!userDetail || (isAdmin && !listData)) return <p>Lade …</p>
+    if (!userDetail || (needsList && !listData)) return <p>Lade …</p>
 
     const u = userDetail.user
     const resumes = userDetail.resumes
@@ -60,9 +71,9 @@ export default function UserEditPage() {
     return (
         <div className="detail-page">
             <DetailHeader
-                backTo={isAdmin ? '/users' : null}
-                onBack={isAdmin ? null : () => navigate(-1)}
-                backLabel={isAdmin ? 'Zurück zu Nutzer' : 'Zurück'}
+                backTo={needsList ? '/users' : null}
+                onBack={needsList ? null : () => navigate(-1)}
+                backLabel={needsList ? 'Zurück zu Nutzer' : 'Zurück'}
                 title={`${u.first_name} ${u.last_name}`}
                 meta={
                     <>
@@ -75,11 +86,15 @@ export default function UserEditPage() {
                                 {place}
                             </span>
                         )}
-                        <span className="status-chip planned">{u.role}</span>
+                        {!isProfile && (
+                            <span className="status-chip planned">
+                                {u.role}
+                            </span>
+                        )}
                     </>
                 }
                 actions={
-                    isAdmin && (
+                    needsList && (
                         <Link className="subtle-btn cancel" to="/users">
                             Abbrechen
                         </Link>
@@ -89,13 +104,15 @@ export default function UserEditPage() {
 
             <div className="detail-layout">
                 <section className="detail-card detail-main">
-                    <h2>Nutzerdaten</h2>
-                    {isAdmin ? (
+                    <h2>{isProfile ? 'Meine Daten' : 'Nutzerdaten'}</h2>
+                    {isProfile || isAdmin ? (
                         <UserForm
                             key={u.id}
-                            roles={listData.roles}
-                            customers={listData.customers}
+                            roles={listData?.roles ?? []}
+                            customers={listData?.customers ?? []}
                             initial={u}
+                            roleOnly={!isProfile && u.id !== user.id}
+                            hideRole={isProfile}
                             onSubmit={handleSave}
                             submitLabel="Speichern"
                         />

@@ -8,6 +8,7 @@ from models import (
     get_user_by_email,
     create_user,
     update_user,
+    update_user_role,
     list_customers,
     count_customers,
     get_customer,
