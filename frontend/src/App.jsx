@@ -151,6 +151,23 @@ export default function App() {
                                                     <i className="fa-solid fa-file-lines text-[#76A250]" />{' '}
                                                     Lebenslauf
                                                 </Link>
+                                                <Link
+                                                    to="/jobs?scope=matching"
+                                                    className={navClass(
+                                                        location.pathname ===
+                                                            '/jobs' &&
+                                                            location.search.includes(
+                                                                'scope=matching',
+                                                            ),
+                                                    )}
+                                                    onClick={() => {
+                                                        if (accountMenuRef.current)
+                                                            accountMenuRef.current.open = false
+                                                    }}
+                                                >
+                                                    <i className="fa-solid fa-briefcase text-[#76A250]" />{' '}
+                                                    Stellenangebote
+                                                </Link>
                                                 <hr className="nav-dropdown-divider" />
                                             </>
                                         )}

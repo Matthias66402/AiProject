@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
     Link,
     useNavigate,
@@ -6,6 +6,7 @@ import {
     useParams,
     useSearchParams,
 } from 'react-router-dom'
+import { createPortal } from 'react-dom'
 import DOMPurify from 'dompurify'
 import { API_BASE, apiDelete, apiGet, apiPost, apiPut } from '../api/client'
 import DetailHeader from '../components/DetailHeader'
@@ -234,25 +235,15 @@ export default function JobEditPage() {
                         )}
                     </section>
 
-                    {savedResume && (
-                        <section className="info-card tailor-saved">
-                            <i className="fa-solid fa-circle-check" />
-                            <p>
-                                Dein angepasster Lebenslauf wurde als neue
-                                Version gespeichert und zählt ab jetzt beim
-                                Matching für diese Stelle.{' '}
-                                <Link to="/resumes">Zu „Mein Lebenslauf“</Link>
-                            </p>
-                        </section>
-                    )}
-
-                    {draft && (
-                        <TailorDraftCard
+                    {(draft || savedResume) && (
+                        <TailorDraftModal
                             draft={draft}
+                            saved={Boolean(savedResume)}
                             saving={draftSaving}
                             error={draftError}
                             onAccept={handleAcceptDraft}
                             onDiscard={() => setDraft(null)}
+                            onClose={() => setSavedResume(null)}
                         />
                     )}
                 </div>
@@ -347,80 +338,212 @@ function formatPct(value) {
     return value == null ? '–' : `${(value * 100).toFixed(1)} %`
 }
 
-// Vorschau eines zugeschnittenen Lebenslaufs: Matching vorher/nachher, vom
-// Prüfschritt gemeldete unbelegte Angaben und der Entwurf selbst.
-function TailorDraftCard({ draft, saving, error, onAccept, onDiscard }) {
-    const bars = [
-        ['Vorher', draft.similarity_before],
-        ['Nachher', draft.similarity_after],
-    ]
-    return (
-        <section className="detail-card">
-            <h2>Entwurf: angepasster Lebenslauf</h2>
+// Vorschau eines zugeschnittenen Lebenslaufs als Popup: Matching vorher/
+// nachher, vom Prüfschritt gemeldete unbelegte Angaben und der Entwurf selbst,
+// nach dem Übernehmen die Erfolgsmeldung. Als Popup, weil der Button in der
+// Seitenspalte sitzt und ein Entwurf unter der (oft langen) Stellenbeschreibung
+// leicht übersehen wird. Kein Schließen per Klick auf den Hintergrund: der
+// Entwurf kostet einen KI-Aufruf - X/Escape fragen vorher nach.
+function TailorDraftModal({
+    draft,
+    saved,
+    saving,
+    error,
+    onAccept,
+    onDiscard,
+    onClose,
+}) {
+    const [askDiscard, setAskDiscard] = useState(false)
+    const dialogRef = useRef(null)
 
-            <div className="tailor-compare">
-                {bars.map(([label, value]) => (
-                    <div key={label} className="tailor-compare-row">
-                        <span className="tailor-compare-label">{label}</span>
-                        <span className="match-bar">
-                            <span style={{ width: `${(value || 0) * 100}%` }} />
-                        </span>
-                        <span className="tailor-compare-pct">
-                            {formatPct(value)}
-                        </span>
-                    </div>
-                ))}
-                <p className="side-panel-hint">
-                    Semantische Ähnlichkeit zu dieser Stelle
-                </p>
-            </div>
+    function requestClose() {
+        if (saved) onClose()
+        else if (!saving) setAskDiscard(true)
+    }
 
-            {draft.unsupported.length > 0 ? (
-                <div className="tailor-warning">
-                    <p>
-                        <i className="fa-solid fa-triangle-exclamation" /> Bitte
-                        prüfen - diese Angaben sind im Original nicht eindeutig
-                        belegt:
-                    </p>
-                    <ul>
-                        {draft.unsupported.map((item) => (
-                            <li key={item}>{item}</li>
-                        ))}
-                    </ul>
-                </div>
-            ) : (
-                <p className="tailor-ok">
-                    <i className="fa-solid fa-circle-check" /> Die Prüfung hat
-                    keine unbelegten Angaben gefunden.
-                </p>
-            )}
+    // Escape wie X; ohne Abhängigkeiten neu registriert, damit requestClose
+    // immer den aktuellen Zustand (saved/saving) sieht.
+    useEffect(() => {
+        function onKeyDown(e) {
+            if (e.key === 'Escape') requestClose()
+        }
+        document.addEventListener('keydown', onKeyDown)
+        return () => document.removeEventListener('keydown', onKeyDown)
+    })
 
+    // Seite dahinter nicht mitscrollen, Fokus ins Popup
+    useEffect(() => {
+        const previous = document.body.style.overflow
+        document.body.style.overflow = 'hidden'
+        dialogRef.current?.focus()
+        return () => {
+            document.body.style.overflow = previous
+        }
+    }, [])
+
+    const bars = draft
+        ? [
+              ['Vorher', draft.similarity_before],
+              ['Nachher', draft.similarity_after],
+          ]
+        : []
+
+    // Per Portal direkt in <body>: die Seite liegt in .scroll (position:
+    // relative + z-index), einem eigenen Stapelkontext - darin gerendert läge
+    // das Popup trotz z-index unter der Navigation und wäre teils verdeckt.
+    return createPortal(
+        <div className="confirm-overlay tailor-overlay">
             <div
-                className="tailor-preview"
-                dangerouslySetInnerHTML={{
-                    __html: DOMPurify.sanitize(draft.draft_html),
-                }}
-            />
+                ref={dialogRef}
+                className="tailor-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="tailor-modal-title"
+                tabIndex={-1}
+            >
+                <div className="tailor-modal-head">
+                    <h2 id="tailor-modal-title">
+                        {saved
+                            ? 'Lebenslauf gespeichert'
+                            : 'Entwurf: angepasster Lebenslauf'}
+                    </h2>
+                    <button
+                        type="button"
+                        className="tailor-modal-close"
+                        aria-label="Schließen"
+                        onClick={requestClose}
+                        disabled={saving}
+                    >
+                        <i className="fa-solid fa-xmark" />
+                    </button>
+                </div>
 
-            {error && <p className="form-error">{error}</p>}
-            <div className="detail-actions tailor-actions">
-                <button
-                    type="button"
-                    className="special-btn"
-                    onClick={onAccept}
-                    disabled={saving}
-                >
-                    {saving ? 'Wird gespeichert …' : 'Übernehmen'}
-                </button>
-                <button
-                    type="button"
-                    className="subtle-btn cancel"
-                    onClick={onDiscard}
-                    disabled={saving}
-                >
-                    Verwerfen
-                </button>
+                {saved ? (
+                    <div className="tailor-modal-body">
+                        <p className="tailor-ok">
+                            <i className="fa-solid fa-circle-check" /> Dein
+                            angepasster Lebenslauf wurde als neue Version
+                            gespeichert und zählt ab jetzt beim Matching für
+                            diese Stelle.
+                        </p>
+                    </div>
+                ) : (
+                    <>
+                        <div className="tailor-compare tailor-modal-compare">
+                            {bars.map(([label, value]) => (
+                                <div key={label} className="tailor-compare-row">
+                                    <span className="tailor-compare-label">
+                                        {label}
+                                    </span>
+                                    <span className="match-bar">
+                                        <span
+                                            style={{
+                                                width: `${(value || 0) * 100}%`,
+                                            }}
+                                        />
+                                    </span>
+                                    <span className="tailor-compare-pct">
+                                        {formatPct(value)}
+                                    </span>
+                                </div>
+                            ))}
+                            <p className="side-panel-hint">
+                                Semantische Ähnlichkeit zu dieser Stelle
+                            </p>
+                        </div>
+                        <div className="tailor-modal-body">
+                            {draft.unsupported.length > 0 ? (
+                                <div className="tailor-warning">
+                                    <p>
+                                        <i className="fa-solid fa-triangle-exclamation" />{' '}
+                                        Bitte prüfen - diese Angaben sind im
+                                        Original nicht eindeutig belegt:
+                                    </p>
+                                    <ul>
+                                        {draft.unsupported.map((item) => (
+                                            <li key={item}>{item}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            ) : (
+                                <p className="tailor-ok">
+                                    <i className="fa-solid fa-circle-check" />{' '}
+                                    Die Prüfung hat keine unbelegten Angaben
+                                    gefunden.
+                                </p>
+                            )}
+                            <div
+                                className="tailor-preview"
+                                dangerouslySetInnerHTML={{
+                                    __html: DOMPurify.sanitize(
+                                        draft.draft_html,
+                                    ),
+                                }}
+                            />
+                        </div>
+                    </>
+                )}
+
+                <div className="tailor-modal-foot">
+                    {error && <p className="form-error">{error}</p>}
+                    {saved ? (
+                        <>
+                            <Link className="subtle-btn" to="/resumes">
+                                Zu „Mein Lebenslauf“
+                            </Link>
+                            <button
+                                type="button"
+                                className="special-btn"
+                                onClick={onClose}
+                                autoFocus
+                            >
+                                Schließen
+                            </button>
+                        </>
+                    ) : askDiscard ? (
+                        <>
+                            <span className="tailor-modal-ask">
+                                Entwurf verwerfen?
+                            </span>
+                            <button
+                                type="button"
+                                className="subtle-btn"
+                                onClick={() => setAskDiscard(false)}
+                                autoFocus
+                            >
+                                Weiter prüfen
+                            </button>
+                            <button
+                                type="button"
+                                className="subtle-btn cancel"
+                                onClick={onDiscard}
+                            >
+                                Verwerfen
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <button
+                                type="button"
+                                className="subtle-btn cancel"
+                                onClick={onDiscard}
+                                disabled={saving}
+                            >
+                                Verwerfen
+                            </button>
+                            <button
+                                type="button"
+                                className="special-btn"
+                                onClick={onAccept}
+                                disabled={saving}
+                            >
+                                {saving ? 'Wird gespeichert …' : 'Übernehmen'}
+                            </button>
+                        </>
+                    )}
+                </div>
             </div>
-        </section>
+        </div>,
+        document.body,
     )
 }
