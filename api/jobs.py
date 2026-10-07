@@ -127,8 +127,9 @@ def list_jobs():
 def job_stats():
     """Kennzahlen für die Zahlenkacheln der Stellenangebote-Liste - eigener Endpoint,
     damit das Match-Zählen nicht bei jeder Suche/jedem Seitenwechsel mitläuft.
-    Matches nur für Admins (alle Stellen) und 'customer'-Nutzer (nur eigene Stellen),
-    analog zu den passenden Kandidaten auf der Stellen-Detailseite.
+    Matches für Admins (alle Stellen), 'customer'-Nutzer (nur eigene Stellen, analog
+    zu den passenden Kandidaten auf der Stellen-Detailseite) und 'user'-Nutzer (nur
+    die eigenen Lebensläufe, analog zu 'Passt zu dir' in der Liste).
     ---
     tags:
       - Jobs
@@ -141,7 +142,7 @@ def job_stats():
             active_jobs: {type: integer, description: "Heute gültige Stellen."}
             customers: {type: integer, description: "Stellenanbieter."}
             matches: {type: integer, x-nullable: true, description: "Paare aus gültiger Stelle und Person ab min_similarity; null ohne Berechtigung."}
-            matches_scope: {type: string, enum: [all, own], x-nullable: true}
+            matches_scope: {type: string, enum: [all, own, mine], x-nullable: true, description: "all = alle Stellen, own = eigene Stellen (customer), mine = eigene Lebensläufe (user)."}
             min_similarity: {type: number}
     """
     permission = job_management_permission()
@@ -149,6 +150,8 @@ def job_stats():
         matches, matches_scope = db.count_active_matches(), "all"
     elif permission:
         matches, matches_scope = db.count_active_matches(customer_id=permission), "own"
+    elif session.get("user_role") == "user" and session.get("user_id"):
+        matches, matches_scope = db.count_active_matches(user_id=session["user_id"]), "mine"
     else:
         matches, matches_scope = None, None
     return jsonify(

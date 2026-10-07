@@ -104,11 +104,12 @@ def count_active_jobs():
         return session.scalar(stmt)
 
 
-def count_active_matches(customer_id=None, min_similarity=MIN_MATCH_SIMILARITY):
+def count_active_matches(customer_id=None, user_id=None, min_similarity=MIN_MATCH_SIMILARITY):
     """Anzahl der Paare (heute gültige Stelle, Person) mit Cosine Similarity
     >= min_similarity für mindestens eine Lebenslauf-Version der Person - gleiche
     Schwelle und gleiche "eine Person = ein Treffer"-Logik wie find_matching_resumes.
-    customer_id beschränkt auf die Stellen eines Stellenanbieters.
+    customer_id beschränkt auf die Stellen eines Stellenanbieters, user_id auf die
+    Lebensläufe einer Person (= Anzahl der zu ihr passenden gültigen Stellen).
     Läuft als Kreuzprodukt ohne Index-Nutzung; für die aktuelle Datenmenge
     unkritisch, bei vielen tausend Einträgen besser zwischenspeichern."""
     similarity = 1 - Job.embedding.cosine_distance(Resume.embedding)
@@ -124,6 +125,8 @@ def count_active_matches(customer_id=None, min_similarity=MIN_MATCH_SIMILARITY):
         )
         if customer_id:
             stmt = stmt.where(Job.customer_id == customer_id)
+        if user_id:
+            stmt = stmt.where(Resume.user_id == user_id)
         return session.scalar(stmt)
 
 

@@ -164,6 +164,8 @@ export default function JobsPage() {
                                     Ähnlichkeit
                                     {stats.matches_scope === 'own' &&
                                         ' (eigene Stellen)'}
+                                    {stats.matches_scope === 'mine' &&
+                                        ' (deine Lebensläufe)'}
                                 </div>
                             </div>
                         </div>
