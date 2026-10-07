@@ -17,17 +17,35 @@ export default function JobsPage() {
     const [search, setSearch] = useState('')
     const [debouncedSearch, setDebouncedSearch] = useState('')
     const [stats, setStats] = useState(null)
-    // Nur Rolle 'customer': 'own' = nur Stellen des eigenen Stellenanbieters.
-    // Steht in der URL (?scope=own), damit der Eintrag 'Stellenangebote' im
-    // Konto-Menü direkt gefiltert öffnen kann, der Hauptmenü-Reiter dagegen alle.
-    const [searchParams, setSearchParams] = useSearchParams()
-    const scope = searchParams.get('scope') === 'own' ? 'own' : 'all'
-
     const isAdmin = user?.role === 'admin'
     const isCustomerUser = Boolean(
         user?.role === 'customer' && user?.customer_id,
     )
+    const isJobSeeker = user?.role === 'user'
     const canManageJob = isAdmin || isCustomerUser
+
+    // Filter 'Anzeigen' je Rolle: 'own' (customer) = nur Stellen des eigenen
+    // Stellenanbieters, 'own_matching' (customer) = davon nur die mit mind.
+    // einer passenden Person, 'matching' (user) = nur Stellen, zu denen ein eigener
+    // Lebenslauf passt. Steht in der URL (?scope=...), damit z.B. der Eintrag
+    // 'Stellenangebote' im Konto-Menü direkt gefiltert öffnen kann, der
+    // Hauptmenü-Reiter dagegen alle.
+    const scopeOptions = isCustomerUser
+        ? [
+              ['own', 'Eigene Stellenangebote'],
+              [
+                  'own_matching',
+                  'Eigene Stellenangebote mit passenden Kandidaten',
+              ],
+          ]
+        : isJobSeeker
+          ? [['matching', 'Passende Stellenangebote']]
+          : []
+    const [searchParams, setSearchParams] = useSearchParams()
+    const requestedScope = searchParams.get('scope')
+    const scope = scopeOptions.some(([value]) => value === requestedScope)
+        ? requestedScope
+        : 'all'
 
     // Dynamisches Suchfeld (sucht bisher nur in der Position): kurz entprellen,
     // statt bei jedem Tastendruck sofort neu zu laden, und dabei auf Seite 1
@@ -51,12 +69,14 @@ export default function JobsPage() {
             per_page: String(perPage),
         })
         if (debouncedSearch) params.set('search', debouncedSearch)
-        if (isCustomerUser && scope === 'own')
+        if (scope === 'own' || scope === 'own_matching')
             params.set('customer_id', String(user.customer_id))
+        if (scope === 'own_matching') params.set('with_candidates', '1')
+        if (scope === 'matching') params.set('matching', '1')
         apiGet(`/api/jobs?${params.toString()}`)
             .then(setData)
             .catch((err) => setError(err.message))
-    }, [page, perPage, debouncedSearch, isCustomerUser, scope, user])
+    }, [page, perPage, debouncedSearch, scope, user])
 
     useEffect(() => {
         if (user === undefined) return
@@ -168,7 +188,7 @@ export default function JobsPage() {
 
             <form
                 onSubmit={(e) => e.preventDefault()}
-                className={isCustomerUser ? 'form-grid' : undefined}
+                className={scopeOptions.length ? 'form-grid' : undefined}
                 style={{ marginBottom: '16px' }}
             >
                 <div>
@@ -181,7 +201,7 @@ export default function JobsPage() {
                         placeholder="z. B. Entwickler"
                     />
                 </div>
-                {isCustomerUser && (
+                {scopeOptions.length > 0 && (
                     <div>
                         <label htmlFor="job-scope">Anzeigen</label>
                         <select
@@ -189,14 +209,18 @@ export default function JobsPage() {
                             value={scope}
                             onChange={(e) => {
                                 setSearchParams(
-                                    e.target.value === 'own'
-                                        ? { scope: 'own' }
-                                        : {},
+                                    e.target.value === 'all'
+                                        ? {}
+                                        : { scope: e.target.value },
                                 )
                             }}
                         >
                             <option value="all">Alle Stellenangebote</option>
-                            <option value="own">Eigene Stellenangebote</option>
+                            {scopeOptions.map(([value, label]) => (
+                                <option key={value} value={value}>
+                                    {label}
+                                </option>
+                            ))}
                         </select>
                     </div>
                 )}

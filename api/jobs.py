@@ -32,17 +32,19 @@ def _serialize_job(row):
     return row
 
 
-def _paginate(customer_id=None, search=None):
+def _paginate(customer_id=None, search=None, matching_user_id=None, with_candidates=False):
     per_page = request.args.get("per_page", type=int)
     # Jeder Wert bis zur größten Option ist erlaubt (z. B. SIDE_PANEL_PER_PAGE aus
     # frontend/src/config.js), die Optionen sind nur die Auswahl im Pager.
     if per_page is None or not 1 <= per_page <= max(JOBS_PER_PAGE_OPTIONS):
         per_page = JOBS_PER_PAGE_DEFAULT
-    total = db.count_jobs(customer_id, search=search)
+    total = db.count_jobs(customer_id, search=search, matching_user_id=matching_user_id,
+                          with_candidates=with_candidates)
     total_pages = max((total + per_page - 1) // per_page, 1)
     page = max(request.args.get("page", type=int) or 1, 1)
     page = min(page, total_pages)
-    jobs_list = db.list_jobs(customer_id, limit=per_page, offset=(page - 1) * per_page, search=search)
+    jobs_list = db.list_jobs(customer_id, limit=per_page, offset=(page - 1) * per_page, search=search,
+                             matching_user_id=matching_user_id, with_candidates=with_candidates)
     return jobs_list, page, per_page, total_pages, total
 
 
@@ -70,13 +72,27 @@ def list_jobs():
         in: query
         type: string
         description: Freitextsuche auf die Position.
+      - name: matching
+        in: query
+        type: integer
+        enum: [0, 1]
+        description: Nur für Rolle user - 1 = nur Stellen, zu denen ein eigener Lebenslauf passt (ab Schwellwert).
+      - name: with_candidates
+        in: query
+        type: integer
+        enum: [0, 1]
+        description: Nur für Rolle customer - 1 = nur Stellen mit mindestens einem passenden Stellensuchenden (ab Schwellwert); zusammen mit customer_id für die eigenen Stellen.
     responses:
       200:
         description: Stellenangebote der aktuellen Seite plus Pagination-Metadaten; für Rolle user je Stelle my_match (beste Ähnlichkeit eines eigenen Lebenslaufs ab Schwellwert, sonst null), für Rolle customer bei eigenen Stellen match_count (Anzahl passender Stellensuchender).
     """
     customer_id = request.args.get("customer_id", type=int)
     search = (request.args.get("search") or "").strip()
-    jobs_list, page, per_page, total_pages, total = _paginate(customer_id, search)
+    matching_user_id = None
+    if request.args.get("matching") == "1" and session.get("user_role") == "user":
+        matching_user_id = session.get("user_id")
+    with_candidates = request.args.get("with_candidates") == "1" and session.get("user_role") == "customer"
+    jobs_list, page, per_page, total_pages, total = _paginate(customer_id, search, matching_user_id, with_candidates)
     permission = job_management_permission()
     own_customer = own_customer_for_session()
     jobs_out = [_serialize_job(dict(job)) for job in jobs_list]

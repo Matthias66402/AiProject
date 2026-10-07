@@ -1,5 +1,6 @@
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, String, Text, and_, func, or_, select, tuple_
+from sqlalchemy.orm import aliased
 
 from models.base import Base, MIN_MATCH_SIMILARITY, escape_like, get_session, to_dict
 from models.customer import Customer
@@ -29,17 +30,45 @@ def _position_search_filter(search):
     return Job.position.ilike(f"%{escape_like(search)}%", escape="\\")
 
 
-def list_jobs(customer_id=None, limit=None, offset=None, search=None):
+def _match_filter(user_id=None, min_similarity=MIN_MATCH_SIMILARITY):
+    """Nur Stellen, zu denen mindestens eine Lebenslauf-Version ab min_similarity
+    passt - gleiche Regeln wie user_match_similarities/job_match_counts
+    (zugeschnittene Versionen nur für ihre Zielstelle). Mit user_id nur dessen
+    Lebensläufe (Filter 'Passende Stellenangebote', Rolle 'user'), ohne alle
+    (Filter '... mit passenden Kandidat:innen', Rolle 'customer')."""
+    matched = aliased(Job)
+    similarity = 1 - matched.embedding.cosine_distance(Resume.embedding)
+    resume_cond = and_(Resume.deleted.is_(False), Resume.embedding.isnot(None),
+                       or_(Resume.target_job_id.is_(None), Resume.target_job_id == matched.id))
+    if user_id is not None:
+        resume_cond = and_(resume_cond, Resume.user_id == user_id)
+    return Job.id.in_(
+        select(matched.id)
+        .join(Resume, resume_cond)
+        .where(matched.embedding.isnot(None), similarity >= min_similarity)
+    )
+
+
+def _apply_list_filters(stmt, customer_id, search, matching_user_id, with_candidates):
+    if customer_id:
+        stmt = stmt.where(Job.customer_id == customer_id)
+    if search:
+        stmt = stmt.where(_position_search_filter(search))
+    if matching_user_id:
+        stmt = stmt.where(_match_filter(matching_user_id))
+    if with_candidates:
+        stmt = stmt.where(_match_filter())
+    return stmt
+
+
+def list_jobs(customer_id=None, limit=None, offset=None, search=None, matching_user_id=None, with_candidates=False):
     with get_session() as session:
         stmt = (
             select(Job, Customer.company_name.label("customer_name"))
             .join(Customer, Customer.id == Job.customer_id)
             .where(Job.deleted.is_(False))
         )
-        if customer_id:
-            stmt = stmt.where(Job.customer_id == customer_id)
-        if search:
-            stmt = stmt.where(_position_search_filter(search))
+        stmt = _apply_list_filters(stmt, customer_id, search, matching_user_id, with_candidates)
         stmt = stmt.order_by(Job.created_at.desc())
         if limit is not None:
             stmt = stmt.limit(limit).offset(offset or 0)
@@ -51,13 +80,10 @@ def list_jobs(customer_id=None, limit=None, offset=None, search=None):
         return result
 
 
-def count_jobs(customer_id=None, search=None):
+def count_jobs(customer_id=None, search=None, matching_user_id=None, with_candidates=False):
     with get_session() as session:
         stmt = select(func.count()).select_from(Job).where(Job.deleted.is_(False))
-        if customer_id:
-            stmt = stmt.where(Job.customer_id == customer_id)
-        if search:
-            stmt = stmt.where(_position_search_filter(search))
+        stmt = _apply_list_filters(stmt, customer_id, search, matching_user_id, with_candidates)
         return session.scalar(stmt)
 
 
