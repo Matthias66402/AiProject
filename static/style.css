@@ -1047,6 +1047,39 @@ html.react-app select {
     font-size: 0.95rem;
 }
 
+/* Passwortfeld mit "Auge"-Button (frontend/src/components/PasswordInput.jsx).
+   Das Feld behält sein Styling auch im Klartext-Modus, da input[type="text"]
+   oben dieselben Regeln bekommt. */
+.password-field {
+    position: relative;
+    display: flex;
+}
+/* Muss hinter "html.react-app input[type=...]" stehen (gleiche Spezifität),
+   sonst überschreibt deren padding den Platz für den Button. */
+.password-field input,
+html.react-app .password-field input {
+    flex: 1;
+    min-width: 0;
+    padding-right: 2.6em;
+}
+.password-toggle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 2.4em;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--ink-faint);
+    cursor: pointer;
+}
+.password-toggle:hover,
+.password-toggle:focus-visible {
+    color: var(--gold);
+    outline: none;
+}
+
 html.react-app textarea {
     padding: 12px 14px;
     font-size: 0.95rem;

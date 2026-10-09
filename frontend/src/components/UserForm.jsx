@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { API_BASE } from '../api/client'
+import PasswordInput from './PasswordInput'
 
 export default function UserForm({
     roles,
@@ -184,9 +185,8 @@ export default function UserForm({
                     <label htmlFor="password">
                         {isEdit ? 'Neues Passwort (optional)' : 'Passwort'}
                     </label>
-                    <input
+                    <PasswordInput
                         id="password"
-                        type="password"
                         value={values.password}
                         onChange={(e) => set('password', e.target.value)}
                         required={!isEdit}

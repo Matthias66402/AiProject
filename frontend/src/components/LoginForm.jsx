@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { apiPost } from '../api/client'
+import PasswordInput from './PasswordInput'
 
 // Login-Formular für die Login-Seite und das Login-Panel auf der Startseite.
 // idPrefix hält die Feld-IDs eindeutig, wenn das Formular neben anderen
@@ -43,9 +44,8 @@ export default function LoginForm({ idPrefix = '', onLoggedIn }) {
                 </div>
                 <div>
                     <label htmlFor={`${idPrefix}password`}>Passwort</label>
-                    <input
+                    <PasswordInput
                         id={`${idPrefix}password`}
-                        type="password"
                         autoComplete="current-password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}

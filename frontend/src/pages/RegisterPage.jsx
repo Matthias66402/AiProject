@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate, useOutletContext } from 'react-router-dom'
 import { apiPost } from '../api/client'
+import PasswordInput from '../components/PasswordInput'
 
 export default function RegisterPage() {
     const { refreshUser } = useOutletContext()
@@ -107,9 +108,8 @@ export default function RegisterPage() {
                 </div>
                 <div>
                     <label htmlFor="password">Passwort</label>
-                    <input
+                    <PasswordInput
                         id="password"
-                        type="password"
                         value={values.password}
                         onChange={(e) => set('password', e.target.value)}
                         required
@@ -119,9 +119,8 @@ export default function RegisterPage() {
                     <label htmlFor="password_confirm">
                         Passwort wiederholen
                     </label>
-                    <input
+                    <PasswordInput
                         id="password_confirm"
-                        type="password"
                         value={values.password_confirm}
                         onChange={(e) =>
                             set('password_confirm', e.target.value)
@@ -129,6 +128,7 @@ export default function RegisterPage() {
                         required
                     />
                 </div>
+                {error && <p className="form-error">{error}</p>}
                 <button id="special-btn" type="submit" disabled={saving}>
                     Registrieren
                 </button>
