@@ -81,6 +81,22 @@ Jeder Job und jeder Lebenslauf bekommt beim Anlegen/Ändern automatisch ein Open
 docker compose exec app python backfill_embeddings.py
 ```
 
+## KI-Logging mit Langfuse
+
+Alle KI-Aufrufe (Chat-Completions und Embeddings, OpenAI wie Groq) werden an [Langfuse](https://langfuse.com/) gemeldet: Prompt, Antwort, Modell, Token-Verbrauch, Kosten und Latenz. Dafür erzeugt `services/ai_clients.py` die Clients über den Langfuse-Drop-in `langfuse.openai.OpenAI` statt über das normale OpenAI-SDK. Groq läuft über dieselbe Klasse mit Groqs OpenAI-kompatiblem Endpunkt (`https://api.groq.com/openai/v1`), API-Fehler kommen deshalb auch dort als `openai.APIStatusError`.
+
+Jeder Aufruf trägt per `name=` einen festen Namen, nach dem sich in Langfuse unter „Tracing“ filtern lässt (dieselben Bezeichnungen wie im Token-Log von `services/ai_usage.py`):
+
+| Name | Aufruf |
+|---|---|
+| `assistant` | KI-Assistent auf der Startseite |
+| `joboffer_extract` / `joboffer_generate` | Stellenangebot aus Upload zusammenfassen / per KI erzeugen |
+| `resume_generate` | Lebenslauf per KI erzeugen |
+| `resume_tailor` / `resume_tailor_check` | Lebenslauf auf eine Stelle zuschneiden / Entwurf prüfen |
+| `embedding` / `embedding_batch` | Embedding für einen bzw. mehrere Texte |
+
+Konfiguriert wird Langfuse über `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` und `LANGFUSE_BASE_URL` in der `.env` (siehe [Umgebungsvariablen](#umgebungsvariablen-env)). Fehlen die Keys, funktioniert die App unverändert, nur ohne Tracing. Langfuse sendet gepuffert im Hintergrund. Kurzlebige Skripte müssen vor dem Beenden `get_client().flush()` aufrufen (so wie `backfill_embeddings.py`), sonst gehen die letzten Traces verloren. Neue KI-Aufrufe sollten den Client aus `services/ai_clients.py` verwenden und einen eigenen `name=` setzen.
+
 ## Datei-Uploads
 
 `/resumes` und `/jobs` (Anlegen) bieten neben der KI-Generierung eine Dropzone für PDF/.docx/.odt (`.doc` bewusst nicht unterstützt). `document_extraction.py` liest den Text aus (`pypdf`/`python-docx`/`odfpy`). Beim Stellenangebot durchläuft der Text zusätzlich eine KI-Zusammenfassung. Originaldateien landen unverändert unter `data/resumes/` bzw. `data/joboffers/` (Uploads auf 10 MB begrenzt) und bleiben auch nach dem Löschen des zugehörigen Eintrags erhalten (siehe [Löschen = Deaktivieren](#löschen--deaktivieren)).
@@ -90,7 +106,8 @@ docker compose exec app python backfill_embeddings.py
 - **Backend**: Flask (Python 3.14), reine JSON-API + Datei-Auslieferung, keine eigenen HTML-Seiten mehr
 - **API-Doku**: [flasgger](https://github.com/flasgger/flasgger) (Swagger UI/OpenAPI) — siehe [API-Dokumentation](#api-dokumentation-swagger--openapi)
 - **Datenbank**: PostgreSQL 16 (`pgvector/pgvector:pg16`) + [pgvector](https://github.com/pgvector/pgvector). Schema/Migration über psycopg2 (`db/db_init.py`); CRUD über [SQLAlchemy](https://pypi.org/project/SQLAlchemy/) (`models/`)
-- **KI**: [Groq](https://pypi.org/project/groq/)- und [OpenAI](https://pypi.org/project/openai/)-SDKs
+- **KI**: [OpenAI](https://pypi.org/project/openai/)-SDK (auch für Groq über dessen OpenAI-kompatiblen Endpunkt); [groq](https://pypi.org/project/groq/)-SDK nur noch für Fehlerklassen
+- **KI-Logging**: [Langfuse](https://langfuse.com/) (Drop-in-Wrapper fürs OpenAI-SDK) — siehe [KI-Logging mit Langfuse](#ki-logging-mit-langfuse)
 - **PDF-Erzeugung**: [WeasyPrint](https://pypi.org/project/weasyprint/) (HTML → PDF), braucht native Pango/Cairo-Bibliotheken (im Dockerfile eingerichtet)
 - **Datei-Parsing**: [pypdf](https://pypi.org/project/pypdf/), [python-docx](https://pypi.org/project/python-docx/), [odfpy](https://pypi.org/project/odfpy/)
 - **Frontend**: [React](https://react.dev/) + [Vite](https://vitejs.dev/) + [react-router-dom](https://reactrouter.com/) (`frontend/`), einzige Oberfläche der App
@@ -120,7 +137,7 @@ services/                  Von app.py und api/ gemeinsam genutzte Logik
   resume_service.py / joboffer_service.py   KI-Generierung + Uploads (inkl. Embedding)
   resume_tailoring_service.py   Lebenslauf auf eine Stelle zuschneiden (Entwurf, Prüfschritt, Speichern)
   pdf_service.py                HTML-zu-PDF (WeasyPrint, ohne Abruf externer Ressourcen)
-  ai_clients.py / text_utils.py Client-Instanzen, KI-Antworten aufbereiten
+  ai_clients.py / text_utils.py Client-Instanzen (OpenAI + Groq, mit Langfuse-Tracing), KI-Antworten aufbereiten
 frontend/                  React-SPA (Vite) - einzige Oberfläche
   src/pages/                   je eine Komponente pro Seite (Home, Jobs, Customers, Users, Tools, Resumes, Login, Register)
   src/components/              JobForm/-Table, CustomerForm/-Table, UserForm/-Table, JobUploadDropzone, Pager, RichTextEditor (Quill), ConfirmProvider (Lösch-Bestätigungsmodal), DetailHeader (Kopf der Detailseiten), TailorResumePanel (Lebenslauf zuschneiden)
@@ -185,6 +202,8 @@ Startet App, PostgreSQL und den React-Dev-Server zusammen; DB-Daten in einem ben
 |---|---|
 | `GROQ_API_KEY` | API-Key für Groq. **Optional**: leer/fehlend blendet die darüber erreichbaren Modelle automatisch aus |
 | `OPENAI_API_KEY` | API-Key für OpenAI (Chat-Modelle + Embeddings). Pflicht |
+| `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` | API-Keys des Langfuse-Projekts. **Optional**: ohne Keys werden die KI-Aufrufe nicht getraced |
+| `LANGFUSE_BASE_URL` | Langfuse-Instanz, z.B. `https://cloud.langfuse.com` (EU) oder `https://us.cloud.langfuse.com` (US) |
 | `DB_HOST` / `DB_PORT` / `DB_NAME` / `DB_USER` / `DB_PASSWORD` | Verbindungsdaten zur PostgreSQL-Datenbank |
 | `SECRET_KEY` | Flask-Session-Secret |
 | `FLASK_DEBUG` | `1` aktiviert Flask-Debug-Modus (Auto-Reloader + Werkzeug-Debugger). Standard: aus. In `docker-compose.yml` für die Entwicklung gesetzt; **nie im öffentlichen Betrieb**, da der Debugger Codeausführung erlaubt |

@@ -5,7 +5,8 @@ Embedding eines nachzuberechnen. Ausführung z.B. via:
 import os
 
 from dotenv import load_dotenv
-from openai import OpenAI
+from langfuse import get_client
+from langfuse.openai import OpenAI
 
 import db
 from embeddings import embed_texts, strip_html_to_text, to_vector_literal
@@ -64,3 +65,5 @@ if __name__ == "__main__":
     db.init_db()
     backfill_jobs(openai_client)
     backfill_resumes(openai_client)
+    # Kurzlebiges Skript: gepufferte Langfuse-Traces vor dem Beenden senden.
+    get_client().flush()

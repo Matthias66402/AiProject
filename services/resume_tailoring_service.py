@@ -49,6 +49,7 @@ def _check_unsupported_claims(openai_client, model, original, draft_html, logger
     Fehlers, damit die Vorschau trotzdem erscheint."""
     response = openai_client.chat.completions.create(
         model=model,
+        name="resume_tailor_check",  # Name der Generation in Langfuse
         response_format={"type": "json_object"},
         messages=[
             {"role": "system", "content": _CHECK_SYSTEM_PROMPT},
@@ -76,6 +77,7 @@ def draft_tailored_resume(openai_client, model, resume, job, logger=None):
     original = compact_whitespace(resume["content"])
     response = openai_client.chat.completions.create(
         model=model,
+        name="resume_tailor",  # Name der Generation in Langfuse
         messages=[
             {"role": "system", "content": _TAILOR_SYSTEM_PROMPT},
             {"role": "user", "content": f"STELLENANGEBOT:\n{_job_text(job)}\n\nORIGINAL-LEBENSLAUF:\n{original}"},

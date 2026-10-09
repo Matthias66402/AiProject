@@ -1,11 +1,9 @@
-import os
-
-from groq import Groq, APIStatusError as GroqAPIStatusError
+from groq import APIStatusError as GroqAPIStatusError
 from openai import APIStatusError as OpenAIAPIStatusError
 
 import db
 from embeddings import embed_text
-from services.ai_clients import openai_client
+from services.ai_clients import openai_client, groq_client
 from services.ai_usage import log_token_usage
 from services.text_utils import strip_think_block
 
@@ -30,12 +28,9 @@ AVAILABE_MODEL_NAMES = {
     "gpt-4.1-mini": "OpenAI - gpt-4.1-mini",
 }
 
-# Groq ist optional: ohne (nicht-leeren) GROQ_API_KEY bleibt der Client None und
-# darüber erreichbare Modelle werden weiter unten aus allen drei Dicts
-# herausgefiltert, statt einen Client mit leerem Key zu erzeugen, der erst
-# beim ersten Aufruf fehlschlagen würde.
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "").strip()
-groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
+# Groq ist optional: ohne (nicht-leeren) GROQ_API_KEY ist groq_client None
+# (services/ai_clients.py) und darüber erreichbare Modelle werden weiter unten
+# aus allen drei Dicts herausgefiltert.
 
 # Welcher Client (Groq oder OpenAI) für welches Modell zuständig ist.
 MODEL_CLIENTS = {
@@ -150,6 +145,7 @@ def ask_assistant(question, model_id, site_map, logger=None):
     try:
         response = active_client.chat.completions.create(
             model=model_id,
+            name="assistant",  # Name der Generation in Langfuse
             messages=[
                 {"role": "system", "content": (
                     "Du bist ein Assistent, der bei allgemeinen Fragen zur Website, Stellenbewerbung und Stellenveröffentlichung hilft.\n\n"

@@ -29,7 +29,7 @@ def embed_text(openai_client, text, logger=None):
     den aufrufenden Request scheitern zu lassen - Embeddings sind ein sekundäres
     Feature gegenüber dem eigentlichen Job-/Resume-Anlegen."""
     try:
-        response = openai_client.embeddings.create(model=EMBEDDING_MODEL, input=text)
+        response = openai_client.embeddings.create(model=EMBEDDING_MODEL, input=text, name="embedding")
         log_token_usage("embedding", EMBEDDING_MODEL, response)
         return response.data[0].embedding
     except OpenAIAPIError as e:
@@ -45,7 +45,7 @@ def embed_texts(openai_client, texts, logger=None):
     if not texts:
         return []
     try:
-        response = openai_client.embeddings.create(model=EMBEDDING_MODEL, input=texts)
+        response = openai_client.embeddings.create(model=EMBEDDING_MODEL, input=texts, name="embedding_batch")
         log_token_usage(f"embedding_batch({len(texts)})", EMBEDDING_MODEL, response)
         result = [None] * len(texts)
         for item in response.data:

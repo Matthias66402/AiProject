@@ -3,6 +3,7 @@ Flask-Cors
 flasgger
 groq
 openai
+langfuse
 python-dotenv
 psycopg2-binary
 SQLAlchemy

@@ -21,6 +21,7 @@ def extract_joboffer_from_text(openai_client, model, document_text):
     json.JSONDecodeError/ValueError (bei unerwartetem Antwortformat) zum Aufrufer durch."""
     response = openai_client.chat.completions.create(
         model=model,
+        name="joboffer_extract",  # Name der Generation in Langfuse
         response_format={"type": "json_object"},
         messages=[
             {"role": "system", "content": (
@@ -101,6 +102,7 @@ def generate_joboffer(openai_client, model, customer_id, spec, logger=None):
 
     response = openai_client.chat.completions.create(
         model=model,
+        name="joboffer_generate",  # Name der Generation in Langfuse
         response_format={"type": "json_object"},
         messages=[
             {"role": "system", "content": system_content},

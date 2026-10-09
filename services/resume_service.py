@@ -56,6 +56,7 @@ def generate_resume_document(openai_client, model, user_id, spec, logger=None):
 
     response = openai_client.chat.completions.create(
         model=model,
+        name="resume_generate",  # Name der Generation in Langfuse
         messages=[
             {"role": "system", "content": system_content},
             {"role": "user", "content": user_content},
