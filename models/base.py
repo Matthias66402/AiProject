@@ -7,11 +7,14 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 Base = declarative_base()
 
 # Ab dieser Cosine-Similarity gilt ein Match als relevant genug für die
-# Anzeige. Erfahrungswert: eng verwandte Stellen/Lebensläufe liegen bei
-# 0.75+, thematisch unverwandte Kombinationen bleiben meist unter 0.6 -
-# ohne Schwellwert würden bei fehlenden echten Treffern trotzdem die
-# "am wenigsten unpassenden" Ergebnisse als Match erscheinen.
-MIN_MATCH_SIMILARITY = 0.60
+# Anzeige - ohne Schwellwert würden bei fehlenden echten Treffern trotzdem die
+# "am wenigsten unpassenden" Ergebnisse als Match erscheinen. Kalibriert auf
+# die Embeddings der Matching-Profile (services/match_profile_service.py, Stand
+# 2026-10-09, 240 Paare): fachlich passende Paare liegen meist bei 0.75-0.88,
+# unpassende bei 0.52-0.70 (Median 0.62). Das gemeinsame Profil-Format hebt
+# alle Werte gegenüber Rohtext-Embeddings an - nach Änderungen am Profil-Prompt
+# daher neu prüfen.
+MIN_MATCH_SIMILARITY = 0.70
 
 # Engine/Sessionmaker erst bei der ersten tatsächlichen Nutzung aufbauen
 # (nicht beim Modul-Import) - so wie zuvor db.get_connection(): os.environ

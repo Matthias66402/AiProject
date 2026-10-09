@@ -19,10 +19,11 @@ def _serialize_dates(row):
 
 
 def _serialize_resume(row):
-    """Wie in api/resumes.py: embedding (nur fürs Matching) und content (voller
-    Text, die Anzeige läuft über die Datei) gehören nicht in die Antwort."""
+    """Wie in api/resumes.py: embedding/match_profile (nur fürs Matching) und content
+    (voller Text, die Anzeige läuft über die Datei) gehören nicht in die Antwort."""
     row = _serialize_dates(dict(row))
     row.pop("embedding", None)
+    row.pop("match_profile", None)
     row.pop("content", None)
     return row
 

@@ -20,6 +20,7 @@ class Job(Base):
     document_link = Column(String(500))
     zip = Column(String(10))
     city = Column(String(100))
+    match_profile = Column(Text)
     embedding = Column(Vector(1536))
     deleted = Column(Boolean, nullable=False, default=False, server_default="false")
 
@@ -34,22 +35,31 @@ def _match_filter(user_id=None, min_similarity=MIN_MATCH_SIMILARITY):
     """Nur Stellen, zu denen mindestens eine Lebenslauf-Version ab min_similarity
     passt - gleiche Regeln wie user_match_similarities/job_match_counts
     (zugeschnittene Versionen nur für ihre Zielstelle). Mit user_id nur dessen
-    Lebensläufe (Filter 'Passende Stellenangebote', Rolle 'user'), ohne alle
-    (Filter '... mit passenden Kandidat:innen', Rolle 'customer')."""
+    Lebensläufe und nur heute gültige Stellen
+    (Filter 'Passende Stellenangebote', Rolle 'user'), ohne alle (Filter
+    '... mit passenden Kandidat:innen', Rolle 'customer' - dort zählen auch
+    abgelaufene eigene Stellen)."""
     matched = aliased(Job)
     similarity = 1 - matched.embedding.cosine_distance(Resume.embedding)
     resume_cond = and_(Resume.deleted.is_(False), Resume.embedding.isnot(None),
                        or_(Resume.target_job_id.is_(None), Resume.target_job_id == matched.id))
     if user_id is not None:
         resume_cond = and_(resume_cond, Resume.user_id == user_id)
-    return Job.id.in_(
+    stmt = (
         select(matched.id)
         .join(Resume, resume_cond)
         .where(matched.embedding.isnot(None), similarity >= min_similarity)
     )
+    if user_id is not None:
+        stmt = stmt.where(_active_filter(matched))
+    return Job.id.in_(stmt)
 
 
-def _apply_list_filters(stmt, customer_id, search, matching_user_id, with_candidates):
+def _apply_list_filters(stmt, customer_id, search, matching_user_id, with_candidates, origin_zip, max_distance_km):
+    if origin_zip and max_distance_km:
+        # Umkreissuche: SQL-Funktion within_match_radius (db/db_init.py) -
+        # Stellen ohne bzw. mit unbekannter PLZ bleiben in der Liste.
+        stmt = stmt.where(func.within_match_radius(Job.zip, origin_zip, max_distance_km))
     if customer_id:
         stmt = stmt.where(Job.customer_id == customer_id)
     if search:
@@ -61,14 +71,18 @@ def _apply_list_filters(stmt, customer_id, search, matching_user_id, with_candid
     return stmt
 
 
-def list_jobs(customer_id=None, limit=None, offset=None, search=None, matching_user_id=None, with_candidates=False):
+def list_jobs(customer_id=None, limit=None, offset=None, search=None, matching_user_id=None, with_candidates=False,
+              origin_zip=None, max_distance_km=None):
+    """origin_zip + max_distance_km: nur Stellen bis max_distance_km Luftlinie
+    um origin_zip (Auswahl 'Entfernung' der Stellensuche, siehe api/jobs.py)."""
     with get_session() as session:
         stmt = (
             select(Job, Customer.company_name.label("customer_name"))
             .join(Customer, Customer.id == Job.customer_id)
             .where(Job.deleted.is_(False))
         )
-        stmt = _apply_list_filters(stmt, customer_id, search, matching_user_id, with_candidates)
+        stmt = _apply_list_filters(stmt, customer_id, search, matching_user_id, with_candidates,
+                                   origin_zip, max_distance_km)
         stmt = stmt.order_by(Job.created_at.desc())
         if limit is not None:
             stmt = stmt.limit(limit).offset(offset or 0)
@@ -80,20 +94,23 @@ def list_jobs(customer_id=None, limit=None, offset=None, search=None, matching_u
         return result
 
 
-def count_jobs(customer_id=None, search=None, matching_user_id=None, with_candidates=False):
+def count_jobs(customer_id=None, search=None, matching_user_id=None, with_candidates=False,
+               origin_zip=None, max_distance_km=None):
     with get_session() as session:
         stmt = select(func.count()).select_from(Job).where(Job.deleted.is_(False))
-        stmt = _apply_list_filters(stmt, customer_id, search, matching_user_id, with_candidates)
+        stmt = _apply_list_filters(stmt, customer_id, search, matching_user_id, with_candidates,
+                                   origin_zip, max_distance_km)
         return session.scalar(stmt)
 
 
-def _active_filter():
+def _active_filter(job=Job):
     """Stelle ist heute gültig: kein Start in der Zukunft, kein Ende in der
-    Vergangenheit (fehlende Daten gelten als unbegrenzt)."""
+    Vergangenheit (fehlende Daten gelten als unbegrenzt). job erlaubt einen
+    Alias statt der Job-Klasse (siehe _match_filter)."""
     today = func.current_date()
     return and_(
-        or_(Job.valid_from.is_(None), Job.valid_from <= today),
-        or_(Job.valid_until.is_(None), Job.valid_until >= today),
+        or_(job.valid_from.is_(None), job.valid_from <= today),
+        or_(job.valid_until.is_(None), job.valid_until >= today),
     )
 
 
@@ -145,15 +162,18 @@ def get_job(job_id):
         return job
 
 
-def create_job(position, content, valid_from, valid_until, customer_id, document_link=None, zip_code=None, city=None, embedding=None):
+def create_job(position, content, valid_from, valid_until, customer_id, document_link=None, zip_code=None, city=None,
+               match_profile=None, embedding=None):
     with get_session() as session:
         session.add(Job(
             position=position, content=content, valid_from=valid_from, valid_until=valid_until,
-            customer_id=customer_id, document_link=document_link, zip=zip_code, city=city, embedding=embedding,
+            customer_id=customer_id, document_link=document_link, zip=zip_code, city=city,
+            match_profile=match_profile, embedding=embedding,
         ))
 
 
-def update_job(job_id, position, content, valid_from, valid_until, customer_id, zip_code=None, city=None, embedding=None):
+def update_job(job_id, position, content, valid_from, valid_until, customer_id, zip_code=None, city=None,
+               match_profile=None, embedding=None):
     with get_session() as session:
         job = session.get(Job, job_id)
         if job is None:
@@ -165,22 +185,23 @@ def update_job(job_id, position, content, valid_from, valid_until, customer_id, 
         job.customer_id = customer_id
         job.zip = zip_code
         job.city = city
+        job.match_profile = match_profile
         job.embedding = embedding
 
 
 def find_matching_jobs(embedding, top_k=5, min_similarity=MIN_MATCH_SIMILARITY):
-    """Liefert die top_k Jobs mit Cosine Similarity >= min_similarity zum
-    gegebenen Embedding (1.0 = identisch), absteigend sortiert, inkl.
-    Kundenname für die Anzeige. embedding kann von einem Job oder einem
-    Lebenslauf stammen - für Job<->Job- wie auch Resume->Job-Matching
-    nutzbar. Läuft nativ per pgvector-Index (idx_jobs_embedding_hnsw)."""
+    """Liefert die top_k heute gültigen Jobs mit Cosine Similarity >=
+    min_similarity zum gegebenen Embedding (1.0 = identisch), absteigend
+    sortiert, inkl. Kundenname für die Anzeige. embedding kann von einem Job,
+    einem Lebenslauf oder einer Frage (KI-Assistent) stammen. Läuft nativ per
+    pgvector-Index (idx_jobs_embedding_hnsw)."""
     similarity = (1 - Job.embedding.cosine_distance(embedding)).label("similarity")
     with get_session() as session:
         stmt = (
             select(Job.id, Job.position, Job.city, Job.valid_from, Job.valid_until,
                    Customer.company_name.label("customer_name"), similarity)
             .join(Customer, Customer.id == Job.customer_id)
-            .where(Job.deleted.is_(False))
+            .where(Job.deleted.is_(False), _active_filter())
             .where(Job.embedding.isnot(None))
             .where(similarity >= min_similarity)
             .order_by(Job.embedding.cosine_distance(embedding))
@@ -193,7 +214,8 @@ def user_match_similarities(user_id, job_ids, min_similarity=MIN_MATCH_SIMILARIT
     """Für die Stellen-Liste der Rolle 'user': beste Cosine Similarity der
     Lebenslauf-Versionen von user_id je Stelle aus job_ids, nur Stellen ab
     min_similarity - als dict {job_id: similarity}. Zugeschnittene Versionen
-    zählen wie in find_matching_resumes nur für ihre Zielstelle."""
+    zählen wie in find_matching_resumes nur für ihre Zielstelle; abgelaufene
+    Stellen zählen nicht."""
     if not job_ids:
         return {}
     similarity = func.max(1 - Job.embedding.cosine_distance(Resume.embedding))
@@ -203,7 +225,7 @@ def user_match_similarities(user_id, job_ids, min_similarity=MIN_MATCH_SIMILARIT
             .join(Resume, and_(Resume.user_id == user_id, Resume.deleted.is_(False),
                                Resume.embedding.isnot(None),
                                or_(Resume.target_job_id.is_(None), Resume.target_job_id == Job.id)))
-            .where(Job.id.in_(job_ids), Job.embedding.isnot(None))
+            .where(Job.id.in_(job_ids), Job.embedding.isnot(None), _active_filter())
             .group_by(Job.id)
             .having(similarity >= min_similarity)
         )

@@ -9,15 +9,16 @@ Flask liefert **keine eigenen Seiten** mehr aus — nur noch JSON (`/api/*`) sow
 - **KI-Assistent** (React-Startseite `/`): beantwortet Fragen zur Website über wählbare KI-Modelle. Der System-Prompt bekommt bei jeder Anfrage automatisch die aktuelle React-Seitenliste mitgegeben (`build_site_map()` in `app.py`), damit der Assistent nichts über nicht existierende Funktionen erfindet. Modell-Logik zentral in `services/assistant_service.py` (`ask_assistant()`).
   - Modelle über [Groq](https://groq.com/) — **optional**: ohne `GROQ_API_KEY` werden diese Modelle automatisch ausgeblendet.
   - Modelle über [OpenAI](https://platform.openai.com/) — `OPENAI_API_KEY` ist Pflicht, da auch die Embeddings darüber laufen.
-- **Login/Registrierung** (`/login`, `/register`): Nutzer registrieren sich (immer mit Rolle `user`), melden sich an/ab; Passwörter gehasht (Werkzeug), Session-Cookie-Auth.
+- **Login/Registrierung** (`/login`, `/register`): Nutzer registrieren sich (immer mit Rolle `user`), melden sich an/ab; Passwörter gehasht (Werkzeug), Session-Cookie-Auth. Nicht eingeloggte Besucher sehen das Login-Formular auch auf der Startseite. Passwortfelder lassen sich per Augen-Button einblenden (`frontend/src/components/PasswordInput.jsx`).
 - **Rollen**: `user` (Standard), `customer`, `admin` (`models/user.py`, `ROLES`). `admin` hat vollen Schreibzugriff. `customer`-Nutzer sind über `users.customer_id` genau einem Stellenanbieter zugeordnet und dürfen dadurch **nur ihre eigenen** Stellenangebote und ihren eigenen Stellenanbieter-Datensatz bearbeiten.
 - **Nutzerverwaltung** (`/users`, nur `admin`, lesend auch `customer`): anlegen, bearbeiten, Rolle zuweisen, Stellenanbieter-Zuordnung bei Rolle `customer`. Die Detailseite zeigt links die Nutzerdaten, rechts die Lebensläufe (zugeschnittene Versionen mit „Angepasst für …“). Kein Löschen — dafür gibt es keine Funktion.
 - **Eigener Lebenslauf** (`/resumes`, Rolle `user`): aktuellster Lebenslauf eingebettet (PDF) bzw. als Download; Selectbox für ältere Versionen (zugeschnittene als „… · angepasst für {Position}“); Löschen; passende Stellenangebote zur gewählten Version. Neuen Lebenslauf per KI **generieren** (echter Name, Wohnort nur bei hinterlegter PLZ+Stadt) oder eigene Datei **hochladen** (Dropzone, PDF/.docx/.odt, Text via `document_extraction.py` ausgelesen und vektorisiert).
 - **Lebenslauf auf eine Stelle zuschneiden** (Rolle `user`, Stellen-Detailseite): siehe [eigener Abschnitt](#lebenslauf-auf-eine-stelle-zuschneiden).
 - **Stellenangebote** (`/jobs`): Stellenanzeigen mit Gültigkeitszeitraum, PLZ/Stadt, Stellenanbieter-Zuordnung; paginierte Liste mit Suche und Status-Chips (Aktiv, Läuft bald ab, Abgelaufen, Geplant).
   - `admin`: anlegen/bearbeiten/löschen für jeden Stellenanbieter. `customer`-Nutzer: nur für den eigenen (serverseitig erzwungen). Alle anderen: nur Lesemodus.
+  - **Such-Filter** über der Liste: Suche (Position), „Anzeigen“ je Rolle (`?scope=…`, z.B. „Passende Stellenangebote“ für `user`, „Eigene Stellenangebote“ für `customer`) und für Rolle `user` zusätzlich „Entfernung“ um die eigene PLZ (`?distance=…`, siehe [Harte Filter](#harte-filter-gültigkeit-und-entfernung)). Bei drei Feldern stehen sie ab 900 px Breite in einer Zeile (`.form-grid.cols-3`).
   - Optionaler Dokumenten-Upload (PDF/.docx/.odt) beim Anlegen (`/jobs/extract-upload`): KI fasst Inhalt zusammen und befüllt Position/PLZ/Stadt.
-  - **Matching-Markierung in der Liste**: Für Rolle `user` sind Stellen hervorgehoben und mit „Passt zu dir · NN %“ markiert, wenn ein eigener Lebenslauf ab `MIN_MATCH_SIMILARITY` passt (`my_match` in `/api/jobs`, `db.user_match_similarities()`). Für Rolle `customer` zeigen die eigenen Stellen „N passende Kandidat:innen“ (`match_count`, `db.job_match_counts()`) — auch in der Stellenliste auf der eigenen Stellenanbieter-Seite.
+  - **Matching-Markierung in der Liste**: Für Rolle `user` sind Stellen hervorgehoben und mit „Passt zu dir · NN %“ markiert, wenn ein eigener Lebenslauf ab `MIN_MATCH_SIMILARITY` passt und die Stelle heute gültig ist (`my_match` in `/api/jobs`, `db.user_match_similarities()`). Für Rolle `customer` zeigen die eigenen Stellen „N passende Kandidat:innen“ (`match_count`, `db.job_match_counts()`) — auch in der Stellenliste auf der eigenen Stellenanbieter-Seite.
   - **Detailseite** (`/jobs/<id>/edit`): Kopf mit Position, Stellenanbieter, Ort, Status und Aktionen; links die Stellendaten (Formular oder Leseansicht), rechts „Passende Kandidat:innen“ (Admins und eigener Stellenanbieter, zugeschnittene Versionen mit Chip „angepasst“) bzw. für Rolle `user` das Feld „Lebenslauf anpassen“.
 - **Stellenanbieter** (`/customers`): Kunden (Unternehmen) mit Adresse, paginierte Liste mit Suche. Die Detailseite zeigt links die Unternehmensdaten und rechts alle Stellenangebote des Anbieters mit Suchfeld und Pager.
   - `admin`: anlegen/bearbeiten/löschen. `customer`-Nutzer: nur der eigene Datensatz bearbeiten. Alle anderen: nur Lesemodus.
@@ -69,16 +70,45 @@ Alle `/api/*`-Endpunkte sind über [Swagger UI](https://swagger.io/tools/swagger
 
 Auth läuft über das Flask-Session-Cookie: Endpoint `POST /api/auth/login` in Swagger UI mit „Try it out" ausführen (setzt das Cookie im Browser), danach funktionieren auch geschützte Endpunkte, solange `/apidocs/` und die App unter derselben Origin geöffnet sind. Die eigentlichen Parameter-/Response-Beschreibungen stehen als YAML-Docstrings direkt bei den jeweiligen Routen in `api/*.py`; die Konfiguration (Titel, Security-Definition fürs Session-Cookie, gemeinsame Error-/Success-Schemas) sitzt in `app.py`. Klassische Datei-Auslieferungsrouten (`/tools/resume/<datei>` etc.) tauchen bewusst **nicht** in der Spec auf (`rule_filter` beschränkt sie auf `/api/*`).
 
-## Embeddings (RAG-Grundlage)
+## Embeddings und Matching
 
-Jeder Job und jeder Lebenslauf bekommt beim Anlegen/Ändern automatisch ein OpenAI-Embedding (`text-embedding-3-small`) und wird als [pgvector](https://github.com/pgvector/pgvector) `vector(1536)` gespeichert. Die Ähnlichkeitssuche läuft nativ in SQL über Cosine-Distance, indiziert per HNSW-Index. Zuständig ist `embeddings.py` (`strip_html_to_text()`, `embed_text()`/`embed_texts()`, `to_vector_literal()`); API-Fehler werden abgefangen/geloggt statt das Anlegen zu blockieren.
+Jeder Job und jeder Lebenslauf bekommt beim Anlegen/Ändern automatisch ein OpenAI-Embedding (`text-embedding-3-small`), gespeichert als [pgvector](https://github.com/pgvector/pgvector) `vector(1536)`. Die Ähnlichkeitssuche läuft nativ in SQL über Cosine-Distance, indiziert per HNSW-Index.
 
-`db.find_matching_jobs()` / `db.find_matching_resumes()` liefern die ähnlichsten Einträge ab einer Mindest-Ähnlichkeit (`MIN_MATCH_SIMILARITY` = 0,60, `models/base.py`) — Grundlage für das Matching zwischen Kandidat und Stellenangebot (angezeigt auf `/resumes` bzw. `/jobs/<id>/edit`). Deaktivierte (gelöschte) Jobs/Lebensläufe fließen dabei nicht mit ein, pro Person zählt die ähnlichste Version. Weitere Matching-Funktionen in `models/job.py`: `count_active_matches()` (Zahlenkachel), `user_match_similarities()` (Markierung „Passt zu dir“), `job_match_counts()` (Kandidaten-Anzahl für Stellenanbieter), `job_similarity()` (eine Stelle gegen ein Embedding). Für zugeschnittene Lebensläufe gilt die [Matching-Regel](#lebenslauf-auf-eine-stelle-zuschneiden).
+### Matching-Profil statt Rohtext
 
-`backfill_embeddings.py` berechnet einmalig fehlende Embeddings für Bestandsdaten nach:
+Eingebettet wird nicht der Rohtext, sondern ein KI-erzeugtes **Matching-Profil** (`services/match_profile_service.py`, `profile_and_embed()`, Modell `gpt-4.1-mini`, Spalte `match_profile` in `jobs`/`resumes`). Stellenangebote und Lebensläufe bekommen dasselbe Format:
+
+```
+Rolle: …
+Berufsfeld: …
+Fachkenntnisse: …
+Werkzeuge und Technologien: …
+Erfahrung: …
+Ausbildung: …
+Sprachen: …
+```
+
+Namen, Kontaktdaten, Orte, Hobbys, Firmenbeschreibungen, Benefits u.ä. lässt das Profil bewusst weg. Sie würden das Embedding sonst verwässern. Zeilen ohne Angabe fallen ganz weg, da Füllzeilen wie „keine Angabe“ unpassende Profile einander ähnlicher machen. Schlägt die Profil-Erzeugung fehl, bleibt der Eintrag ohne Embedding (kein Rückfall auf Rohtext, der nicht vergleichbar wäre), bis `backfill_embeddings.py` ihn nachholt. Beim Bearbeiten einer Stelle wird das Profil nur neu erzeugt, wenn sich Position oder Beschreibung geändert haben.
+
+Ergebnis auf den Testdaten (240 Paare): Fachlich passende Paare liegen jetzt bei 0,75–0,88, unpassende bei 0,52–0,70. Bei Rohtext-Embeddings überlappten beide Bereiche (passend ab 0,40, unpassend bis 0,60). Das gemeinsame Format hebt alle Werte an, deshalb liegt `MIN_MATCH_SIMILARITY` (`models/base.py`) jetzt bei **0,70**. Nach Änderungen am Profil-Prompt alle Profile neu berechnen und den Schwellwert neu prüfen.
+
+### Harte Filter: Gültigkeit und Entfernung
+
+Was sich nicht sinnvoll per Embedding vergleichen lässt, prüft die Datenbank direkt:
+
+- **Gültigkeit**: Im Matching aus Sicht der Person (passende Stellen auf `/resumes`, „Passt zu dir“, Filter „Passende Stellenangebote“, Zahlenkachel) zählen nur heute gültige Stellen (`valid_from`/`valid_until`). Stellenanbieter sehen für ihre eigenen Stellen die Kandidat:innen auch nach Ablauf weiter. Auch der KI-Assistent schlägt nur gültige Stellen vor.
+- **Entfernung**: Rolle `user` wählt in der Stellenangebote-Liste neben Suche und „Anzeigen“ eine Entfernung um die PLZ aus dem eigenen Profil: „Wohnortnähe (bis 10 km)“, „bis 25 km“, „bis 50 km“, „bis 100 km“ oder „umzugsbereit“. „umzugsbereit“ ist die Voreinstellung und filtert nicht nach Entfernung. Die Auswahl steht in der URL (`?distance=near|25|50|100`), geht als Parameter `distance` an `GET /api/jobs` (Kilometer in `DISTANCE_KM`, `api/jobs.py`, Beschriftungen in `DISTANCE_OPTIONS`, `frontend/src/config.js`) und lässt sich mit „Passende Stellenangebote“ kombinieren. Ohne hinterlegte PLZ ist sie gesperrt. Gemessen wird die Luftlinie zwischen den PLZ-Mittelpunkten. Die SQL-Funktionen `zip_distance_km()` und `within_match_radius()` legt `db/db_init.py` an, die Koordinaten kommen aus `db/plz_geo_de.csv` (Tabelle `plz_geo`). Stellen ohne bzw. mit unbekannter PLZ bleiben in der Liste. Das übrige Matching (Kandidat:innen, Treffer auf `/resumes`, Zahlenkachel) filtert nicht nach Entfernung.
+
+PLZ-Koordinaten: [GeoNames](https://www.geonames.org/) (`DE.zip` von download.geonames.org/export/zip/), Lizenz [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Je PLZ ist der Mittelwert aller GeoNames-Einträge gespeichert.
+
+### Matching-Funktionen
+
+`db.find_matching_jobs()` / `db.find_matching_resumes()` liefern die ähnlichsten Einträge ab `MIN_MATCH_SIMILARITY`. Sie sind die Grundlage für das Matching zwischen Kandidat und Stellenangebot (angezeigt auf `/resumes` bzw. `/jobs/<id>/edit`). Deaktivierte (gelöschte) Jobs/Lebensläufe fließen nicht mit ein, pro Person zählt die ähnlichste Version. Weitere Matching-Funktionen in `models/job.py`: `count_active_matches()` (Zahlenkachel), `user_match_similarities()` (Markierung „Passt zu dir“), `job_match_counts()` (Kandidaten-Anzahl für Stellenanbieter), `job_similarity()` (eine Stelle gegen ein Embedding). Für zugeschnittene Lebensläufe gilt die [Matching-Regel](#lebenslauf-auf-eine-stelle-zuschneiden).
+
+`backfill_embeddings.py` berechnet Matching-Profil und Embedding für alle Einträge nach, denen eines davon fehlt. Mit `--all` berechnet es alles neu, etwa nach einer Änderung am Profil-Prompt:
 
 ```bash
-docker compose exec app python backfill_embeddings.py
+docker compose exec app python backfill_embeddings.py [--all]
 ```
 
 ## KI-Logging mit Langfuse
@@ -93,6 +123,7 @@ Jeder Aufruf trägt per `name=` einen festen Namen, nach dem sich in Langfuse un
 | `joboffer_extract` / `joboffer_generate` | Stellenangebot aus Upload zusammenfassen / per KI erzeugen |
 | `resume_generate` | Lebenslauf per KI erzeugen |
 | `resume_tailor` / `resume_tailor_check` | Lebenslauf auf eine Stelle zuschneiden / Entwurf prüfen |
+| `match_profile_job` / `match_profile_resume` | Matching-Profil einer Stelle bzw. eines Lebenslaufs erzeugen |
 | `embedding` / `embedding_batch` | Embedding für einen bzw. mehrere Texte |
 
 Konfiguriert wird Langfuse über `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` und `LANGFUSE_BASE_URL` in der `.env` (siehe [Umgebungsvariablen](#umgebungsvariablen-env)). Fehlen die Keys, funktioniert die App unverändert, nur ohne Tracing. Langfuse sendet gepuffert im Hintergrund. Kurzlebige Skripte müssen vor dem Beenden `get_client().flush()` aufrufen (so wie `backfill_embeddings.py`), sonst gehen die letzten Traces verloren. Neue KI-Aufrufe sollten den Client aus `services/ai_clients.py` verwenden und einen eigenen `name=` setzen.
@@ -128,7 +159,7 @@ api/                       JSON-API fürs React-Frontend, inkl. YAML-Docstrings 
   resumes.py                  /api/resumes-Endpunkte (Liste/Anzeige/Generieren/Hochladen/Löschen, Zuschneiden: /tailor/preview + /tailor)
   tools.py                    /api/tools/resume + /api/tools/joboffer (KI-Generierung)
   assistant.py                /api/assistant(/ask) für die Startseite
-db/                        DB-Verbindung & Schema, von außen per `import db` genutzt
+db/                        DB-Verbindung & Schema, von außen per `import db` genutzt (inkl. plz_geo_de.csv: PLZ-Koordinaten für die Entfernungssuche)
 models/                    SQLAlchemy-ORM-Modelle + CRUD je Tabelle (user/customer/job/resume, base.py mit Engine/Session; job/customer/resume mit "deleted"-Flag statt Hard-Delete)
 services/                  Von app.py und api/ gemeinsam genutzte Logik
   assistant_service.py        KI-Assistent-Logik (`ask_assistant()`)
@@ -136,6 +167,7 @@ services/                  Von app.py und api/ gemeinsam genutzte Logik
   permissions.py                Rollen-/Berechtigungslogik
   resume_service.py / joboffer_service.py   KI-Generierung + Uploads (inkl. Embedding)
   resume_tailoring_service.py   Lebenslauf auf eine Stelle zuschneiden (Entwurf, Prüfschritt, Speichern)
+  match_profile_service.py      Matching-Profil erzeugen + einbetten (Grundlage aller Embeddings)
   pdf_service.py                HTML-zu-PDF (WeasyPrint, ohne Abruf externer Ressourcen)
   ai_clients.py / text_utils.py Client-Instanzen (OpenAI + Groq, mit Langfuse-Tracing), KI-Antworten aufbereiten
 frontend/                  React-SPA (Vite) - einzige Oberfläche

@@ -14,3 +14,15 @@ export const SIDE_PANEL_PER_PAGE = 5
 // (api/customers.py, 50); größere Werte ersetzt es durch seinen Standardwert.
 // DEFAULT_PER_PAGE sollte zudem eine der Optionen sein, sonst zeigt das
 // Auswahlfeld "Einträge pro Seite" keinen passenden Eintrag an.
+
+// Auswahl "Entfernung" in der Stellensuche (Rolle 'user'): Wert für den
+// URL-/API-Parameter distance und Beschriftung. Die Kilometer dazu stehen in
+// DISTANCE_KM in api/jobs.py; 'relocate' filtert nicht (Voreinstellung).
+export const DISTANCE_OPTIONS = [
+    ['near', 'Wohnortnähe (bis 10 km)'],
+    ['25', 'bis 25 km'],
+    ['50', 'bis 50 km'],
+    ['100', 'bis 100 km'],
+    ['relocate', 'umzugsbereit'],
+]
+export const DEFAULT_DISTANCE = 'relocate'

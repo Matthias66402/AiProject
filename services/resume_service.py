@@ -5,8 +5,9 @@ from flask import url_for
 
 import db
 from document_extraction import extract_document_text
-from embeddings import embed_text, strip_html_to_text
+from embeddings import strip_html_to_text
 from services.ai_usage import log_token_usage
+from services.match_profile_service import profile_and_embed
 from services.pdf_service import write_html_as_pdf
 from services.text_utils import DOCUMENT_HTML_RULE, clean_ai_response
 
@@ -69,8 +70,8 @@ def generate_resume_document(openai_client, model, user_id, spec, logger=None):
     filename = f"lebenslauf_{datetime.now():%Y%m%d_%H%M%S}.pdf"
     write_html_as_pdf(resume_text, os.path.join(RESUME_DIR, filename))
     file_url = url_for('view_resume', filename=filename)
-    embedding = embed_text(openai_client, strip_html_to_text(resume_text), logger)
-    return db.create_resume(resume_text, file_url, user_id, embedding=embedding)
+    match_profile, embedding = profile_and_embed(openai_client, "resume", strip_html_to_text(resume_text), logger)
+    return db.create_resume(resume_text, file_url, user_id, match_profile=match_profile, embedding=embedding)
 
 
 def create_resume_from_upload(openai_client, user_id, uploaded_file, logger=None):
@@ -88,5 +89,5 @@ def create_resume_from_upload(openai_client, user_id, uploaded_file, logger=None
     uploaded_file.stream.seek(0)
     uploaded_file.save(os.path.join(RESUME_DIR, filename))
     file_url = url_for('view_resume', filename=filename)
-    embedding = embed_text(openai_client, strip_html_to_text(resume_text), logger)
-    return db.create_resume(resume_text, file_url, user_id, embedding=embedding)
+    match_profile, embedding = profile_and_embed(openai_client, "resume", strip_html_to_text(resume_text), logger)
+    return db.create_resume(resume_text, file_url, user_id, match_profile=match_profile, embedding=embedding)

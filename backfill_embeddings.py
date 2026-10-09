@@ -1,69 +1,52 @@
-"""Einmalig ausführbares Skript, um für bestehende Jobs/Lebensläufe ohne
-Embedding eines nachzuberechnen. Ausführung z.B. via:
-    docker compose exec app python backfill_embeddings.py
+"""Berechnet für bestehende Jobs/Lebensläufe ohne Matching-Profil (oder ohne
+Embedding) beides nach - z.B. für Bestandsdaten von vor Einführung der
+Matching-Profile oder nach einem fehlgeschlagenen KI-Aufruf. Mit --all werden
+alle Einträge neu berechnet (z.B. nach einer Änderung am Profil-Prompt in
+services/match_profile_service.py). Ausführung z.B. via:
+    docker compose exec app python backfill_embeddings.py [--all]
 """
 import os
+import sys
 
 from dotenv import load_dotenv
 from langfuse import get_client
 from langfuse.openai import OpenAI
 
 import db
-from embeddings import embed_texts, strip_html_to_text, to_vector_literal
+from embeddings import strip_html_to_text, to_vector_literal
+from services.match_profile_service import job_profile_input, profile_and_embed
 
 load_dotenv()
 
 
-def backfill_jobs(openai_client):
+def _backfill(openai_client, table, kind, columns, to_text, recompute_all):
     conn = db.get_connection()
     try:
+        where = "" if recompute_all else " WHERE match_profile IS NULL OR embedding IS NULL"
         with conn.cursor() as cur:
-            cur.execute("SELECT id, position, content FROM jobs WHERE embedding IS NULL")
-            jobs = cur.fetchall()
-        print(f"{len(jobs)} Job(s) ohne Embedding gefunden.")
-        if not jobs:
-            return
-        texts = [f"{job['position']}\n\n{strip_html_to_text(job['content'])}" for job in jobs]
-        embeddings = embed_texts(openai_client, texts)
-        for job, embedding in zip(jobs, embeddings):
+            cur.execute(f"SELECT id, {columns} FROM {table}{where} ORDER BY id")
+            rows = cur.fetchall()
+        print(f"{table}: {len(rows)} Eintrag/Einträge zu berechnen.")
+        for row in rows:
+            match_profile, embedding = profile_and_embed(openai_client, kind, to_text(row))
             if embedding is None:
-                print(f"  Job {job['id']}: Embedding fehlgeschlagen, übersprungen.")
+                print(f"  {table} {row['id']}: fehlgeschlagen, übersprungen.")
                 continue
             with conn.cursor() as cur:
-                cur.execute("UPDATE jobs SET embedding = %s::vector WHERE id = %s",
-                            (to_vector_literal(embedding), job["id"]))
-            print(f"  Job {job['id']}: Embedding gespeichert.")
-    finally:
-        conn.close()
-
-
-def backfill_resumes(openai_client):
-    conn = db.get_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT id, content FROM resumes WHERE embedding IS NULL")
-            resumes = cur.fetchall()
-        print(f"{len(resumes)} Lebenslauf/Lebensläufe ohne Embedding gefunden.")
-        if not resumes:
-            return
-        texts = [strip_html_to_text(resume["content"]) for resume in resumes]
-        embeddings = embed_texts(openai_client, texts)
-        for resume, embedding in zip(resumes, embeddings):
-            if embedding is None:
-                print(f"  Resume {resume['id']}: Embedding fehlgeschlagen, übersprungen.")
-                continue
-            with conn.cursor() as cur:
-                cur.execute("UPDATE resumes SET embedding = %s::vector WHERE id = %s",
-                            (to_vector_literal(embedding), resume["id"]))
-            print(f"  Resume {resume['id']}: Embedding gespeichert.")
+                cur.execute(f"UPDATE {table} SET match_profile = %s, embedding = %s::vector WHERE id = %s",
+                            (match_profile, to_vector_literal(embedding), row["id"]))
+            print(f"  {table} {row['id']}: Profil + Embedding gespeichert.")
     finally:
         conn.close()
 
 
 if __name__ == "__main__":
+    recompute_all = "--all" in sys.argv[1:]
     openai_client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
     db.init_db()
-    backfill_jobs(openai_client)
-    backfill_resumes(openai_client)
+    _backfill(openai_client, "jobs", "job", "position, content",
+              lambda job: job_profile_input(job["position"], job["content"]), recompute_all)
+    _backfill(openai_client, "resumes", "resume", "content",
+              lambda resume: strip_html_to_text(resume["content"]), recompute_all)
     # Kurzlebiges Skript: gepufferte Langfuse-Traces vor dem Beenden senden.
     get_client().flush()

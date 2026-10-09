@@ -5,7 +5,7 @@ import Pager from '../components/Pager'
 import JobTable from '../components/JobTable'
 import JobForm from '../components/JobForm'
 import { useConfirm } from '../components/ConfirmProvider'
-import { DEFAULT_PER_PAGE } from '../config'
+import { DEFAULT_DISTANCE, DEFAULT_PER_PAGE, DISTANCE_OPTIONS } from '../config'
 
 export default function JobsPage() {
     const { user } = useOutletContext()
@@ -50,6 +50,24 @@ export default function JobsPage() {
         ? requestedScope
         : 'all'
 
+    // Entfernung um die eigene PLZ (nur Rolle 'user'), ebenfalls in der URL
+    // (?distance=...). 'relocate' (umzugsbereit) filtert nicht.
+    const requestedDistance = searchParams.get('distance')
+    const distance =
+        isJobSeeker &&
+        DISTANCE_OPTIONS.some(([value]) => value === requestedDistance)
+            ? requestedDistance
+            : DEFAULT_DISTANCE
+
+    // Einen Filter in der URL setzen, die anderen behalten; Standardwerte
+    // werden entfernt, damit die URL ohne Filter sauber bleibt.
+    function setFilterParam(key, value, defaultValue) {
+        const next = new URLSearchParams(searchParams)
+        if (value === defaultValue) next.delete(key)
+        else next.set(key, value)
+        setSearchParams(next)
+    }
+
     // Dynamisches Suchfeld (sucht bisher nur in der Position): kurz entprellen,
     // statt bei jedem Tastendruck sofort neu zu laden, und dabei auf Seite 1
     // zurückspringen, da das Suchergebnis eine andere Seitenzahl haben kann.
@@ -64,7 +82,7 @@ export default function JobsPage() {
     // Filterwechsel (Auswahl oder Menü-Link) -> zurück auf Seite 1
     useEffect(() => {
         setPage(1)
-    }, [scope])
+    }, [scope, distance])
 
     const load = useCallback(() => {
         const params = new URLSearchParams({
@@ -77,10 +95,11 @@ export default function JobsPage() {
         if (scope === 'own_matching' || scope === 'with_candidates')
             params.set('with_candidates', '1')
         if (scope === 'matching') params.set('matching', '1')
+        if (distance !== DEFAULT_DISTANCE) params.set('distance', distance)
         apiGet(`/api/jobs?${params.toString()}`)
             .then(setData)
             .catch((err) => setError(err.message))
-    }, [page, perPage, debouncedSearch, scope, user])
+    }, [page, perPage, debouncedSearch, scope, distance, user])
 
     useEffect(() => {
         if (user === undefined) return
@@ -194,7 +213,13 @@ export default function JobsPage() {
 
             <form
                 onSubmit={(e) => e.preventDefault()}
-                className={scopeOptions.length ? 'form-grid' : undefined}
+                className={
+                    isJobSeeker
+                        ? 'form-grid cols-3'
+                        : scopeOptions.length
+                          ? 'form-grid'
+                          : undefined
+                }
                 style={{ marginBottom: '16px' }}
             >
                 <div>
@@ -213,13 +238,9 @@ export default function JobsPage() {
                         <select
                             id="job-scope"
                             value={scope}
-                            onChange={(e) => {
-                                setSearchParams(
-                                    e.target.value === 'all'
-                                        ? {}
-                                        : { scope: e.target.value },
-                                )
-                            }}
+                            onChange={(e) =>
+                                setFilterParam('scope', e.target.value, 'all')
+                            }
                         >
                             <option value="all">Alle Stellenangebote</option>
                             {scopeOptions.map(([value, label]) => (
@@ -228,6 +249,35 @@ export default function JobsPage() {
                                 </option>
                             ))}
                         </select>
+                    </div>
+                )}
+                {isJobSeeker && (
+                    <div>
+                        <label htmlFor="job-distance">Entfernung</label>
+                        <select
+                            id="job-distance"
+                            value={distance}
+                            disabled={!data.origin_zip}
+                            onChange={(e) =>
+                                setFilterParam(
+                                    'distance',
+                                    e.target.value,
+                                    DEFAULT_DISTANCE,
+                                )
+                            }
+                        >
+                            {DISTANCE_OPTIONS.map(([value, label]) => (
+                                <option key={value} value={value}>
+                                    {label}
+                                </option>
+                            ))}
+                        </select>
+                        {!data.origin_zip && (
+                            <span className="side-panel-hint">
+                                Für die Entfernungssuche bitte unter
+                                Einstellungen eine PLZ hinterlegen.
+                            </span>
+                        )}
                     </div>
                 )}
             </form>

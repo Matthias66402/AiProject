@@ -5,8 +5,9 @@ from datetime import datetime
 from flask import url_for
 
 import db
-from embeddings import embed_text, strip_html_to_text
+from embeddings import strip_html_to_text
 from services.ai_usage import log_token_usage
+from services.match_profile_service import profile_and_embed
 from services.pdf_service import write_html_as_pdf
 from services.resume_service import RESUME_DIR
 from services.text_utils import DOCUMENT_HTML_RULE, clean_ai_response, compact_whitespace
@@ -87,7 +88,9 @@ def draft_tailored_resume(openai_client, model, resume, job, logger=None):
     draft_html = clean_ai_response(response.choices[0].message.content)
 
     unsupported = _check_unsupported_claims(openai_client, model, original, draft_html, logger)
-    draft_embedding = embed_text(openai_client, strip_html_to_text(draft_html), logger)
+    # Wie beim Speichern über das Matching-Profil, damit similarity_after mit
+    # den gespeicherten Embeddings vergleichbar ist.
+    _, draft_embedding = profile_and_embed(openai_client, "resume", strip_html_to_text(draft_html), logger)
     return {
         "draft_html": draft_html,
         "unsupported": unsupported,
@@ -104,5 +107,6 @@ def save_tailored_resume(openai_client, user_id, job_id, html, logger=None):
     filename = f"lebenslauf_{datetime.now():%Y%m%d_%H%M%S}.pdf"
     write_html_as_pdf(html, os.path.join(RESUME_DIR, filename))
     file_url = url_for('view_resume', filename=filename)
-    embedding = embed_text(openai_client, strip_html_to_text(html), logger)
-    return db.create_resume(html, file_url, user_id, embedding=embedding, target_job_id=job_id)
+    match_profile, embedding = profile_and_embed(openai_client, "resume", strip_html_to_text(html), logger)
+    return db.create_resume(html, file_url, user_id, match_profile=match_profile, embedding=embedding,
+                            target_job_id=job_id)

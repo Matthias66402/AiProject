@@ -501,6 +501,15 @@ form div {
     }
 }
 
+/* Dreispaltige Variante (z.B. Suche/Anzeigen/Entfernung der Stellenliste für
+   Rolle 'user'): erst ab ausreichender Breite nebeneinander, darunter wie
+   .form-grid zwei- bzw. einspaltig. */
+@media (min-width: 900px) {
+    .form-grid.cols-3 {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
 label {
     color: var(--label);
     font-size: 0.72rem;

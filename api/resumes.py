@@ -15,13 +15,14 @@ resumes_api = Blueprint("resumes_api", __name__, url_prefix="/api/resumes")
 
 def _serialize_resume(row):
     """Wie bei jobs/customers: Datumsfelder als ISO-String. Zusätzlich werden
-    embedding (nur intern fürs Matching relevant) und content (voller
+    embedding/match_profile (nur intern fürs Matching relevant) und content (voller
     HTML-Text, vom Frontend nicht benötigt - die Anzeige läuft über das
     eingebettete PDF) aus der Antwort entfernt."""
     row = dict(row)
     if row.get("created_at") is not None and hasattr(row["created_at"], "isoformat"):
         row["created_at"] = row["created_at"].isoformat()
     row.pop("embedding", None)
+    row.pop("match_profile", None)
     row.pop("content", None)
     return row
 
