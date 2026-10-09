@@ -52,7 +52,7 @@ if groq_client is None:
     MODEL_CLIENTS = {k: v for k, v in MODEL_CLIENTS.items() if k not in _unavailable_models}
 
 
-# Niedrigerer Schwellwert als MIN_MATCH_SIMILARITY (0.70, fürs Resume<->Job-
+# Niedrigerer Schwellwert als MIN_MATCH_SIMILARITY (0.71, fürs Resume<->Job-
 # Matching zwischen zwei Matching-Profilen gleichen Formats): hier steht eine
 # kurze Frage gegen ein ganzes Profil, das liefert naturgemäß
 # niedrigere Kosinus-Ähnlichkeiten, obwohl der Treffer inhaltlich passt. Das

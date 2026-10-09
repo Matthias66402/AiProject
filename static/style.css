@@ -1389,6 +1389,51 @@ html.react-app .confirm-overlay {
     font-size: 0.9rem;
 }
 
+/* "Warum passt das?" unter einem Treffer (frontend/src/components/MatchExplanation.jsx). */
+.match-explain {
+    margin-top: 4px;
+    padding: 0 4px;
+    font-size: 0.82rem;
+}
+.match-explain .match-explain-toggle {
+    color: var(--green);
+    font-size: 0.8rem;
+}
+.match-explain-body {
+    margin-top: 6px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: #322651;
+    border: 1px solid #43376a;
+    color: #e6e1f3;
+}
+.match-explain-summary {
+    margin: 0 0 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.match-explain-label {
+    display: block;
+    margin-top: 6px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: #c3bcd9;
+}
+.match-explain-list {
+    margin: 2px 0 0;
+    padding-left: 18px;
+    list-style: disc;
+}
+.match-explain-list.ok li::marker {
+    color: #a8d07f;
+}
+.match-explain-list.gap li::marker {
+    color: #f0a58a;
+}
+
 /* Detailseiten (Stelle, Stellenanbieter, Nutzer): Kopf mit Aktionen, darunter
    Daten-Karte links und Seitenspalte (Matching, zugehörige Einträge) rechts.
    Unter ~940px Breite rutscht die Seitenspalte unter die Daten. */

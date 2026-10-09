@@ -1,8 +1,8 @@
-"""Berechnet für bestehende Jobs/Lebensläufe ohne Matching-Profil (oder ohne
-Embedding) beides nach - z.B. für Bestandsdaten von vor Einführung der
-Matching-Profile oder nach einem fehlgeschlagenen KI-Aufruf. Mit --all werden
-alle Einträge neu berechnet (z.B. nach einer Änderung am Profil-Prompt in
-services/match_profile_service.py). Ausführung z.B. via:
+"""Berechnet Matching-Profil + Embedding für bestehende Jobs/Lebensläufe nach,
+denen eines davon fehlt (z.B. nach einem fehlgeschlagenen KI-Aufruf) oder
+deren Profil mit einem älteren Prompt-Stand erzeugt wurde (match_profile_version
+!= PROFILE_VERSION in services/match_profile_service.py). Mit --all werden alle
+Einträge neu berechnet. Ausführung z.B. via:
     docker compose exec app python backfill_embeddings.py [--all]
 """
 import os
@@ -14,7 +14,7 @@ from langfuse.openai import OpenAI
 
 import db
 from embeddings import strip_html_to_text, to_vector_literal
-from services.match_profile_service import job_profile_input, profile_and_embed
+from services.match_profile_service import PROFILE_VERSION, job_profile_input, profile_and_embed
 
 load_dotenv()
 
@@ -22,19 +22,26 @@ load_dotenv()
 def _backfill(openai_client, table, kind, columns, to_text, recompute_all):
     conn = db.get_connection()
     try:
-        where = "" if recompute_all else " WHERE match_profile IS NULL OR embedding IS NULL"
+        if recompute_all:
+            where, params = "", ()
+        else:
+            where = (" WHERE match_profile IS NULL OR embedding IS NULL"
+                     " OR match_profile_version IS DISTINCT FROM %s")
+            params = (PROFILE_VERSION,)
         with conn.cursor() as cur:
-            cur.execute(f"SELECT id, {columns} FROM {table}{where} ORDER BY id")
+            cur.execute(f"SELECT id, {columns} FROM {table}{where} ORDER BY id", params)
             rows = cur.fetchall()
-        print(f"{table}: {len(rows)} Eintrag/Einträge zu berechnen.")
+        print(f"{table}: {len(rows)} Eintrag/Einträge zu berechnen (Profil-Version {PROFILE_VERSION}).")
         for row in rows:
-            match_profile, embedding = profile_and_embed(openai_client, kind, to_text(row))
-            if embedding is None:
+            fields = profile_and_embed(openai_client, kind, to_text(row))
+            if fields["embedding"] is None:
                 print(f"  {table} {row['id']}: fehlgeschlagen, übersprungen.")
                 continue
             with conn.cursor() as cur:
-                cur.execute(f"UPDATE {table} SET match_profile = %s, embedding = %s::vector WHERE id = %s",
-                            (match_profile, to_vector_literal(embedding), row["id"]))
+                cur.execute(f"UPDATE {table} SET match_profile = %s, match_profile_version = %s, "
+                            f"embedding = %s::vector WHERE id = %s",
+                            (fields["match_profile"], fields["match_profile_version"],
+                             to_vector_literal(fields["embedding"]), row["id"]))
             print(f"  {table} {row['id']}: Profil + Embedding gespeichert.")
     finally:
         conn.close()

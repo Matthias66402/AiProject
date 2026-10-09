@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { API_BASE, apiDelete, apiGet, apiPost } from '../api/client'
 import { useConfirm } from '../components/ConfirmProvider'
+import MatchExplanation from '../components/MatchExplanation'
 
 export default function MyResumesPage() {
     const confirm = useConfirm()
@@ -235,6 +236,12 @@ export default function MyResumesPage() {
                                                             : ''}
                                                     </span>
                                                 </Link>
+                                                {/* key mit Lebenslauf-ID: beim Versionswechsel neu laden */}
+                                                <MatchExplanation
+                                                    key={`${selectedResume.id}-${m.id}`}
+                                                    jobId={m.id}
+                                                    resumeId={selectedResume.id}
+                                                />
                                             </li>
                                         ))}
                                     </ul>

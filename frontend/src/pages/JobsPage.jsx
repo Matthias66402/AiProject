@@ -182,9 +182,10 @@ export default function JobsPage() {
                             <div>
                                 <div className="stat-value">{stats.matches}</div>
                                 <div className="stat-label">
-                                    Matches ab{' '}
-                                    {Math.round(stats.min_similarity * 100)} %
-                                    Ähnlichkeit
+                                    {/* Schwelle 0.71 als "> 70 %" - liest sich runder */}
+                                    Matches &gt;{' '}
+                                    {Math.round(stats.min_similarity * 100) - 1}{' '}
+                                    % Ähnlichkeit
                                     {stats.matches_scope === 'own' &&
                                         ' (eigene Stellen)'}
                                     {stats.matches_scope === 'mine' &&

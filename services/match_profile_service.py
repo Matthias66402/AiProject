@@ -8,6 +8,13 @@ from services.ai_usage import log_token_usage
 # formuliert sein, sonst sinkt die Vergleichbarkeit der Embeddings.
 PROFILE_MODEL = "gpt-4.1-mini"
 
+# Version des Profil-Prompts unten, gespeichert in jobs/resumes.match_profile_version.
+# Bei jeder inhaltlichen Änderung am Prompt erhöhen: backfill_embeddings.py
+# berechnet dann alle Profile mit älterer Version neu (danach eval_matching.py
+# laufen lassen und MIN_MATCH_SIMILARITY prüfen).
+# 1 = erste Fassung mit 'keine Angabe'-Zeilen, 2 = leere Zeilen werden weggelassen.
+PROFILE_VERSION = 2
+
 _KIND_LABELS = {"job": "Stellenangebot", "resume": "Lebenslauf"}
 
 _PROFILE_SYSTEM_PROMPT = (
@@ -44,7 +51,8 @@ def build_match_profile(openai_client, kind, text, logger=None):
     nur Rolle, Berufsfeld, Kenntnisse, Werkzeuge, Erfahrung, Ausbildung und
     Sprachen - ohne persönliche Daten, Ort, Benefits u.ä., die das Embedding
     sonst verwässern. Ort und Gültigkeit werden stattdessen als harte Filter
-    im SQL geprüft (models/job.py). Gibt None zurück, wenn kein Text vorliegt
+    im SQL geprüft (models/job.py, Entfernungssuche der Stellenliste). Gibt
+    None zurück, wenn kein Text vorliegt
     oder die API einen Fehler meldet."""
     if not text or not text.strip():
         return None
@@ -68,15 +76,18 @@ def build_match_profile(openai_client, kind, text, logger=None):
 
 def profile_and_embed(openai_client, kind, text, logger=None):
     """Erzeugt das Matching-Profil zu text und dessen Embedding - Grundlage
-    für alles Matching zwischen Lebensläufen und Stellenangeboten. Gibt
-    (match_profile, embedding) zurück; schlägt einer der Schritte fehl, beide
-    als None (bewusst kein Rückfall auf ein Embedding des Rohtexts, das mit
-    den Profil-Embeddings nicht vergleichbar wäre). backfill_embeddings.py
-    holt fehlende Profile später nach."""
+    für alles Matching zwischen Lebensläufen und Stellenangeboten. Gibt die
+    Spaltenwerte als dict zurück (match_profile, match_profile_version,
+    embedding), passend für create_job/update_job/create_resume(**fields).
+    Schlägt einer der Schritte fehl, sind alle drei None (bewusst kein
+    Rückfall auf ein Embedding des Rohtexts, das mit den Profil-Embeddings
+    nicht vergleichbar wäre). backfill_embeddings.py holt fehlende Profile
+    später nach."""
+    empty = {"match_profile": None, "match_profile_version": None, "embedding": None}
     profile = build_match_profile(openai_client, kind, text, logger)
     if profile is None:
-        return None, None
+        return empty
     embedding = embed_text(openai_client, profile, logger)
     if embedding is None:
-        return None, None
-    return profile, embedding
+        return empty
+    return {"match_profile": profile, "match_profile_version": PROFILE_VERSION, "embedding": embedding}

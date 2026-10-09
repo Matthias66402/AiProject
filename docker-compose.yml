@@ -52,6 +52,8 @@ services:
       - ./embeddings.py:/app/embeddings.py
       - ./document_extraction.py:/app/document_extraction.py
       - ./backfill_embeddings.py:/app/backfill_embeddings.py
+      - ./eval_matching.py:/app/eval_matching.py
+      - ./eval:/app/eval
       - ./migrate_mysql_to_postgres.py:/app/migrate_mysql_to_postgres.py
       - ./static:/app/static
     depends_on:

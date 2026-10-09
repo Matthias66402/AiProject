@@ -70,8 +70,8 @@ def generate_resume_document(openai_client, model, user_id, spec, logger=None):
     filename = f"lebenslauf_{datetime.now():%Y%m%d_%H%M%S}.pdf"
     write_html_as_pdf(resume_text, os.path.join(RESUME_DIR, filename))
     file_url = url_for('view_resume', filename=filename)
-    match_profile, embedding = profile_and_embed(openai_client, "resume", strip_html_to_text(resume_text), logger)
-    return db.create_resume(resume_text, file_url, user_id, match_profile=match_profile, embedding=embedding)
+    match_fields = profile_and_embed(openai_client, "resume", strip_html_to_text(resume_text), logger)
+    return db.create_resume(resume_text, file_url, user_id, **match_fields)
 
 
 def create_resume_from_upload(openai_client, user_id, uploaded_file, logger=None):
@@ -89,5 +89,5 @@ def create_resume_from_upload(openai_client, user_id, uploaded_file, logger=None
     uploaded_file.stream.seek(0)
     uploaded_file.save(os.path.join(RESUME_DIR, filename))
     file_url = url_for('view_resume', filename=filename)
-    match_profile, embedding = profile_and_embed(openai_client, "resume", strip_html_to_text(resume_text), logger)
-    return db.create_resume(resume_text, file_url, user_id, match_profile=match_profile, embedding=embedding)
+    match_fields = profile_and_embed(openai_client, "resume", strip_html_to_text(resume_text), logger)
+    return db.create_resume(resume_text, file_url, user_id, **match_fields)

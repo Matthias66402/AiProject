@@ -1,8 +1,11 @@
 from flask import Blueprint, current_app, jsonify, request, session
+from groq import APIStatusError as GroqAPIStatusError
+from openai import APIStatusError as OpenAIAPIStatusError
 
 import db
+from services import match_explanation_service
 from services.ai_clients import openai_client
-from services.match_profile_service import job_profile_input, profile_and_embed
+from services.match_profile_service import PROFILE_VERSION, job_profile_input, profile_and_embed
 from services.permissions import job_management_permission, own_customer_for_session
 
 jobs_api = Blueprint("jobs_api", __name__, url_prefix="/api/jobs")
@@ -241,10 +244,9 @@ def create_job():
     if not (position and content and customer_id):
         return jsonify(error="Bitte Position, Beschreibung und Kunde angeben."), 400
 
-    match_profile, embedding = profile_and_embed(openai_client, "job", job_profile_input(position, content), current_app.logger)
+    match_fields = profile_and_embed(openai_client, "job", job_profile_input(position, content), current_app.logger)
     db.create_job(position, content, valid_from, valid_until, int(customer_id),
-                  document_link=document_link, zip_code=zip_code, city=city,
-                  match_profile=match_profile, embedding=embedding)
+                  document_link=document_link, zip_code=zip_code, city=city, **match_fields)
     return jsonify(success=True), 201
 
 
@@ -284,6 +286,77 @@ def get_job(job_id):
     else:
         result["matching_resumes"] = []
     return jsonify(job=result)
+
+
+@jobs_api.route("/<int:job_id>/match-explanation/<int:resume_id>", methods=["GET"])
+def match_explanation(job_id, resume_id):
+    """KI-Begründung, warum ein Lebenslauf zu einer Stelle passt ('Warum passt das?' in den Trefferlisten).
+    Wird pro Paar zwischengespeichert und nur bei geändertem Matching-Profil neu erzeugt.
+    ---
+    tags:
+      - Jobs
+    security:
+      - sessionAuth: []
+    parameters:
+      - name: job_id
+        in: path
+        type: integer
+        required: true
+      - name: resume_id
+        in: path
+        type: integer
+        required: true
+    responses:
+      200:
+        description: Begründung.
+        schema:
+          type: object
+          properties:
+            summary: {type: string, description: "Ein Satz zur Gesamteinschätzung."}
+            matches: {type: array, items: {type: string}, description: "Übereinstimmungen (max. 5)."}
+            gaps: {type: array, items: {type: string}, description: "Anforderungen der Stelle, die im Lebenslauf fehlen (max. 5)."}
+            cached: {type: boolean, description: "true = aus dem Zwischenspeicher, ohne KI-Aufruf."}
+      403:
+        description: Nicht berechtigt - nur Admins, der Stellenanbieter der Stelle oder die Person, der der Lebenslauf gehört.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+      404:
+        description: Stelle oder Lebenslauf nicht gefunden.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+      409:
+        description: Für Stelle oder Lebenslauf liegt (noch) kein Matching-Profil vor.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+      502:
+        description: KI-Dienst nicht erreichbar oder unerwartete Antwort.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+    """
+    job = db.get_job(job_id)
+    resume = db.get_resume(resume_id)
+    if not job or not resume:
+        return jsonify(error="Nicht gefunden."), 404
+
+    # Gleiche Sichtbarkeit wie bei den Trefferlisten: Admin und eigener
+    # Stellenanbieter (Kandidat:innen der Stelle), Person selbst (eigene Lebensläufe).
+    permission = job_management_permission()
+    is_own_resume = session.get("user_id") is not None and resume["user_id"] == session.get("user_id")
+    if not (permission == "admin" or permission == job["customer_id"] or is_own_resume):
+        return jsonify(error="Nicht berechtigt."), 403
+
+    if not (job.get("match_profile") and resume.get("match_profile")):
+        return jsonify(error="Für diesen Treffer liegt noch kein Matching-Profil vor."), 409
+
+    try:
+        explanation = match_explanation_service.explain_match(openai_client, job, resume)
+    except (GroqAPIStatusError, OpenAIAPIStatusError) as e:
+        current_app.logger.warning("API error %s: %s", e.status_code, e.body)
+        return jsonify(error="Die Begründung konnte gerade nicht erstellt werden. Bitte später erneut versuchen."), 502
+    except ValueError as e:  # inkl. json.JSONDecodeError
+        current_app.logger.warning("Unerwartete Begründungs-Antwort: %s", e)
+        return jsonify(error="Die Begründung konnte gerade nicht erstellt werden. Bitte später erneut versuchen."), 502
+    return jsonify(**explanation)
 
 
 @jobs_api.route("/<int:job_id>", methods=["PUT"])
@@ -345,14 +418,15 @@ def update_job(job_id):
         return jsonify(error="Bitte Position, Beschreibung und Kunde angeben."), 400
 
     # Profil + Embedding hängen nur von Position und Beschreibung ab - bei
-    # unverändertem Text (z.B. nur Gültigkeit/Ort geändert) den KI-Aufruf sparen.
-    if position == job["position"] and content == job["content"] and job.get("match_profile") and job.get("embedding"):
-        match_profile, embedding = job["match_profile"], job["embedding"]
+    # unverändertem Text (z.B. nur Gültigkeit/Ort geändert) und aktuellem
+    # Prompt-Stand den KI-Aufruf sparen.
+    if (position == job["position"] and content == job["content"] and job.get("embedding")
+            and job.get("match_profile_version") == PROFILE_VERSION):
+        match_fields = {key: job[key] for key in ("match_profile", "match_profile_version", "embedding")}
     else:
-        match_profile, embedding = profile_and_embed(openai_client, "job", job_profile_input(position, content),
-                                                     current_app.logger)
+        match_fields = profile_and_embed(openai_client, "job", job_profile_input(position, content), current_app.logger)
     db.update_job(job_id, position, content, valid_from, valid_until, int(customer_id),
-                  zip_code=zip_code, city=city, match_profile=match_profile, embedding=embedding)
+                  zip_code=zip_code, city=city, **match_fields)
     return jsonify(success=True)
 
 

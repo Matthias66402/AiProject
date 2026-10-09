@@ -11,6 +11,7 @@ import DOMPurify from 'dompurify'
 import { API_BASE, apiDelete, apiGet, apiPost, apiPut } from '../api/client'
 import DetailHeader from '../components/DetailHeader'
 import JobForm from '../components/JobForm'
+import MatchExplanation from '../components/MatchExplanation'
 import TailorResumePanel from '../components/TailorResumePanel'
 import { formatDate, jobStatus } from '../components/JobTable'
 import { useConfirm } from '../components/ConfirmProvider'
@@ -309,6 +310,10 @@ export default function JobEditPage() {
                                                     )}
                                                 </span>
                                             </Link>
+                                            <MatchExplanation
+                                                jobId={job.id}
+                                                resumeId={m.id}
+                                            />
                                         </li>
                                     ))}
                                 </ul>

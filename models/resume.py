@@ -14,6 +14,7 @@ class Resume(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime, nullable=False, server_default=func.current_timestamp())
     match_profile = Column(Text)
+    match_profile_version = Column(Integer)
     embedding = Column(Vector(1536))
     deleted = Column(Boolean, nullable=False, default=False, server_default="false")
     # Auf diese Stelle zugeschnittene Version (NULL = allgemeine Version). Zählt im
@@ -21,10 +22,12 @@ class Resume(Base):
     target_job_id = Column(Integer, ForeignKey("jobs.id"))
 
 
-def create_resume(content, document_link, user_id, match_profile=None, embedding=None, target_job_id=None):
+def create_resume(content, document_link, user_id, match_profile=None, match_profile_version=None, embedding=None,
+                  target_job_id=None):
     with get_session() as session:
         resume = Resume(content=content, document_link=document_link, user_id=user_id, match_profile=match_profile,
-                        embedding=embedding, target_job_id=target_job_id)
+                        match_profile_version=match_profile_version, embedding=embedding,
+                        target_job_id=target_job_id)
         session.add(resume)
         session.flush()
         return resume.id

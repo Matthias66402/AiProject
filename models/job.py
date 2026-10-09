@@ -21,6 +21,7 @@ class Job(Base):
     zip = Column(String(10))
     city = Column(String(100))
     match_profile = Column(Text)
+    match_profile_version = Column(Integer)
     embedding = Column(Vector(1536))
     deleted = Column(Boolean, nullable=False, default=False, server_default="false")
 
@@ -163,17 +164,17 @@ def get_job(job_id):
 
 
 def create_job(position, content, valid_from, valid_until, customer_id, document_link=None, zip_code=None, city=None,
-               match_profile=None, embedding=None):
+               match_profile=None, match_profile_version=None, embedding=None):
     with get_session() as session:
         session.add(Job(
             position=position, content=content, valid_from=valid_from, valid_until=valid_until,
             customer_id=customer_id, document_link=document_link, zip=zip_code, city=city,
-            match_profile=match_profile, embedding=embedding,
+            match_profile=match_profile, match_profile_version=match_profile_version, embedding=embedding,
         ))
 
 
 def update_job(job_id, position, content, valid_from, valid_until, customer_id, zip_code=None, city=None,
-               match_profile=None, embedding=None):
+               match_profile=None, match_profile_version=None, embedding=None):
     with get_session() as session:
         job = session.get(Job, job_id)
         if job is None:
@@ -186,6 +187,7 @@ def update_job(job_id, position, content, valid_from, valid_until, customer_id, 
         job.zip = zip_code
         job.city = city
         job.match_profile = match_profile
+        job.match_profile_version = match_profile_version
         job.embedding = embedding
 
 

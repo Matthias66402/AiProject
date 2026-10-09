@@ -11,10 +11,11 @@ Base = declarative_base()
 # "am wenigsten unpassenden" Ergebnisse als Match erscheinen. Kalibriert auf
 # die Embeddings der Matching-Profile (services/match_profile_service.py, Stand
 # 2026-10-09, 240 Paare): fachlich passende Paare liegen meist bei 0.75-0.88,
-# unpassende bei 0.52-0.70 (Median 0.62). Das gemeinsame Profil-Format hebt
-# alle Werte gegenüber Rohtext-Embeddings an - nach Änderungen am Profil-Prompt
-# daher neu prüfen.
-MIN_MATCH_SIMILARITY = 0.70
+# unpassende bei 0.51-0.70 (Median 0.61). 0.71 = knapp über dem höchsten
+# unpassenden Paar (Empfehlung von eval_matching.py). Das gemeinsame
+# Profil-Format hebt alle Werte gegenüber Rohtext-Embeddings an - nach
+# Änderungen am Profil-Prompt daher mit eval_matching.py neu prüfen.
+MIN_MATCH_SIMILARITY = 0.71
 
 # Engine/Sessionmaker erst bei der ersten tatsächlichen Nutzung aufbauen
 # (nicht beim Modul-Import) - so wie zuvor db.get_connection(): os.environ

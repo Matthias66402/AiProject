@@ -90,7 +90,7 @@ def draft_tailored_resume(openai_client, model, resume, job, logger=None):
     unsupported = _check_unsupported_claims(openai_client, model, original, draft_html, logger)
     # Wie beim Speichern über das Matching-Profil, damit similarity_after mit
     # den gespeicherten Embeddings vergleichbar ist.
-    _, draft_embedding = profile_and_embed(openai_client, "resume", strip_html_to_text(draft_html), logger)
+    draft_embedding = profile_and_embed(openai_client, "resume", strip_html_to_text(draft_html), logger)["embedding"]
     return {
         "draft_html": draft_html,
         "unsupported": unsupported,
@@ -107,6 +107,5 @@ def save_tailored_resume(openai_client, user_id, job_id, html, logger=None):
     filename = f"lebenslauf_{datetime.now():%Y%m%d_%H%M%S}.pdf"
     write_html_as_pdf(html, os.path.join(RESUME_DIR, filename))
     file_url = url_for('view_resume', filename=filename)
-    match_profile, embedding = profile_and_embed(openai_client, "resume", strip_html_to_text(html), logger)
-    return db.create_resume(html, file_url, user_id, match_profile=match_profile, embedding=embedding,
-                            target_job_id=job_id)
+    match_fields = profile_and_embed(openai_client, "resume", strip_html_to_text(html), logger)
+    return db.create_resume(html, file_url, user_id, target_job_id=job_id, **match_fields)

@@ -88,16 +88,18 @@ Ausbildung: …
 Sprachen: …
 ```
 
-Namen, Kontaktdaten, Orte, Hobbys, Firmenbeschreibungen, Benefits u.ä. lässt das Profil bewusst weg. Sie würden das Embedding sonst verwässern. Zeilen ohne Angabe fallen ganz weg, da Füllzeilen wie „keine Angabe“ unpassende Profile einander ähnlicher machen. Schlägt die Profil-Erzeugung fehl, bleibt der Eintrag ohne Embedding (kein Rückfall auf Rohtext, der nicht vergleichbar wäre), bis `backfill_embeddings.py` ihn nachholt. Beim Bearbeiten einer Stelle wird das Profil nur neu erzeugt, wenn sich Position oder Beschreibung geändert haben.
+Namen, Kontaktdaten, Orte, Hobbys, Firmenbeschreibungen, Benefits u.ä. lässt das Profil bewusst weg. Sie würden das Embedding sonst verwässern. Zeilen ohne Angabe fallen ganz weg, da Füllzeilen wie „keine Angabe“ unpassende Profile einander ähnlicher machen. Schlägt die Profil-Erzeugung fehl, bleibt der Eintrag ohne Embedding (kein Rückfall auf Rohtext, der nicht vergleichbar wäre), bis `backfill_embeddings.py` ihn nachholt. Beim Bearbeiten einer Stelle wird das Profil nur neu erzeugt, wenn sich Position oder Beschreibung geändert haben oder das Profil von einem älteren Prompt-Stand stammt.
 
-Ergebnis auf den Testdaten (240 Paare): Fachlich passende Paare liegen jetzt bei 0,75–0,88, unpassende bei 0,52–0,70. Bei Rohtext-Embeddings überlappten beide Bereiche (passend ab 0,40, unpassend bis 0,60). Das gemeinsame Format hebt alle Werte an, deshalb liegt `MIN_MATCH_SIMILARITY` (`models/base.py`) jetzt bei **0,70**. Nach Änderungen am Profil-Prompt alle Profile neu berechnen und den Schwellwert neu prüfen.
+Ergebnis auf den Testdaten (240 Paare): Fachlich passende Paare liegen jetzt bei 0,75–0,88, unpassende bei 0,52–0,70. Bei Rohtext-Embeddings überlappten beide Bereiche (passend ab 0,40, unpassend bis 0,60). Das gemeinsame Format hebt alle Werte an, deshalb liegt `MIN_MATCH_SIMILARITY` (`models/base.py`) jetzt bei **0,71**, knapp über dem höchsten unpassenden Paar. Nach Änderungen am Profil-Prompt alle Profile neu berechnen und den Schwellwert neu prüfen.
 
 ### Harte Filter: Gültigkeit und Entfernung
 
 Was sich nicht sinnvoll per Embedding vergleichen lässt, prüft die Datenbank direkt:
 
 - **Gültigkeit**: Im Matching aus Sicht der Person (passende Stellen auf `/resumes`, „Passt zu dir“, Filter „Passende Stellenangebote“, Zahlenkachel) zählen nur heute gültige Stellen (`valid_from`/`valid_until`). Stellenanbieter sehen für ihre eigenen Stellen die Kandidat:innen auch nach Ablauf weiter. Auch der KI-Assistent schlägt nur gültige Stellen vor.
-- **Entfernung**: Rolle `user` wählt in der Stellenangebote-Liste neben Suche und „Anzeigen“ eine Entfernung um die PLZ aus dem eigenen Profil: „Wohnortnähe (bis 10 km)“, „bis 25 km“, „bis 50 km“, „bis 100 km“ oder „umzugsbereit“. „umzugsbereit“ ist die Voreinstellung und filtert nicht nach Entfernung. Die Auswahl steht in der URL (`?distance=near|25|50|100`), geht als Parameter `distance` an `GET /api/jobs` (Kilometer in `DISTANCE_KM`, `api/jobs.py`, Beschriftungen in `DISTANCE_OPTIONS`, `frontend/src/config.js`) und lässt sich mit „Passende Stellenangebote“ kombinieren. Ohne hinterlegte PLZ ist sie gesperrt. Gemessen wird die Luftlinie zwischen den PLZ-Mittelpunkten. Die SQL-Funktionen `zip_distance_km()` und `within_match_radius()` legt `db/db_init.py` an, die Koordinaten kommen aus `db/plz_geo_de.csv` (Tabelle `plz_geo`). Stellen ohne bzw. mit unbekannter PLZ bleiben in der Liste. Das übrige Matching (Kandidat:innen, Treffer auf `/resumes`, Zahlenkachel) filtert nicht nach Entfernung.
+- **Entfernung**: Rolle `user` wählt in der Stellenangebote-Liste neben Suche und „Anzeigen“ eine Entfernung um die PLZ aus dem eigenen Profil: „Wohnortnähe (bis 10 km)“, „bis 25 
+- 
+- km“, „bis 50 km“, „bis 100 km“ oder „umzugsbereit“. „umzugsbereit“ ist die Voreinstellung und filtert nicht nach Entfernung. Die Auswahl steht in der URL (`?distance=near|25|50|100`), geht als Parameter `distance` an `GET /api/jobs` (Kilometer in `DISTANCE_KM`, `api/jobs.py`, Beschriftungen in `DISTANCE_OPTIONS`, `frontend/src/config.js`) und lässt sich mit „Passende Stellenangebote“ kombinieren. Ohne hinterlegte PLZ ist sie gesperrt. Gemessen wird die Luftlinie zwischen den PLZ-Mittelpunkten. Die SQL-Funktionen `zip_distance_km()` und `within_match_radius()` legt `db/db_init.py` an, die Koordinaten kommen aus `db/plz_geo_de.csv` (Tabelle `plz_geo`). Stellen ohne bzw. mit unbekannter PLZ bleiben in der Liste. Das übrige Matching (Kandidat:innen, Treffer auf `/resumes`, Zahlenkachel) filtert nicht nach Entfernung.
 
 PLZ-Koordinaten: [GeoNames](https://www.geonames.org/) (`DE.zip` von download.geonames.org/export/zip/), Lizenz [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Je PLZ ist der Mittelwert aller GeoNames-Einträge gespeichert.
 
@@ -105,11 +107,29 @@ PLZ-Koordinaten: [GeoNames](https://www.geonames.org/) (`DE.zip` von download.ge
 
 `db.find_matching_jobs()` / `db.find_matching_resumes()` liefern die ähnlichsten Einträge ab `MIN_MATCH_SIMILARITY`. Sie sind die Grundlage für das Matching zwischen Kandidat und Stellenangebot (angezeigt auf `/resumes` bzw. `/jobs/<id>/edit`). Deaktivierte (gelöschte) Jobs/Lebensläufe fließen nicht mit ein, pro Person zählt die ähnlichste Version. Weitere Matching-Funktionen in `models/job.py`: `count_active_matches()` (Zahlenkachel), `user_match_similarities()` (Markierung „Passt zu dir“), `job_match_counts()` (Kandidaten-Anzahl für Stellenanbieter), `job_similarity()` (eine Stelle gegen ein Embedding). Für zugeschnittene Lebensläufe gilt die [Matching-Regel](#lebenslauf-auf-eine-stelle-zuschneiden).
 
-`backfill_embeddings.py` berechnet Matching-Profil und Embedding für alle Einträge nach, denen eines davon fehlt. Mit `--all` berechnet es alles neu, etwa nach einer Änderung am Profil-Prompt:
+### Prompt-Version, Backfill und Auswertung
+
+Jedes Profil speichert den Prompt-Stand, mit dem es erzeugt wurde (`match_profile_version`, Konstante `PROFILE_VERSION` in `services/match_profile_service.py`, aktuell 2). Wer den Profil-Prompt ändert, erhöht `PROFILE_VERSION`. `backfill_embeddings.py` berechnet dann alle Einträge mit älterer Version neu, außerdem alle, denen Profil oder Embedding fehlt. Mit `--all` berechnet es alles neu. Beim Bearbeiten einer Stelle wird ein veraltetes Profil ebenfalls neu erzeugt.
 
 ```bash
 docker compose exec app python backfill_embeddings.py [--all]
 ```
+
+`eval_matching.py` prüft danach, ob das Matching besser oder schlechter geworden ist. Grundlage ist die fachliche Einordnung der Testdaten in `eval/matching_labels.json`: ein Fachgebiet je Stellen- und Lebenslauf-ID plus die Liste der Teiltreffer. Ausgegeben werden die Verteilung der Ähnlichkeit für passende, teilweise passende und unpassende Paare, eine Tabelle über die Schwellen 0,60 bis 0,85, die niedrigste Schwelle ohne unpassende Treffer und die Ausreißer bei der aktuellen `MIN_MATCH_SIMILARITY`. Das Skript liest nur. Neue Testdaten werden in der JSON-Datei ergänzt, nicht eingeordnete IDs meldet das Skript.
+
+```bash
+docker compose exec app python eval_matching.py
+```
+
+Stand 2026-10-09 bei 0,71: 27 von 31 passenden Paaren erkannt, kein unpassendes darüber. Bei 0,70 wären es 28 gewesen, aber auch ein unpassendes Paar (Personalmanager-Stelle ↔ Buchhalterin, 0,704).
+
+### Begründung pro Treffer („Warum passt das?“)
+
+In beiden Trefferlisten („Passende Kandidat:innen“ auf `/jobs/<id>/edit`, „Passende Stellenangebote“ auf `/resumes`) klappt „Warum passt das?“ unter jedem Treffer eine kurze KI-Begründung auf: ein Satz, „Passt“ (bis zu 5 Übereinstimmungen) und „Fehlt“ (bis zu 5 Anforderungen der Stelle, die der Lebenslauf nicht abdeckt). Komponente `frontend/src/components/MatchExplanation.jsx`, Endpoint `GET /api/jobs/<job_id>/match-explanation/<resume_id>`, Logik in `services/match_explanation_service.py`.
+
+- **Erst beim Klick** wird die KI aufgerufen, nicht schon beim Laden der Seite. Grundlage sind nur die beiden Matching-Profile, das ist günstig (ca. 500 Tokens, `gpt-4.1-mini`).
+- **Zwischenspeicher**: Tabelle `match_explanations`, je Stelle × Lebenslauf-Version. Der Schlüssel `profiles_hash` umfasst beide Profile und `EXPLANATION_VERSION`. Ändert sich ein Profil oder der Begründungs-Prompt, wird die Begründung neu erzeugt, sonst kommt sie ohne KI-Aufruf aus der Datenbank.
+- **Berechtigung** wie bei den Trefferlisten: Admins, der Stellenanbieter der Stelle und die Person, der der Lebenslauf gehört.
 
 ## KI-Logging mit Langfuse
 
@@ -124,6 +144,7 @@ Jeder Aufruf trägt per `name=` einen festen Namen, nach dem sich in Langfuse un
 | `resume_generate` | Lebenslauf per KI erzeugen |
 | `resume_tailor` / `resume_tailor_check` | Lebenslauf auf eine Stelle zuschneiden / Entwurf prüfen |
 | `match_profile_job` / `match_profile_resume` | Matching-Profil einer Stelle bzw. eines Lebenslaufs erzeugen |
+| `match_explanation` | Begründung „Warum passt das?“ zu einem Treffer |
 | `embedding` / `embedding_batch` | Embedding für einen bzw. mehrere Texte |
 
 Konfiguriert wird Langfuse über `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` und `LANGFUSE_BASE_URL` in der `.env` (siehe [Umgebungsvariablen](#umgebungsvariablen-env)). Fehlen die Keys, funktioniert die App unverändert, nur ohne Tracing. Langfuse sendet gepuffert im Hintergrund. Kurzlebige Skripte müssen vor dem Beenden `get_client().flush()` aufrufen (so wie `backfill_embeddings.py`), sonst gehen die letzten Traces verloren. Neue KI-Aufrufe sollten den Client aus `services/ai_clients.py` verwenden und einen eigenen `name=` setzen.
@@ -160,7 +181,7 @@ api/                       JSON-API fürs React-Frontend, inkl. YAML-Docstrings 
   tools.py                    /api/tools/resume + /api/tools/joboffer (KI-Generierung)
   assistant.py                /api/assistant(/ask) für die Startseite
 db/                        DB-Verbindung & Schema, von außen per `import db` genutzt (inkl. plz_geo_de.csv: PLZ-Koordinaten für die Entfernungssuche)
-models/                    SQLAlchemy-ORM-Modelle + CRUD je Tabelle (user/customer/job/resume, base.py mit Engine/Session; job/customer/resume mit "deleted"-Flag statt Hard-Delete)
+models/                    SQLAlchemy-ORM-Modelle + CRUD je Tabelle (user/customer/job/resume/match_explanation, base.py mit Engine/Session; job/customer/resume mit "deleted"-Flag statt Hard-Delete)
 services/                  Von app.py und api/ gemeinsam genutzte Logik
   assistant_service.py        KI-Assistent-Logik (`ask_assistant()`)
   auth_service.py              Login-Session befüllen (`log_in_user()`)
@@ -168,6 +189,7 @@ services/                  Von app.py und api/ gemeinsam genutzte Logik
   resume_service.py / joboffer_service.py   KI-Generierung + Uploads (inkl. Embedding)
   resume_tailoring_service.py   Lebenslauf auf eine Stelle zuschneiden (Entwurf, Prüfschritt, Speichern)
   match_profile_service.py      Matching-Profil erzeugen + einbetten (Grundlage aller Embeddings)
+  match_explanation_service.py  KI-Begründung eines Treffers ("Warum passt das?"), zwischengespeichert
   pdf_service.py                HTML-zu-PDF (WeasyPrint, ohne Abruf externer Ressourcen)
   ai_clients.py / text_utils.py Client-Instanzen (OpenAI + Groq, mit Langfuse-Tracing), KI-Antworten aufbereiten
 frontend/                  React-SPA (Vite) - einzige Oberfläche
@@ -176,7 +198,8 @@ frontend/                  React-SPA (Vite) - einzige Oberfläche
   src/config.js                Zentrale Einstellungen (Einträge pro Seite)
 embeddings.py              Embedding-Erzeugung, HTML-Stripping, Ähnlichkeits-Matching
 document_extraction.py     Textextraktion aus PDF/.docx/.odt-Uploads
-backfill_embeddings.py     Einmaliges Nachrechnen fehlender Embeddings
+backfill_embeddings.py     Matching-Profile + Embeddings nachrechnen (fehlende/veraltete, --all für alle)
+eval_matching.py           Matching-Qualität gegen eval/matching_labels.json auswerten
 migrate_mysql_to_postgres.py  Einmaliges Migrationsskript MySQL → PostgreSQL
 static/                    style.css (von React genutzt), lokales Font Awesome, Logo (static/pics/)
 data/                      Generierte/hochgeladene Dateien, von Git ausgeschlossen, per Bind-Mount persistent (./data)

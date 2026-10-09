@@ -32,4 +32,6 @@ from models import (
     list_resumes_for_user,
     delete_resume,
     find_matching_resumes,
+    get_match_explanation,
+    save_match_explanation,
 )

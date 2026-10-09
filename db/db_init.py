@@ -33,8 +33,9 @@ _JOB_COLUMNS = {
     "embedding": "vector(1536)",
     "deleted": "BOOLEAN NOT NULL DEFAULT FALSE",
     # KI-erzeugtes Matching-Profil, aus dem das Embedding berechnet wird
-    # (services/match_profile_service.py).
+    # (services/match_profile_service.py), samt Version des Profil-Prompts.
     "match_profile": "TEXT",
+    "match_profile_version": "INT",
 }
 
 _USER_COLUMNS = {
@@ -44,6 +45,7 @@ _USER_COLUMNS = {
 
 _RESUME_COLUMNS = {
     "match_profile": "TEXT",
+    "match_profile_version": "INT",
     "embedding": "vector(1536)",
     "deleted": "BOOLEAN NOT NULL DEFAULT FALSE",
     # Auf eine Stelle zugeschnittene Lebenslauf-Version (NULL = allgemeine Version),
@@ -76,6 +78,15 @@ def _migrate_embedding_to_vector(cur, table):
     row = cur.fetchone()
     if row is not None and row["udt_name"] != "vector":
         cur.execute(f"ALTER TABLE {table} ALTER COLUMN embedding TYPE vector(1536) USING embedding::text::vector")
+
+
+def _init_profile_version(cur, table, existing_columns):
+    """Beim erstmaligen Anlegen von match_profile_version: vorhandene Profile
+    stammen vom Prompt-Stand 2 (PROFILE_VERSION in
+    services/match_profile_service.py zum Zeitpunkt der Einführung) - so
+    rechnet backfill_embeddings.py sie nicht unnötig neu."""
+    if "match_profile_version" not in existing_columns:
+        cur.execute(f"UPDATE {table} SET match_profile_version = 2 WHERE match_profile IS NOT NULL")
 
 
 def _load_zip_geo(cur):
@@ -238,6 +249,7 @@ def init_db():
             for column, definition in _JOB_COLUMNS.items():
                 if column not in existing_job_columns:
                     cur.execute(f"ALTER TABLE jobs ADD COLUMN {column} {definition}")
+            _init_profile_version(cur, "jobs", existing_job_columns)
             _migrate_embedding_to_vector(cur, "jobs")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_jobs_embedding_hnsw ON jobs USING hnsw (embedding vector_cosine_ops)")
 
@@ -261,7 +273,25 @@ def init_db():
             for column, definition in _RESUME_COLUMNS.items():
                 if column not in existing_resume_columns:
                     cur.execute(f"ALTER TABLE resumes ADD COLUMN {column} {definition}")
+            _init_profile_version(cur, "resumes", existing_resume_columns)
             _migrate_embedding_to_vector(cur, "resumes")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_resumes_embedding_hnsw ON resumes USING hnsw (embedding vector_cosine_ops)")
+
+            # Zwischenspeicher für KI-Begründungen eines Treffers (Stelle x
+            # Lebenslauf-Version), siehe services/match_explanation_service.py.
+            # profiles_hash deckt beide Matching-Profile und den Prompt-Stand ab -
+            # weicht er ab, wird die Begründung neu erzeugt.
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS match_explanations (
+                    job_id INT NOT NULL REFERENCES jobs(id),
+                    resume_id INT NOT NULL REFERENCES resumes(id),
+                    profiles_hash VARCHAR(64) NOT NULL,
+                    summary TEXT NOT NULL,
+                    matches JSONB NOT NULL,
+                    gaps JSONB NOT NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (job_id, resume_id)
+                )
+            """)
     finally:
         conn.close()
