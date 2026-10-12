@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { apiGet, apiPost } from '../api/client'
 import { formatDate } from './JobTable'
+import MatchExplanation from './MatchExplanation'
 
 // Längere Positionsnamen in der Versionsauswahl kürzen, damit die Auswahl in
 // die schmale Seitenspalte passt (voller Text steht im title-Attribut).
@@ -26,7 +27,8 @@ function resumeTitle(resume) {
 }
 
 // Seitenspalte der Stellen-Detailseite für Rolle 'user': eigene Lebenslauf-
-// Version wählen und per KI auf diese Stelle zuschneiden lassen. Der Entwurf
+// Version wählen, deren Passung zu dieser Stelle sehen (inkl. "Warum passt
+// das?") und sie per KI auf diese Stelle zuschneiden lassen. Der Entwurf
 // selbst (Vorschau, Übernehmen/Verwerfen) wird in JobEditPage angezeigt.
 export default function TailorResumePanel({ jobId, reloadKey, onDraft }) {
     const [resumes, setResumes] = useState(null)
@@ -35,7 +37,7 @@ export default function TailorResumePanel({ jobId, reloadKey, onDraft }) {
     const [error, setError] = useState('')
 
     useEffect(() => {
-        apiGet('/api/resumes')
+        apiGet(`/api/resumes?job_id=${jobId}`)
             .then((data) => {
                 setResumes(data.resumes)
                 // Vorbelegt: neueste allgemeine Version (Liste ist neueste zuerst).
@@ -45,7 +47,7 @@ export default function TailorResumePanel({ jobId, reloadKey, onDraft }) {
                 setResumeId(base ? String(base.id) : '')
             })
             .catch((err) => setError(err.message))
-    }, [reloadKey])
+    }, [jobId, reloadKey])
 
     async function handleTailor() {
         setBusy(true)
@@ -118,6 +120,44 @@ export default function TailorResumePanel({ jobId, reloadKey, onDraft }) {
                             </option>
                         ))}
                     </select>
+                    {selectedResume && (
+                        <div className="tailor-fit">
+                            <span className="tailor-fit-label">
+                                Passung zu dieser Stelle
+                            </span>
+                            {selectedResume.job_similarity != null ? (
+                                <>
+                                    <div className="tailor-compare-row">
+                                        <span className="match-bar">
+                                            <span
+                                                style={{
+                                                    width: `${selectedResume.job_similarity * 100}%`,
+                                                }}
+                                            />
+                                        </span>
+                                        <span className="tailor-compare-pct">
+                                            {(
+                                                selectedResume.job_similarity *
+                                                100
+                                            ).toFixed(1)}{' '}
+                                            %
+                                        </span>
+                                    </div>
+                                    {/* key: beim Versionswechsel Begründung neu laden */}
+                                    <MatchExplanation
+                                        key={selectedResume.id}
+                                        jobId={jobId}
+                                        resumeId={selectedResume.id}
+                                    />
+                                </>
+                            ) : (
+                                <p className="side-empty">
+                                    Noch nicht berechenbar (kein Embedding
+                                    vorhanden).
+                                </p>
+                            )}
+                        </div>
+                    )}
                     <button
                         type="button"
                         className="special-btn"

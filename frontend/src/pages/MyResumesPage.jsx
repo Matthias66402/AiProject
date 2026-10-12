@@ -123,7 +123,7 @@ export default function MyResumesPage() {
         : null
 
     return (
-        <div className="scroll wide">
+        <div className="scroll full">
             <h1 id="greetings">Mein Lebenslauf</h1>
 
             {message && <p className="subtitle">{message}</p>}
@@ -174,84 +174,100 @@ export default function MyResumesPage() {
                                 </button>
                             </div>
 
-                            {documentExt === 'pdf' ? (
-                                <iframe
-                                    className="pdf-embed"
-                                    src={`${API_BASE}/resumes/${selectedResume.id}/file`}
-                                    title="Lebenslauf PDF"
-                                />
-                            ) : (
-                                <p>
-                                    <a
-                                        href={`${API_BASE}/resumes/${selectedResume.id}/file`}
-                                    >
-                                        Lebenslauf-Datei herunterladen (
-                                        {documentExt?.toUpperCase()})
-                                    </a>
-                                </p>
-                            )}
-
-                            <section className="match-panel">
-                                <div className="match-panel-head">
-                                    <span className="icon-circle">
-                                        <i className="fa-solid fa-diagram-project" />
-                                    </span>
-                                    <div>
-                                        <h2>Passende Stellenangebote</h2>
-                                        <div className="match-panel-hint">
-                                            {selectedResume.target_job_id
-                                                ? 'Diese angepasste Version zählt nur für ihre Zielstelle'
-                                                : 'Semantische Ähnlichkeit zu diesem Lebenslauf'}
-                                        </div>
-                                    </div>
+                            <div className="detail-layout mt-5">
+                                <div className="detail-main">
+                                    {documentExt === 'pdf' ? (
+                                        <iframe
+                                            className="pdf-embed"
+                                            src={`${API_BASE}/resumes/${selectedResume.id}/file`}
+                                            title="Lebenslauf PDF"
+                                        />
+                                    ) : (
+                                        <p>
+                                            <a
+                                                href={`${API_BASE}/resumes/${selectedResume.id}/file`}
+                                            >
+                                                Lebenslauf-Datei herunterladen (
+                                                {documentExt?.toUpperCase()})
+                                            </a>
+                                        </p>
+                                    )}
                                 </div>
-                                {matchingJobs.length > 0 ? (
-                                    <ul className="match-list">
-                                        {matchingJobs.map((m) => (
-                                            <li key={m.id}>
-                                                <Link
-                                                    className="match-item"
-                                                    to={`/jobs/${m.id}/edit`}
-                                                >
-                                                    <span className="match-item-top">
-                                                        <span>{m.position}</span>
-                                                        <span className="match-pct">
-                                                            {(
-                                                                m.similarity * 100
-                                                            ).toFixed(1)}{' '}
-                                                            %
-                                                        </span>
-                                                    </span>
-                                                    <span className="match-bar">
-                                                        <span
-                                                            style={{
-                                                                width: `${m.similarity * 100}%`,
-                                                            }}
+                                <aside className="detail-aside">
+                                    <section className="match-panel">
+                                        <div className="match-panel-head">
+                                            <span className="icon-circle">
+                                                <i className="fa-solid fa-diagram-project" />
+                                            </span>
+                                            <div>
+                                                <h2>
+                                                    Passende Stellenangebote
+                                                </h2>
+                                                <div className="match-panel-hint">
+                                                    {selectedResume.target_job_id
+                                                        ? 'Diese angepasste Version zählt nur für ihre Zielstelle'
+                                                        : 'Semantische Ähnlichkeit zu diesem Lebenslauf'}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {matchingJobs.length > 0 ? (
+                                            <ul className="match-list">
+                                                {matchingJobs.map((m) => (
+                                                    <li key={m.id}>
+                                                        <Link
+                                                            className="match-item"
+                                                            to={`/jobs/${m.id}/edit`}
+                                                        >
+                                                            <span className="match-item-top">
+                                                                <span>
+                                                                    {m.position}
+                                                                </span>
+                                                                <span className="match-pct">
+                                                                    {(
+                                                                        m.similarity *
+                                                                        100
+                                                                    ).toFixed(
+                                                                        1,
+                                                                    )}{' '}
+                                                                    %
+                                                                </span>
+                                                            </span>
+                                                            <span className="match-bar">
+                                                                <span
+                                                                    style={{
+                                                                        width: `${m.similarity * 100}%`,
+                                                                    }}
+                                                                />
+                                                            </span>
+                                                            <span className="match-meta">
+                                                                {
+                                                                    m.customer_name
+                                                                }
+                                                                {m.city
+                                                                    ? ` · ${m.city}`
+                                                                    : ''}
+                                                            </span>
+                                                        </Link>
+                                                        {/* key mit Lebenslauf-ID: beim Versionswechsel neu laden */}
+                                                        <MatchExplanation
+                                                            key={`${selectedResume.id}-${m.id}`}
+                                                            jobId={m.id}
+                                                            resumeId={
+                                                                selectedResume.id
+                                                            }
                                                         />
-                                                    </span>
-                                                    <span className="match-meta">
-                                                        {m.customer_name}
-                                                        {m.city
-                                                            ? ` · ${m.city}`
-                                                            : ''}
-                                                    </span>
-                                                </Link>
-                                                {/* key mit Lebenslauf-ID: beim Versionswechsel neu laden */}
-                                                <MatchExplanation
-                                                    key={`${selectedResume.id}-${m.id}`}
-                                                    jobId={m.id}
-                                                    resumeId={selectedResume.id}
-                                                />
-                                            </li>
-                                        ))}
-                                    </ul>
-                                ) : (
-                                    <p className="match-empty">
-                                        Keine passenden Stellenangebote
-                                        gefunden.
-                                    </p>
-                                )}
-                            </section>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        ) : (
+                                            <p className="match-empty">
+                                                Keine passenden Stellenangebote
+                                                gefunden.
+                                            </p>
+                                        )}
+                                    </section>
+                                </aside>
+                            </div>
                         </>
                     )}
                 </>

@@ -280,7 +280,7 @@ export default function JobEditPage() {
                                         <li key={m.id}>
                                             <Link
                                                 className="match-item"
-                                                to={`/users/${m.user_id}/edit`}
+                                                to={`/users/${m.user_id}/edit?job=${job.id}`}
                                             >
                                                 <span className="match-item-top">
                                                     <span>

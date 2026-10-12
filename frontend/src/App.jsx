@@ -149,7 +149,7 @@ export default function App() {
                                                     }}
                                                 >
                                                     <i className="fa-solid fa-file-lines text-[#76A250]" />{' '}
-                                                    Lebenslauf
+                                                    Meine Lebensläufe
                                                 </Link>
                                                 <Link
                                                     to="/jobs?scope=matching"

@@ -3,7 +3,7 @@ from werkzeug.security import generate_password_hash
 
 import db
 from db import DEFAULT_ROLE, ROLES
-from services.permissions import user_read_permission
+from services.permissions import job_management_permission, user_read_permission
 
 users_api = Blueprint("users_api", __name__, url_prefix="/api/users")
 
@@ -148,9 +148,14 @@ def get_user(user_id):
         in: path
         type: integer
         required: true
+      - name: job_id
+        in: query
+        type: integer
+        required: false
+        description: "Optional: Stelle, für die matching_job (Ähnlichkeit der besten Lebenslauf-Version) berechnet wird - nur für Admins, den Stellenanbieter der Stelle oder die Person selbst."
     responses:
       200:
-        description: Nutzer (ohne Passwort-Hash) plus dessen Lebensläufe.
+        description: Nutzer (ohne Passwort-Hash) plus dessen Lebensläufe und ggf. matching_job.
       403:
         description: Nicht berechtigt.
         schema:
@@ -167,10 +172,42 @@ def get_user(user_id):
     if not user:
         return jsonify(error="Nicht gefunden."), 404
 
+    resumes = db.list_resumes_for_user(user_id)
     return jsonify(
         user=_serialize_user(user),
-        resumes=[_serialize_resume(r) for r in db.list_resumes_for_user(user_id)],
+        resumes=[_serialize_resume(r) for r in resumes],
+        matching_job=_matching_job(request.args.get("job_id", type=int), user_id, resumes),
     )
+
+
+def _matching_job(job_id, user_id, resumes):
+    """'Passende Stelle' auf der Kandidatenseite (erreicht über 'Passende
+    Kandidat:innen' einer Stelle): Ähnlichkeit der besten Lebenslauf-Version
+    zu genau dieser Stelle. Gleiche Sichtbarkeit wie die Begründung (Admin,
+    Stellenanbieter der Stelle, Person selbst) und gleiche Regeln wie
+    find_matching_resumes: zugeschnittene Versionen zählen nur für ihre
+    Zielstelle. None ohne job_id/Berechtigung, sonst resume_id/similarity
+    None, wenn (noch) kein Embedding vorliegt."""
+    if not job_id:
+        return None
+    job = db.get_job(job_id)
+    if not job:
+        return None
+    permission = job_management_permission()
+    if not (permission == "admin" or permission == job["customer_id"] or _is_self(user_id)):
+        return None
+
+    best_resume_id, best_similarity = None, None
+    for resume in resumes:
+        if resume.get("target_job_id") not in (None, job_id):
+            continue
+        similarity = db.job_similarity(job_id, resume.get("embedding"))
+        if similarity is not None and (best_similarity is None or similarity > best_similarity):
+            best_resume_id, best_similarity = resume["id"], similarity
+    return {
+        "id": job["id"], "position": job["position"], "city": job["city"],
+        "customer_name": job["customer_name"], "resume_id": best_resume_id, "similarity": best_similarity,
+    }
 
 
 @users_api.route("/<int:user_id>", methods=["PUT"])

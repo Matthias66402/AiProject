@@ -4,16 +4,22 @@ import {
     useNavigate,
     useOutletContext,
     useParams,
+    useSearchParams,
 } from 'react-router-dom'
 import { API_BASE, apiGet, apiPut } from '../api/client'
 import DetailHeader from '../components/DetailHeader'
 import { formatDate } from '../components/JobTable'
+import MatchExplanation from '../components/MatchExplanation'
 import UserForm from '../components/UserForm'
 
 export default function UserEditPage() {
     const { user, refreshUser } = useOutletContext()
     const params = useParams()
     const navigate = useNavigate()
+    // ?job=<id>: über 'Passende Kandidat:innen' einer Stelle erreicht - dann
+    // zeigt die Seite die Übereinstimmung mit genau dieser Stelle.
+    const [searchParams] = useSearchParams()
+    const jobId = searchParams.get('job')
     // Ohne :userId = eigenes Profil (/profile, Konto-Menü -> 'Bearbeiten'):
     // für jeden eingeloggten Nutzer editierbar, Rolle nicht sichtbar.
     const isProfile = !params.userId
@@ -38,10 +44,11 @@ export default function UserEditPage() {
     const loadUser = useCallback(() => {
         if (!userId) return
         setUserDetail(null)
-        apiGet(`/api/users/${userId}`)
+        const query = jobId ? `?job_id=${encodeURIComponent(jobId)}` : ''
+        apiGet(`/api/users/${userId}${query}`)
             .then(setUserDetail)
             .catch((err) => setError(err.message))
-    }, [userId])
+    }, [userId, jobId])
 
     useEffect(() => {
         loadList()
@@ -66,6 +73,7 @@ export default function UserEditPage() {
 
     const u = userDetail.user
     const resumes = userDetail.resumes
+    const matchingJob = userDetail.matching_job
     const place = [u.zip, u.city].filter(Boolean).join(' ')
 
     return (
@@ -186,6 +194,71 @@ export default function UserEditPage() {
                         )}
                     </section>
                 </aside>
+
+                {matchingJob && (
+                    <aside className="detail-aside">
+                        <section className="match-panel">
+                            <div className="match-panel-head">
+                                <span className="icon-circle">
+                                    <i className="fa-solid fa-diagram-project" />
+                                </span>
+                                <div>
+                                    <h2>Passende Stelle</h2>
+                                    <div className="match-panel-hint">
+                                        Semantische Ähnlichkeit zum besten
+                                        Lebenslauf für diese Stelle
+                                    </div>
+                                </div>
+                            </div>
+                            {matchingJob.similarity !== null ? (
+                                <ul className="match-list">
+                                    <li>
+                                        <Link
+                                            className="match-item"
+                                            to={`/jobs/${matchingJob.id}/edit`}
+                                        >
+                                            <span className="match-item-top">
+                                                <span>
+                                                    {matchingJob.position}
+                                                </span>
+                                                <span className="match-pct">
+                                                    {(
+                                                        matchingJob.similarity *
+                                                        100
+                                                    ).toFixed(1)}{' '}
+                                                    %
+                                                </span>
+                                            </span>
+                                            <span className="match-bar">
+                                                <span
+                                                    style={{
+                                                        width: `${matchingJob.similarity * 100}%`,
+                                                    }}
+                                                />
+                                            </span>
+                                            <span className="match-meta">
+                                                {matchingJob.customer_name}
+                                                {matchingJob.city
+                                                    ? ` · ${matchingJob.city}`
+                                                    : ''}
+                                            </span>
+                                        </Link>
+                                        <MatchExplanation
+                                            key={`${matchingJob.resume_id}-${matchingJob.id}`}
+                                            jobId={matchingJob.id}
+                                            resumeId={matchingJob.resume_id}
+                                        />
+                                    </li>
+                                </ul>
+                            ) : (
+                                <p className="match-empty">
+                                    Keine Übereinstimmung berechenbar (evtl.
+                                    noch kein Embedding vorhanden).
+                                </p>
+                            )}
+                        </section>
+                    </aside>
+                )}
             </div>
         </div>
     )

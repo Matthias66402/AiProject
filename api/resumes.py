@@ -35,6 +35,12 @@ def list_resumes():
       - Resumes
     security:
       - sessionAuth: []
+    parameters:
+      - name: job_id
+        in: query
+        type: integer
+        required: false
+        description: "Optional: ergänzt je Version job_similarity (Cosine Similarity zu dieser Stelle, null ohne Embedding) - für 'Lebenslauf anpassen' auf der Stellen-Detailseite."
     responses:
       200:
         description: Liste der eigenen Lebensläufe.
@@ -46,7 +52,14 @@ def list_resumes():
     user_id = session.get("user_id")
     if not user_id:
         return jsonify(error="Nicht angemeldet."), 401
-    return jsonify(resumes=[_serialize_resume(r) for r in db.list_resumes_for_user(user_id)])
+    job_id = request.args.get("job_id", type=int)
+    resumes = []
+    for row in db.list_resumes_for_user(user_id):
+        resume = _serialize_resume(row)
+        if job_id:
+            resume["job_similarity"] = db.job_similarity(job_id, row.get("embedding"))
+        resumes.append(resume)
+    return jsonify(resumes=resumes)
 
 
 @resumes_api.route("/<int:resume_id>", methods=["GET"])

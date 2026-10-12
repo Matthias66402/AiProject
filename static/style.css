@@ -1728,6 +1728,48 @@ html.react-app .side-panel .pager {
     width: 100%;
 }
 
+/* Passung der gewählten Ausgangsversion zur Stelle (TailorResumePanel):
+   Balken/Prozent wie im Vorher/Nachher-Vergleich, Begründung hell statt
+   im dunklen Matching-Panel-Stil. */
+.tailor-fit {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.tailor-fit-label {
+    font-size: 0.82rem;
+    color: var(--ink-muted);
+}
+
+.tailor-fit .tailor-compare-row {
+    grid-template-columns: minmax(0, 1fr) 64px;
+}
+
+.tailor-fit .match-bar {
+    background: var(--tint);
+}
+
+.tailor-fit .match-explain {
+    margin-top: 0;
+    padding: 0;
+}
+
+.tailor-fit .match-explain .match-explain-toggle {
+    color: var(--green-dark);
+}
+
+.tailor-fit .match-explain-body {
+    background: var(--tint);
+    border-color: var(--card-border);
+    color: var(--ink);
+}
+
+.tailor-fit .match-explain-label {
+    color: var(--ink-muted);
+}
+
 .spinner.spinner-small {
     width: 16px;
     height: 16px;

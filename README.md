@@ -48,7 +48,7 @@ Das Backend akzeptiert `per_page` von 1 bis zur größten Option aus `JOBS_PER_P
 
 ## Lebenslauf auf eine Stelle zuschneiden
 
-Nutzer mit Rolle `user` können auf der Stellen-Detailseite (rechte Spalte „Lebenslauf anpassen“) eine eigene Lebenslauf-Version per KI auf genau diese Stelle zuschneiden lassen — ohne etwas zu erfinden.
+Nutzer mit Rolle `user` können auf der Stellen-Detailseite (rechte Spalte „Lebenslauf anpassen“) eine eigene Lebenslauf-Version per KI auf genau diese Stelle zuschneiden lassen — ohne etwas zu erfinden. Unter der gewählten Ausgangsversion zeigt das Panel deren Passung zur Stelle (Prozent, Balken) samt „Warum passt das?“; die Werte liefert `GET /api/resumes?job_id=<id>` als `job_similarity` je Version.
 
 1. **Vorschau** (`POST /api/resumes/tailor/preview`, `{resume_id, job_id}`): `services/resume_tailoring_service.py` (`draft_tailored_resume()`) lässt die KI den Lebenslauf umformulieren, umsortieren, gewichten und kürzen. Der Prompt verbietet neue Kenntnisse, Stationen, Abschlüsse, Zertifikate, Zahlen und Zeiträume.
 2. **Prüfschritt**: Ein zweiter KI-Aufruf (JSON-Antwort) vergleicht Entwurf und Original und listet Angaben ohne Beleg im Original. Sie erscheinen in der Vorschau als Warnung.
@@ -125,7 +125,7 @@ Stand 2026-10-09 bei 0,71: 27 von 31 passenden Paaren erkannt, kein unpassendes 
 
 ### Begründung pro Treffer („Warum passt das?“)
 
-In beiden Trefferlisten („Passende Kandidat:innen“ auf `/jobs/<id>/edit`, „Passende Stellenangebote“ auf `/resumes`) klappt „Warum passt das?“ unter jedem Treffer eine kurze KI-Begründung auf: ein Satz, „Passt“ (bis zu 5 Übereinstimmungen) und „Fehlt“ (bis zu 5 Anforderungen der Stelle, die der Lebenslauf nicht abdeckt). Komponente `frontend/src/components/MatchExplanation.jsx`, Endpoint `GET /api/jobs/<job_id>/match-explanation/<resume_id>`, Logik in `services/match_explanation_service.py`.
+In den Trefferlisten („Passende Kandidat:innen“ auf `/jobs/<id>/edit`, „Passende Stellenangebote“ auf `/resumes`, „Passende Stelle“ auf der Kandidatenseite `/users/<id>/edit?job=<job_id>`, erreicht über „Passende Kandidat:innen“) klappt „Warum passt das?“ unter jedem Treffer eine kurze KI-Begründung auf: ein Satz, „Passt“ (bis zu 5 Übereinstimmungen) und „Fehlt“ (bis zu 5 Anforderungen der Stelle, die der Lebenslauf nicht abdeckt). Komponente `frontend/src/components/MatchExplanation.jsx`, Endpoint `GET /api/jobs/<job_id>/match-explanation/<resume_id>`, Logik in `services/match_explanation_service.py`.
 
 - **Erst beim Klick** wird die KI aufgerufen, nicht schon beim Laden der Seite. Grundlage sind nur die beiden Matching-Profile, das ist günstig (ca. 500 Tokens, `gpt-4.1-mini`).
 - **Zwischenspeicher**: Tabelle `match_explanations`, je Stelle × Lebenslauf-Version. Der Schlüssel `profiles_hash` umfasst beide Profile und `EXPLANATION_VERSION`. Ändert sich ein Profil oder der Begründungs-Prompt, wird die Begründung neu erzeugt, sonst kommt sie ohne KI-Aufruf aus der Datenbank.
