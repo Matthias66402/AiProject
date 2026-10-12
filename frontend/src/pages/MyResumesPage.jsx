@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { API_BASE, apiDelete, apiGet, apiPost } from '../api/client'
 import { useConfirm } from '../components/ConfirmProvider'
+import DetailHeader from '../components/DetailHeader'
+import { formatDate } from '../components/JobTable'
 import MatchExplanation from '../components/MatchExplanation'
 
 export default function MyResumesPage() {
@@ -58,7 +60,7 @@ export default function MyResumesPage() {
         setMessage('')
         try {
             const data = await apiPost('/api/resumes', { spec })
-            setMessage('Dein Lebenslauf wurde erstellt:')
+            setMessage('Dein Lebenslauf wurde erstellt.')
             setSpec('')
             loadList(data.resume.id)
         } catch (err) {
@@ -94,7 +96,7 @@ export default function MyResumesPage() {
                 )
                 return
             }
-            setMessage('Dein Lebenslauf wurde hochgeladen:')
+            setMessage('Dein Lebenslauf wurde hochgeladen.')
             setUploadFile(null)
             if (fileInputRef.current) fileInputRef.current.value = ''
             loadList(data.resume.id)
@@ -123,268 +125,310 @@ export default function MyResumesPage() {
         : null
 
     return (
-        <div className="scroll full">
-            <h1 id="greetings">Mein Lebenslauf</h1>
+        <div className="detail-page">
+            <DetailHeader
+                title="Meine Lebensläufe"
+                meta={
+                    selectedResume && (
+                        <>
+                            <span>
+                                <i className="fa-regular fa-calendar" />{' '}
+                                {formatDate(selectedResume.created_at)}
+                            </span>
+                            <span>
+                                <i className="fa-regular fa-file-lines" />{' '}
+                                {resumes.length === 1
+                                    ? '1 Version'
+                                    : `${resumes.length} Versionen`}
+                            </span>
+                            {selectedResume.target_job_position && (
+                                <span className="status-chip planned">
+                                    Angepasst für{' '}
+                                    {selectedResume.target_job_position}
+                                </span>
+                            )}
+                        </>
+                    )
+                }
+                actions={
+                    selectedResume && (
+                        <button
+                            type="button"
+                            className="danger-btn"
+                            onClick={handleDelete}
+                        >
+                            <i className="fa-solid fa-trash" /> Löschen
+                        </button>
+                    )
+                }
+            />
 
-            {message && <p className="subtitle">{message}</p>}
+            {message && <p className="detail-message">{message}</p>}
             {error && <p className="form-error">{error}</p>}
 
-            {resumes.length === 0 ? (
-                <p className="subtitle">
-                    Für dich wurde noch kein Lebenslauf erstellt.
-                </p>
-            ) : (
-                <>
-                    <p className="subtitle">
-                        Dein aktuellster Lebenslauf ist unten eingebettet - über
-                        die Auswahl erreichst du auch ältere Versionen.
-                    </p>
-
-                    <div>
-                        <label htmlFor="resume_id">Version</label>
-                        <select
-                            id="resume_id"
-                            value={selectedId ?? ''}
-                            onChange={(e) =>
-                                setSelectedId(Number(e.target.value))
-                            }
-                        >
-                            {resumes.map((resume, index) => (
-                                <option key={resume.id} value={resume.id}>
-                                    {resume.created_at}
-                                    {index === 0 ? ' (neueste)' : ''}
-                                    {resume.target_job_position
-                                        ? ` · angepasst für ${resume.target_job_position}`
-                                        : ''}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {selectedResume && (
-                        <>
-                            <div className="row-actions mt-5">
-                                <button
-                                    type="button"
-                                    className="link-button"
-                                    onClick={handleDelete}
-                                >
-                                    <i className="fa-solid fa-trash" />{' '}
-                                    Lebenslauf löschen
-                                </button>
-                            </div>
-
-                            <div className="detail-layout mt-5">
-                                <div className="detail-main">
-                                    {documentExt === 'pdf' ? (
-                                        <iframe
-                                            className="pdf-embed"
-                                            src={`${API_BASE}/resumes/${selectedResume.id}/file`}
-                                            title="Lebenslauf PDF"
-                                        />
-                                    ) : (
-                                        <p>
-                                            <a
-                                                href={`${API_BASE}/resumes/${selectedResume.id}/file`}
+            <div className="detail-layout">
+                <div className="detail-main detail-stack">
+                    <section className="detail-card">
+                        <h2>Lebenslauf</h2>
+                        {resumes.length === 0 ? (
+                            <p className="side-empty">
+                                Für dich wurde noch kein Lebenslauf erstellt.
+                            </p>
+                        ) : (
+                            <div className="entity-view">
+                                <div>
+                                    <label htmlFor="resume_id">Version</label>
+                                    <select
+                                        id="resume_id"
+                                        value={selectedId ?? ''}
+                                        onChange={(e) =>
+                                            setSelectedId(
+                                                Number(e.target.value),
+                                            )
+                                        }
+                                    >
+                                        {resumes.map((resume, index) => (
+                                            <option
+                                                key={resume.id}
+                                                value={resume.id}
                                             >
-                                                Lebenslauf-Datei herunterladen (
-                                                {documentExt?.toUpperCase()})
-                                            </a>
-                                        </p>
-                                    )}
+                                                {resume.created_at}
+                                                {index === 0
+                                                    ? ' (neueste)'
+                                                    : ''}
+                                                {resume.target_job_position
+                                                    ? ` · angepasst für ${resume.target_job_position}`
+                                                    : ''}
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
-                                <aside className="detail-aside">
-                                    <section className="match-panel">
-                                        <div className="match-panel-head">
-                                            <span className="icon-circle">
-                                                <i className="fa-solid fa-diagram-project" />
-                                            </span>
-                                            <div>
-                                                <h2>
-                                                    Passende Stellenangebote
-                                                </h2>
-                                                <div className="match-panel-hint">
-                                                    {selectedResume.target_job_id
-                                                        ? 'Diese angepasste Version zählt nur für ihre Zielstelle'
-                                                        : 'Semantische Ähnlichkeit zu diesem Lebenslauf'}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        {matchingJobs.length > 0 ? (
-                                            <ul className="match-list">
-                                                {matchingJobs.map((m) => (
-                                                    <li key={m.id}>
-                                                        <Link
-                                                            className="match-item"
-                                                            to={`/jobs/${m.id}/edit`}
-                                                        >
-                                                            <span className="match-item-top">
-                                                                <span>
-                                                                    {m.position}
-                                                                </span>
-                                                                <span className="match-pct">
-                                                                    {(
-                                                                        m.similarity *
-                                                                        100
-                                                                    ).toFixed(
-                                                                        1,
-                                                                    )}{' '}
-                                                                    %
-                                                                </span>
-                                                            </span>
-                                                            <span className="match-bar">
-                                                                <span
-                                                                    style={{
-                                                                        width: `${m.similarity * 100}%`,
-                                                                    }}
-                                                                />
-                                                            </span>
-                                                            <span className="match-meta">
-                                                                {
-                                                                    m.customer_name
-                                                                }
-                                                                {m.city
-                                                                    ? ` · ${m.city}`
-                                                                    : ''}
-                                                            </span>
-                                                        </Link>
-                                                        {/* key mit Lebenslauf-ID: beim Versionswechsel neu laden */}
-                                                        <MatchExplanation
-                                                            key={`${selectedResume.id}-${m.id}`}
-                                                            jobId={m.id}
-                                                            resumeId={
-                                                                selectedResume.id
-                                                            }
-                                                        />
-                                                    </li>
-                                                ))}
-                                            </ul>
+                                {selectedResume && (
+                                    <div>
+                                        {documentExt === 'pdf' ? (
+                                            <iframe
+                                                className="pdf-embed"
+                                                src={`${API_BASE}/resumes/${selectedResume.id}/file`}
+                                                title="Lebenslauf PDF"
+                                            />
                                         ) : (
-                                            <p className="match-empty">
-                                                Keine passenden Stellenangebote
-                                                gefunden.
+                                            <p>
+                                                <a
+                                                    href={`${API_BASE}/resumes/${selectedResume.id}/file`}
+                                                >
+                                                    Lebenslauf-Datei
+                                                    herunterladen (
+                                                    {documentExt?.toUpperCase()}
+                                                    )
+                                                </a>
                                             </p>
                                         )}
-                                    </section>
-                                </aside>
+                                    </div>
+                                )}
                             </div>
-                        </>
+                        )}
+                    </section>
+                </div>
+
+                <aside className="detail-aside">
+                    <section className="side-panel">
+                        <div className="side-panel-head">
+                            <span className="icon-circle">
+                                <i className="fa-solid fa-file-circle-plus" />
+                            </span>
+                            <div>
+                                <h2>Neuer Lebenslauf</h2>
+                                <div className="side-panel-hint">
+                                    Hochladen oder generieren
+                                </div>
+                            </div>
+                        </div>
+                        <div className="resume-actions-row">
+                            <details className="entity-form">
+                                <summary className="subtle-btn">
+                                    {resumes.length > 0
+                                        ? 'Neuen Lebenslauf generieren'
+                                        : 'Lebenslauf generieren'}
+                                </summary>
+                                <p className="subtitle">
+                                    Bitte beschreibe, was dein Lebenslauf
+                                    enthalten soll:
+                                </p>
+                                <form onSubmit={handleGenerate}>
+                                    <div className="textarea-wrap">
+                                        <textarea
+                                            className="p-3"
+                                            rows={8}
+                                            value={spec}
+                                            onChange={(e) =>
+                                                setSpec(e.target.value)
+                                            }
+                                        />
+                                        <div
+                                            className={`generating-indicator${generating ? ' visible' : ''}`}
+                                        >
+                                            <span className="spinner" />
+                                            Lebenslauf wird generiert …
+                                        </div>
+                                    </div>
+                                    <button
+                                        className="subtle-btn"
+                                        type="submit"
+                                        disabled={generating}
+                                    >
+                                        Generieren
+                                    </button>
+                                </form>
+                            </details>
+
+                            <details className="entity-form">
+                                <summary className="subtle-btn">
+                                    Lebenslauf hochladen
+                                </summary>
+                                <p className="subtitle">
+                                    Lade deinen bestehenden Lebenslauf als PDF-,
+                                    Word- (.docx) oder LibreOffice-Datei (.odt)
+                                    hoch:
+                                </p>
+                                <form onSubmit={handleUpload}>
+                                    <div className="textarea-wrap">
+                                        <label
+                                            className={`dropzone${dragOver ? ' dragover' : ''}`}
+                                            htmlFor="resume_file_input"
+                                            onDragEnter={(e) => {
+                                                e.preventDefault()
+                                                setDragOver(true)
+                                            }}
+                                            onDragOver={(e) => {
+                                                e.preventDefault()
+                                                setDragOver(true)
+                                            }}
+                                            onDragLeave={(e) => {
+                                                e.preventDefault()
+                                                setDragOver(false)
+                                            }}
+                                            onDrop={(e) => {
+                                                e.preventDefault()
+                                                setDragOver(false)
+                                                const file =
+                                                    e.dataTransfer.files?.[0]
+                                                if (
+                                                    file &&
+                                                    fileInputRef.current
+                                                ) {
+                                                    // Ohne die Dateiliste des versteckten <input> zu übernehmen,
+                                                    // würde die native "required"-Prüfung beim Absenden fehlschlagen,
+                                                    // da der Browser einen per Drag&Drop gesetzten React-State nicht kennt.
+                                                    fileInputRef.current.files =
+                                                        e.dataTransfer.files
+                                                    setUploadFile(file)
+                                                }
+                                            }}
+                                        >
+                                            <input
+                                                ref={fileInputRef}
+                                                className="dropzone-input"
+                                                type="file"
+                                                id="resume_file_input"
+                                                accept=".pdf,.docx,.odt"
+                                                required
+                                                onChange={(e) =>
+                                                    setUploadFile(
+                                                        e.target.files?.[0] ||
+                                                            null,
+                                                    )
+                                                }
+                                            />
+                                            <i className="fa-solid fa-cloud-arrow-up dropzone-icon" />
+                                            <span className="dropzone-text">
+                                                {uploadFile?.name ||
+                                                    'Datei hierher ziehen oder klicken zum Auswählen'}
+                                            </span>
+                                            <span className="dropzone-hint">
+                                                PDF, .docx oder .odt
+                                            </span>
+                                        </label>
+                                        <div
+                                            className={`generating-indicator${uploading ? ' visible' : ''}`}
+                                        >
+                                            <span className="spinner" />
+                                            Lebenslauf wird verarbeitet …
+                                        </div>
+                                    </div>
+                                    <button
+                                        className="subtle-btn"
+                                        type="submit"
+                                        disabled={uploading}
+                                    >
+                                        Hochladen
+                                    </button>
+                                </form>
+                            </details>
+                        </div>
+                    </section>
+                    {selectedResume && (
+                        <section className="match-panel">
+                            <div className="match-panel-head">
+                                <span className="icon-circle">
+                                    <i className="fa-solid fa-diagram-project" />
+                                </span>
+                                <div>
+                                    <h2>Passende Stellenangebote</h2>
+                                    <div className="match-panel-hint">
+                                        {selectedResume.target_job_id
+                                            ? 'Diese angepasste Version zählt nur für ihre Zielstelle'
+                                            : 'Semantische Ähnlichkeit zu diesem Lebenslauf'}
+                                    </div>
+                                </div>
+                            </div>
+                            {matchingJobs.length > 0 ? (
+                                <ul className="match-list">
+                                    {matchingJobs.map((m) => (
+                                        <li key={m.id}>
+                                            <Link
+                                                className="match-item"
+                                                to={`/jobs/${m.id}/edit`}
+                                            >
+                                                <span className="match-item-top">
+                                                    <span>{m.position}</span>
+                                                    <span className="match-pct">
+                                                        {(
+                                                            m.similarity * 100
+                                                        ).toFixed(1)}{' '}
+                                                        %
+                                                    </span>
+                                                </span>
+                                                <span className="match-bar">
+                                                    <span
+                                                        style={{
+                                                            width: `${m.similarity * 100}%`,
+                                                        }}
+                                                    />
+                                                </span>
+                                                <span className="match-meta">
+                                                    {m.customer_name}
+                                                    {m.city
+                                                        ? ` · ${m.city}`
+                                                        : ''}
+                                                </span>
+                                            </Link>
+                                            {/* key mit Lebenslauf-ID: beim Versionswechsel neu laden */}
+                                            <MatchExplanation
+                                                key={`${selectedResume.id}-${m.id}`}
+                                                jobId={m.id}
+                                                resumeId={selectedResume.id}
+                                            />
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <p className="match-empty">
+                                    Keine passenden Stellenangebote gefunden.
+                                </p>
+                            )}
+                        </section>
                     )}
-                </>
-            )}
-
-            <div className="resume-actions-row">
-                <details className="entity-form">
-                    <summary className="subtle-btn mt-5">
-                        {resumes.length > 0
-                            ? 'Neuen Lebenslauf generieren'
-                            : 'Lebenslauf generieren'}
-                    </summary>
-                    <p className="subtitle">
-                        Bitte beschreibe, was dein Lebenslauf enthalten soll:
-                    </p>
-                    <form onSubmit={handleGenerate}>
-                        <div className="textarea-wrap">
-                            <textarea
-                                className="p-3"
-                                rows={8}
-                                value={spec}
-                                onChange={(e) => setSpec(e.target.value)}
-                            />
-                            <div
-                                className={`generating-indicator${generating ? ' visible' : ''}`}
-                            >
-                                <span className="spinner" />
-                                Lebenslauf wird generiert …
-                            </div>
-                        </div>
-                        <button
-                            className="subtle-btn"
-                            type="submit"
-                            disabled={generating}
-                        >
-                            Generieren
-                        </button>
-                    </form>
-                </details>
-
-                <details className="entity-form">
-                    <summary className="subtle-btn mt-5">
-                        Lebenslauf hochladen
-                    </summary>
-                    <p className="subtitle">
-                        Lade deinen bestehenden Lebenslauf als PDF-, Word-
-                        (.docx) oder LibreOffice-Datei (.odt) hoch:
-                    </p>
-                    <form onSubmit={handleUpload}>
-                        <div className="textarea-wrap">
-                            <label
-                                className={`dropzone${dragOver ? ' dragover' : ''}`}
-                                htmlFor="resume_file_input"
-                                onDragEnter={(e) => {
-                                    e.preventDefault()
-                                    setDragOver(true)
-                                }}
-                                onDragOver={(e) => {
-                                    e.preventDefault()
-                                    setDragOver(true)
-                                }}
-                                onDragLeave={(e) => {
-                                    e.preventDefault()
-                                    setDragOver(false)
-                                }}
-                                onDrop={(e) => {
-                                    e.preventDefault()
-                                    setDragOver(false)
-                                    const file = e.dataTransfer.files?.[0]
-                                    if (file && fileInputRef.current) {
-                                        // Ohne die Dateiliste des versteckten <input> zu übernehmen,
-                                        // würde die native "required"-Prüfung beim Absenden fehlschlagen,
-                                        // da der Browser einen per Drag&Drop gesetzten React-State nicht kennt.
-                                        fileInputRef.current.files =
-                                            e.dataTransfer.files
-                                        setUploadFile(file)
-                                    }
-                                }}
-                            >
-                                <input
-                                    ref={fileInputRef}
-                                    className="dropzone-input"
-                                    type="file"
-                                    id="resume_file_input"
-                                    accept=".pdf,.docx,.odt"
-                                    required
-                                    onChange={(e) =>
-                                        setUploadFile(
-                                            e.target.files?.[0] || null,
-                                        )
-                                    }
-                                />
-                                <i className="fa-solid fa-cloud-arrow-up dropzone-icon" />
-                                <span className="dropzone-text">
-                                    {uploadFile?.name ||
-                                        'Datei hierher ziehen oder klicken zum Auswählen'}
-                                </span>
-                                <span className="dropzone-hint">
-                                    PDF, .docx oder .odt
-                                </span>
-                            </label>
-                            <div
-                                className={`generating-indicator${uploading ? ' visible' : ''}`}
-                            >
-                                <span className="spinner" />
-                                Lebenslauf wird verarbeitet …
-                            </div>
-                        </div>
-                        <button
-                            className="subtle-btn"
-                            type="submit"
-                            disabled={uploading}
-                        >
-                            Hochladen
-                        </button>
-                    </form>
-                </details>
+                </aside>
             </div>
         </div>
     )

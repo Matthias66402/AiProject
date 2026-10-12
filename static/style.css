@@ -1566,6 +1566,13 @@ html.react-app .detail-actions .danger-btn:hover {
     padding: 28px;
 }
 
+/* Erfolgsmeldung unter dem Kopf einer Detailseite (z.B. Lebenslauf hochgeladen). */
+.detail-message {
+    margin: 0;
+    color: var(--green-dark);
+    font-weight: 600;
+}
+
 .detail-card > h2 {
     margin: 0 0 20px;
     font-family: var(--heading-font);
