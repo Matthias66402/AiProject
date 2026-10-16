@@ -10,6 +10,7 @@ import { API_BASE, apiGet, apiPut } from '../api/client'
 import DetailHeader from '../components/DetailHeader'
 import { formatDate } from '../components/JobTable'
 import MatchExplanation from '../components/MatchExplanation'
+import ResumeViewerWindow from '../components/ResumeViewerWindow'
 import UserForm from '../components/UserForm'
 
 export default function UserEditPage() {
@@ -30,6 +31,8 @@ export default function UserEditPage() {
     const [listData, setListData] = useState(null)
     const [userDetail, setUserDetail] = useState(null)
     const [error, setError] = useState('')
+    const [viewedResume, setViewedResume] = useState(null)
+    const closeViewer = useCallback(() => setViewedResume(null), [])
 
     const loadList = useCallback(() => {
         // Nur Admins duerfen/brauchen die Liste (fuer Rollen-/Kunden-Dropdown
@@ -75,6 +78,10 @@ export default function UserEditPage() {
     const resumes = userDetail.resumes
     const matchingJob = userDetail.matching_job
     const place = [u.zip, u.city].filter(Boolean).join(' ')
+    // Eigene Lebensläufe über die Besitzer-Route (/resumes/<id>/file, auch für
+    // Rolle 'user'), fremde über document_link (/tools/resume/..., nur Admin/
+    // Stellenanbieter) - siehe app.py.
+    const isOwn = u.id === user.id
 
     return (
         <div className="detail-page">
@@ -166,18 +173,17 @@ export default function UserEditPage() {
                             <ul className="side-list">
                                 {resumes.map((resume) => (
                                     <li key={resume.id} className="side-item">
-                                        <a
-                                            className="side-item-title"
-                                            href={
-                                                API_BASE + resume.document_link
+                                        <button
+                                            type="button"
+                                            className="side-item-title resume-open-btn"
+                                            onClick={() =>
+                                                setViewedResume(resume)
                                             }
-                                            target="_blank"
-                                            rel="noopener noreferrer"
                                         >
                                             <i className="fa-regular fa-file-lines" />{' '}
                                             Lebenslauf vom{' '}
                                             {formatDate(resume.created_at)}
-                                        </a>
+                                        </button>
                                         {resume.target_job_position && (
                                             <span className="side-item-meta">
                                                 Angepasst für{' '}
@@ -191,6 +197,17 @@ export default function UserEditPage() {
                             <p className="side-empty">
                                 Noch kein Lebenslauf hochgeladen.
                             </p>
+                        )}
+                        {viewedResume && (
+                            <ResumeViewerWindow
+                                resume={viewedResume}
+                                fileUrl={
+                                    isOwn
+                                        ? undefined
+                                        : API_BASE + viewedResume.document_link
+                                }
+                                onClose={closeViewer}
+                            />
                         )}
                     </section>
                 </aside>

@@ -13,6 +13,7 @@ import DetailHeader from '../components/DetailHeader'
 import JobForm from '../components/JobForm'
 import MatchExplanation from '../components/MatchExplanation'
 import TailorResumePanel from '../components/TailorResumePanel'
+import ResumeViewerWindow from '../components/ResumeViewerWindow'
 import CoverLetterPanel from '../components/CoverLetterPanel'
 import { formatDate, jobStatus } from '../components/JobTable'
 import { useConfirm } from '../components/ConfirmProvider'
@@ -38,6 +39,9 @@ export default function JobEditPage() {
     // Im Panel "Lebenslauf anpassen" gewählte Version, Grundlage fürs
     // Motivationsschreiben.
     const [selectedResume, setSelectedResume] = useState(null)
+    // Lebenslauf eines Treffers aus 'Passende Kandidat:innen' im Fenster
+    const [viewedMatch, setViewedMatch] = useState(null)
+    const closeMatchViewer = useCallback(() => setViewedMatch(null), [])
 
     const isAdmin = user?.role === 'admin'
     const isUser = user?.role === 'user'
@@ -321,6 +325,18 @@ export default function JobEditPage() {
                                                     )}
                                                 </span>
                                             </Link>
+                                            {m.document_link && (
+                                                <button
+                                                    type="button"
+                                                    className="link-button match-view-resume"
+                                                    onClick={() =>
+                                                        setViewedMatch(m)
+                                                    }
+                                                >
+                                                    <i className="fa-regular fa-eye" />{' '}
+                                                    Lebenslauf ansehen
+                                                </button>
+                                            )}
                                             <MatchExplanation
                                                 jobId={job.id}
                                                 resumeId={m.id}
@@ -333,6 +349,16 @@ export default function JobEditPage() {
                                     Keine Übereinstimmungen gefunden (evtl. noch
                                     kein Embedding vorhanden).
                                 </p>
+                            )}
+                            {viewedMatch && (
+                                <ResumeViewerWindow
+                                    resume={viewedMatch}
+                                    title={`Lebenslauf von ${viewedMatch.first_name} ${viewedMatch.last_name}`}
+                                    fileUrl={
+                                        API_BASE + viewedMatch.document_link
+                                    }
+                                    onClose={closeMatchViewer}
+                                />
                             )}
                         </section>
                         <section className="info-card">

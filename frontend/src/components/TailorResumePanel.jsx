@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { apiGet, apiPost } from '../api/client'
 import { formatDate } from './JobTable'
 import MatchExplanation from './MatchExplanation'
+import ResumeViewerWindow from './ResumeViewerWindow'
 
 // Längere Positionsnamen in der Versionsauswahl kürzen, damit die Auswahl in
 // die schmale Seitenspalte passt (voller Text steht im title-Attribut).
@@ -41,6 +42,7 @@ export default function TailorResumePanel({
     const [resumeId, setResumeId] = useState('')
     const [busy, setBusy] = useState(false)
     const [error, setError] = useState('')
+    const [viewerOpen, setViewerOpen] = useState(false)
 
     useEffect(() => {
         apiGet(`/api/resumes?job_id=${jobId}`)
@@ -54,6 +56,9 @@ export default function TailorResumePanel({
             })
             .catch((err) => setError(err.message))
     }, [jobId, reloadKey])
+
+    // stabil, damit das Fenster seinen Escape-Listener nicht ständig neu setzt
+    const closeViewer = useCallback(() => setViewerOpen(false), [])
 
     async function handleTailor() {
         setBusy(true)
@@ -130,6 +135,22 @@ export default function TailorResumePanel({
                             </option>
                         ))}
                     </select>
+                    {selectedResume && (
+                        <button
+                            type="button"
+                            className="subtle-btn tailor-view-btn"
+                            onClick={() => setViewerOpen(true)}
+                        >
+                            <i className="fa-regular fa-eye" /> Lebenslauf
+                            ansehen
+                        </button>
+                    )}
+                    {viewerOpen && selectedResume && (
+                        <ResumeViewerWindow
+                            resume={selectedResume}
+                            onClose={closeViewer}
+                        />
+                    )}
                     {selectedResume && (
                         <div className="tailor-fit">
                             <span className="tailor-fit-label">

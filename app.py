@@ -43,6 +43,10 @@ _frontend_origin = os.environ.get("FRONTEND_ORIGIN", "http://localhost:5173")
 CORS(app, resources={
     r"/api/*": {"origins": _frontend_origin, "supports_credentials": True},
     r"/jobs/extract-upload": {"origins": _frontend_origin, "supports_credentials": True},
+    # Lebenslauf-Dateien: Download-Button im Lebenslauf-Fenster lädt per fetch
+    # (frontend ResumeViewerWindow).
+    r"/resumes/*": {"origins": _frontend_origin, "supports_credentials": True},
+    r"/tools/resume/*": {"origins": _frontend_origin, "supports_credentials": True},
     r"/static/*": {"origins": "*"},
 })
 # Swagger/OpenAPI-Doku nur für die /api/*-Routen (die React-REST-API) - die

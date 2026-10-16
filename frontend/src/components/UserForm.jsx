@@ -1,13 +1,11 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { API_BASE } from '../api/client'
 import PasswordInput from './PasswordInput'
 
 export default function UserForm({
     roles,
     customers,
     initial,
-    resumes,
     onSubmit,
     submitLabel,
     cancelTo,
@@ -159,27 +157,6 @@ export default function UserForm({
                     </div>
                 )}
             </div>
-            {isEdit && resumes && resumes.length > 0 && (
-                <div>
-                    <label>Lebensläufe</label>
-                    <ul>
-                        {resumes.map((resume) => (
-                            <li key={resume.id}>
-                                <a
-                                    href={API_BASE + resume.document_link}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                >
-                                    Lebenslauf vom{' '}
-                                    {resume.created_at
-                                        ? resume.created_at.slice(0, 10)
-                                        : '-'}
-                                </a>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            )}
             {!roleOnly && (
                 <div>
                     <label htmlFor="password">

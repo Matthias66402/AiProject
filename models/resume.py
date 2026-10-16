@@ -80,7 +80,7 @@ def find_matching_resumes(embedding, top_k=5, min_similarity=MIN_MATCH_SIMILARIT
     distance = Resume.embedding.cosine_distance(embedding)
     with get_session() as session:
         best_per_user = (
-            select(Resume.id, Resume.user_id, Resume.created_at, Resume.target_job_id,
+            select(Resume.id, Resume.user_id, Resume.created_at, Resume.target_job_id, Resume.document_link,
                    (1 - distance).label("similarity"))
             .where(Resume.deleted.is_(False))
             .where(or_(Resume.target_job_id.is_(None), Resume.target_job_id == job_id))
@@ -92,7 +92,7 @@ def find_matching_resumes(embedding, top_k=5, min_similarity=MIN_MATCH_SIMILARIT
         )
         stmt = (
             select(best_per_user.c.id, best_per_user.c.user_id, best_per_user.c.created_at,
-                   best_per_user.c.target_job_id,
+                   best_per_user.c.target_job_id, best_per_user.c.document_link,
                    User.first_name, User.last_name, User.short_name, best_per_user.c.similarity)
             .join(User, User.id == best_per_user.c.user_id)
             .order_by(best_per_user.c.similarity.desc())
