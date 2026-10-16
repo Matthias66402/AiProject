@@ -34,4 +34,8 @@ from models import (
     find_matching_resumes,
     get_match_explanation,
     save_match_explanation,
+    create_cover_letter,
+    get_cover_letter,
+    list_cover_letters,
+    delete_cover_letter,
 )

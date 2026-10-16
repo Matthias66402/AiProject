@@ -35,6 +35,10 @@ th, td { border: 0.75pt solid #ccc; padding: 3pt 6pt; text-align: left; vertical
 th { background: #eef3f7; }
 tr { page-break-inside: avoid; }
 a { color: #1a3d5c; }
+/* Motivationsschreiben, Klassen aus cover_letter_service */
+.letter-right { text-align: right; margin: 7.5pt 0 15pt; }
+.letter-subject { margin: 18pt 0 14pt; }
+.letter-signature { margin-top: 30pt; }
 """
 
 
@@ -47,9 +51,18 @@ def _blocking_url_fetcher():
     return URLFetcher(allowed_protocols=())
 
 
-def write_html_as_pdf(html_fragment, output_path):
+def _html_document(html_fragment):
     document = (
         f"<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>{_PDF_STYLESHEET}</style></head>"
         f"<body>{html_fragment}</body></html>"
     )
-    HTML(string=document, url_fetcher=_blocking_url_fetcher()).write_pdf(output_path)
+    return HTML(string=document, url_fetcher=_blocking_url_fetcher())
+
+
+def write_html_as_pdf(html_fragment, output_path):
+    _html_document(html_fragment).write_pdf(output_path)
+
+
+def html_to_pdf_bytes(html_fragment):
+    """Wie write_html_as_pdf, aber ohne Datei - für direkte Downloads."""
+    return _html_document(html_fragment).write_pdf()

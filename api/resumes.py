@@ -1,14 +1,16 @@
 import os
+import re
 
-from flask import Blueprint, current_app, jsonify, request, session
+from flask import Blueprint, Response, current_app, jsonify, request, session
 from groq import APIStatusError as GroqAPIStatusError
 from openai import APIStatusError as OpenAIAPIStatusError
 
 import db
 from document_extraction import ALLOWED_DOCUMENT_UPLOAD_EXTENSIONS
-from services import resume_service, resume_tailoring_service
+from services import cover_letter_service, resume_service, resume_tailoring_service
 from services.ai_clients import openai_client
 from services.assistant_service import DEFAULT_MODEL
+from services.pdf_service import html_to_pdf_bytes
 
 resumes_api = Blueprint("resumes_api", __name__, url_prefix="/api/resumes")
 
@@ -385,3 +387,208 @@ def tailor_resume_save():
 
     resume_id = resume_tailoring_service.save_tailored_resume(openai_client, user_id, job["id"], content, current_app.logger)
     return jsonify(resume=_serialize_resume(db.get_resume(resume_id))), 201
+
+
+def _serialize_cover_letter(row):
+    row = dict(row)
+    if row.get("created_at") is not None and hasattr(row["created_at"], "isoformat"):
+        row["created_at"] = row["created_at"].isoformat()
+    row.pop("deleted", None)
+    return row
+
+
+def _own_cover_letter(letter_id, user_id):
+    letter = db.get_cover_letter(letter_id)
+    return letter if letter and letter["user_id"] == user_id else None
+
+
+@resumes_api.route("/cover-letters", methods=["GET"])
+def list_cover_letters():
+    """Eigene Motivationsschreiben zu einer Stelle auflisten (neueste zuerst).
+    ---
+    tags:
+      - Resumes
+    security:
+      - sessionAuth: []
+    parameters:
+      - in: query
+        name: job_id
+        type: integer
+        required: true
+    responses:
+      200:
+        description: Liste cover_letters (inkl. content als HTML).
+      400:
+        description: job_id fehlt.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+      401:
+        description: Nicht angemeldet.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+      403:
+        description: Nur für Rolle user.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+    """
+    user_id, error = _tailoring_context()
+    if error:
+        return error
+    job_id = request.args.get("job_id", type=int)
+    if job_id is None:
+        return jsonify(error="job_id fehlt."), 400
+    letters = db.list_cover_letters(user_id, job_id)
+    return jsonify(cover_letters=[_serialize_cover_letter(letter) for letter in letters])
+
+
+@resumes_api.route("/cover-letters", methods=["POST"])
+def create_cover_letter():
+    """Motivationsschreiben zu einem Stellenangebot aus einer eigenen Lebenslauf-Version erzeugen und speichern.
+    ---
+    tags:
+      - Resumes
+    security:
+      - sessionAuth: []
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required: [resume_id, job_id]
+          properties:
+            resume_id:
+              type: integer
+              description: Eigene Lebenslauf-Version als Grundlage.
+            job_id:
+              type: integer
+              description: Stellenangebot, auf das sich das Schreiben bezieht.
+    responses:
+      201:
+        description: Gespeichertes Motivationsschreiben (cover_letter).
+      401:
+        description: Nicht angemeldet.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+      403:
+        description: Nur für Rolle user.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+      404:
+        description: Lebenslauf oder Stelle nicht gefunden.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+      502:
+        description: KI-Anfrage fehlgeschlagen, bitte später erneut versuchen.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+    """
+    user_id, error = _tailoring_context()
+    if error:
+        return error
+
+    data = request.get_json(silent=True) or {}
+    resume = db.get_resume(data.get("resume_id")) if isinstance(data.get("resume_id"), int) else None
+    if not resume or resume["user_id"] != user_id:
+        return jsonify(error="Lebenslauf nicht gefunden."), 404
+    job = db.get_job(data.get("job_id")) if isinstance(data.get("job_id"), int) else None
+    if not job:
+        return jsonify(error="Stellenangebot nicht gefunden."), 404
+
+    try:
+        letter_html = cover_letter_service.draft_cover_letter(
+            openai_client, DEFAULT_MODEL, resume, job, db.get_customer(job["customer_id"]) or {}
+        )
+    except (GroqAPIStatusError, OpenAIAPIStatusError) as e:
+        current_app.logger.warning("API error %s: %s", e.status_code, e.body)
+        return jsonify(error="Das Motivationsschreiben konnte gerade nicht erstellt werden. Bitte später erneut versuchen."), 502
+
+    letter_id = db.create_cover_letter(user_id, job["id"], resume["id"], letter_html)
+    return jsonify(cover_letter=_serialize_cover_letter(db.get_cover_letter(letter_id))), 201
+
+
+@resumes_api.route("/cover-letters/<int:letter_id>", methods=["DELETE"])
+def delete_cover_letter(letter_id):
+    """Eigenes Motivationsschreiben löschen.
+    ---
+    tags:
+      - Resumes
+    security:
+      - sessionAuth: []
+    parameters:
+      - in: path
+        name: letter_id
+        type: integer
+        required: true
+    responses:
+      200:
+        description: Gelöscht.
+      401:
+        description: Nicht angemeldet.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+      403:
+        description: Nur für Rolle user.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+      404:
+        description: Nicht gefunden oder gehört einem anderen Nutzer.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+    """
+    user_id, error = _tailoring_context()
+    if error:
+        return error
+    if not _own_cover_letter(letter_id, user_id):
+        return jsonify(error="Nicht gefunden."), 404
+    db.delete_cover_letter(letter_id)
+    return jsonify(success=True)
+
+
+@resumes_api.route("/cover-letters/<int:letter_id>/pdf", methods=["GET"])
+def cover_letter_pdf(letter_id):
+    """Eigenes Motivationsschreiben als PDF herunterladen.
+    ---
+    tags:
+      - Resumes
+    security:
+      - sessionAuth: []
+    produces:
+      - application/pdf
+    parameters:
+      - in: path
+        name: letter_id
+        type: integer
+        required: true
+    responses:
+      200:
+        description: PDF-Datei.
+      401:
+        description: Nicht angemeldet.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+      403:
+        description: Nur für Rolle user.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+      404:
+        description: Nicht gefunden oder gehört einem anderen Nutzer.
+        schema:
+          $ref: '#/definitions/ErrorResponse'
+    """
+    user_id, error = _tailoring_context()
+    if error:
+        return error
+    letter = _own_cover_letter(letter_id, user_id)
+    if not letter:
+        return jsonify(error="Nicht gefunden."), 404
+    job = db.get_job(letter["job_id"])
+    # Nur unkritische Zeichen im Header-Dateinamen
+    position = re.sub(r"[^A-Za-z0-9_-]+", "_", job["position"] if job else "").strip("_")
+    name = "_".join(filter(None, ["Motivationsschreiben", position[:60]]))
+
+    return Response(
+        html_to_pdf_bytes(letter["content"]),
+        mimetype="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{name}.pdf"'},
+    )

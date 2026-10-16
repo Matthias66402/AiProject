@@ -13,6 +13,7 @@ import DetailHeader from '../components/DetailHeader'
 import JobForm from '../components/JobForm'
 import MatchExplanation from '../components/MatchExplanation'
 import TailorResumePanel from '../components/TailorResumePanel'
+import CoverLetterPanel from '../components/CoverLetterPanel'
 import { formatDate, jobStatus } from '../components/JobTable'
 import { useConfirm } from '../components/ConfirmProvider'
 
@@ -34,6 +35,9 @@ export default function JobEditPage() {
     const [draftError, setDraftError] = useState('')
     const [savedResume, setSavedResume] = useState(null)
     const [tailorReloadKey, setTailorReloadKey] = useState(0)
+    // Im Panel "Lebenslauf anpassen" gewählte Version, Grundlage fürs
+    // Motivationsschreiben.
+    const [selectedResume, setSelectedResume] = useState(null)
 
     const isAdmin = user?.role === 'admin'
     const isUser = user?.role === 'user'
@@ -255,6 +259,13 @@ export default function JobEditPage() {
                             jobId={job.id}
                             reloadKey={tailorReloadKey}
                             onDraft={handleDraft}
+                            onSelectResume={setSelectedResume}
+                        />
+                        <CoverLetterPanel
+                            key={job.id}
+                            jobId={job.id}
+                            jobPosition={job.position}
+                            resume={selectedResume}
                         />
                     </aside>
                 )}

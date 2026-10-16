@@ -30,7 +30,13 @@ function resumeTitle(resume) {
 // Version wählen, deren Passung zu dieser Stelle sehen (inkl. "Warum passt
 // das?") und sie per KI auf diese Stelle zuschneiden lassen. Der Entwurf
 // selbst (Vorschau, Übernehmen/Verwerfen) wird in JobEditPage angezeigt.
-export default function TailorResumePanel({ jobId, reloadKey, onDraft }) {
+// onSelectResume meldet die gewählte Version (z.B. fürs Motivationsschreiben).
+export default function TailorResumePanel({
+    jobId,
+    reloadKey,
+    onDraft,
+    onSelectResume,
+}) {
     const [resumes, setResumes] = useState(null)
     const [resumeId, setResumeId] = useState('')
     const [busy, setBusy] = useState(false)
@@ -67,6 +73,10 @@ export default function TailorResumePanel({ jobId, reloadKey, onDraft }) {
 
     const tailoredForJob = resumes?.find((r) => r.target_job_id === jobId)
     const selectedResume = resumes?.find((r) => String(r.id) === resumeId)
+
+    useEffect(() => {
+        onSelectResume?.(selectedResume || null)
+    }, [selectedResume, onSelectResume])
 
     return (
         <section className="side-panel">

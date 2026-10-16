@@ -30,6 +30,16 @@ DOCUMENT_HTML_RULE = _HTML_FRAGMENT_BASE + (
     "tabellarische Angaben (z.B. Sprachen mit Niveau); kein hr"
 )
 
+# Für Motivationsschreiben: klassischer Brief, nur Absätze - die Briefform
+# (Absender, Empfänger, Datum, Betreff) ergibt sich aus der Reihenfolge.
+LETTER_HTML_RULE = _HTML_FRAGMENT_BASE + (
+    "je ein p für den Absender (Name, Anschrift, weitere Kontaktdaten - jeweils mit <br> "
+    "getrennt), den Empfänger (Firma, Straße mit Hausnummer, PLZ und Ort - mit "
+    "<br> getrennt), Ort und Datum, den Betreff (in strong), die Anrede, jeden Absatz des "
+    "Fließtexts, die Grußformel und - als eigenes, letztes p - den Namen; keine Überschriften, "
+    "Listen oder Tabellen"
+)
+
 
 def compact_whitespace(text):
     """Reduziert Leerzeichen-/Leerzeilen-Folgen (typisch bei aus PDFs extrahiertem

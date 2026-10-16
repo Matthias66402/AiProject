@@ -2052,3 +2052,37 @@ html.react-app .user-table a.my-match-chip:hover {
 .side-item a.my-match-chip:hover {
     filter: brightness(1.2);
 }
+
+/* Motivationsschreiben (CoverLetterPanel): Briefabsätze mit etwas Luft */
+.cover-letter-preview p {
+    margin: 0 0 12px;
+}
+/* Absender und Ort/Datum, siehe cover_letter_service */
+.cover-letter-preview .letter-right {
+    text-align: right;
+    margin-top: 10px;
+    margin-bottom: 20px;	
+}
+/* Betreff mit Abstand davor/danach, Platz für die Unterschrift vor dem Namen */
+.cover-letter-preview .letter-subject {
+    margin: 24px 0 20px;
+}
+.cover-letter-preview .letter-signature {
+    margin-top: 40px;
+}
+/* Liste der gespeicherten Motivationsschreiben: Einträge als Buttons */
+.cover-letter-saved {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 18px;
+}
+.cover-letter-item {
+    width: 100%;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.cover-letter-item:hover {
+    border-color: var(--green-dark);
+}

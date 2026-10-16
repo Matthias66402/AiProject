@@ -31,3 +31,18 @@ export const apiPost = (path, body) =>
   request(path, { method: 'POST', body: body instanceof FormData ? body : JSON.stringify(body) })
 export const apiPut = (path, body) => request(path, { method: 'PUT', body: JSON.stringify(body) })
 export const apiDelete = (path) => request(path, { method: 'DELETE' })
+
+// GET mit Datei-Antwort (z.B. PDF-Download): liefert ein Blob statt JSON.
+export async function apiGetBlob(path) {
+  const response = await fetch(`${API_BASE}${path}`, { credentials: 'include' })
+  if (!response.ok) {
+    let data = null
+    try {
+      data = await response.json()
+    } catch {
+      data = null
+    }
+    throw new Error((data && data.error) || `Anfrage fehlgeschlagen (${response.status})`)
+  }
+  return response.blob()
+}

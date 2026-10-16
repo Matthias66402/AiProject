@@ -293,5 +293,20 @@ def init_db():
                     PRIMARY KEY (job_id, resume_id)
                 )
             """)
+
+            # KI-erstellte Motivationsschreiben (Rolle 'user', je Stelle beliebig
+            # viele), siehe services/cover_letter_service.py.
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS cover_letters (
+                    id SERIAL PRIMARY KEY,
+                    user_id INT NOT NULL REFERENCES users(id),
+                    job_id INT NOT NULL REFERENCES jobs(id),
+                    resume_id INT NOT NULL REFERENCES resumes(id),
+                    content TEXT NOT NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    deleted BOOLEAN NOT NULL DEFAULT FALSE
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS cover_letters_user_job_idx ON cover_letters (user_id, job_id)")
     finally:
         conn.close()
